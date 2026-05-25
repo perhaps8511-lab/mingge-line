@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>命格 · 進場儀式 v0.2</title>
+<style>
+  :root{
+    --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
+    --rice:#F5F1E8; --rice-deep:#ece5d6; --paper:#faf7f0;
+    --gold:#B8860B; --gold-lit:#e0bc5e; --gold-soft:#c79a2e;
+    --jade:#7a9a72; --line:#d8cfbc;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;}
+  body{
+    background:#070b07;
+    font-family:"Noto Serif TC","Songti TC","STSong",serif;
+    color:var(--rice); position:relative; -webkit-font-smoothing:antialiased;
+  }
+
+  /* ====== 深邃星雲底(墨綠金 · 取四維玄空縱深) ====== */
+  .cosmos{position:absolute;inset:0;z-index:0;overflow:hidden;background:#070b07;}
+  .cosmos .glow{position:absolute;top:50%;left:50%;width:140vmax;height:140vmax;
+    transform:translate(-50%,-50%);
+    background:radial-gradient(circle, rgba(60,83,64,.55) 0%, rgba(34,53,31,.32) 28%, rgba(7,11,7,0) 62%);}
+  .cosmos .glow2{position:absolute;top:46%;left:50%;width:60vmax;height:60vmax;
+    transform:translate(-50%,-50%);
+    background:radial-gradient(circle, rgba(184,134,11,.18) 0%, rgba(184,134,11,0) 60%);
+    animation:pulseGlow 7s ease-in-out infinite;}
+  @keyframes pulseGlow{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1)}50%{opacity:.85;transform:translate(-50%,-50%) scale(1.12)}}
+  /* 細塵點 */
+  .cosmos .dust{position:absolute;inset:0;opacity:.5;
+    background-image:radial-gradient(1px 1px at 20% 30%, rgba(216,188,94,.5), transparent),
+      radial-gradient(1px 1px at 70% 60%, rgba(216,188,94,.4), transparent),
+      radial-gradient(1px 1px at 40% 80%, rgba(122,154,114,.4), transparent),
+      radial-gradient(1px 1px at 85% 25%, rgba(216,188,94,.35), transparent),
+      radial-gradient(1px 1px at 12% 70%, rgba(122,154,114,.3), transparent),
+      radial-gradient(1px 1px at 55% 15%, rgba(216,188,94,.4), transparent);
+    background-size:100% 100%;}
+  /* 旋臂(極淡) */
+  .cosmos .swirl{position:absolute;top:50%;left:50%;width:120vmax;height:120vmax;
+    transform:translate(-50%,-50%);border-radius:50%;
+    border:1px solid rgba(184,134,11,.04);
+    box-shadow:0 0 0 18vmax rgba(184,134,11,.012), 0 0 0 36vmax rgba(184,134,11,.01);}
+
+  /* ====== 場景容器 ====== */
+  .scene{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;padding:40px 24px;
+    opacity:0;pointer-events:none;transition:opacity 1s ease;z-index:10;}
+  .scene.active{opacity:1;pointer-events:auto;}
+
+  /* ====================================================
+     S0 — 推門鎮場
+  ==================================================== */
+  .door{text-align:center;}
+  /* 太極印(不依賴字體,純 SVG) */
+  .taiji-seal{width:88px;height:88px;margin:0 auto 34px;animation:sealIn 2.2s ease both, spinSeal 26s linear infinite 2.2s;}
+  @keyframes sealIn{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
+  @keyframes spinSeal{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  .door h1{font-size:42px;letter-spacing:.5em;text-indent:.5em;font-weight:600;color:var(--rice);
+    margin-bottom:26px;animation:fadeUp 1.8s ease .6s both;}
+  .door .saying{font-size:17px;letter-spacing:.46em;text-indent:.46em;color:var(--gold-lit);
+    animation:fadeUp 1.8s ease 1.2s both;text-shadow:0 0 22px rgba(216,188,94,.35);}
+  .door .saying small{display:block;font-size:12px;color:var(--jade);letter-spacing:.3em;
+    text-indent:.3em;margin-top:22px;opacity:.85;}
+  /* 定位句(自成一段 · 匾額落款調性 · 金軟色,介於金主標與玉副標之間) */
+  .door .scope{font-size:13px;letter-spacing:.4em;text-indent:.4em;color:var(--gold-soft);
+    margin-top:30px;opacity:.92;animation:fadeUp 1.8s ease 1.6s both;}
+  .door .enter{margin-top:60px;background:transparent;color:var(--rice);
+    border:1px solid var(--gold);border-radius:2px;padding:15px 52px;
+    font-family:inherit;font-size:15px;letter-spacing:.4em;text-indent:.4em;
+    cursor:pointer;transition:.5s;animation:fadeUp 1.8s ease 2s both;}
+  .door .enter:hover{background:var(--gold);color:#15200f;box-shadow:0 0 40px rgba(184,134,11,.45);}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+
+  /* ====================================================
+     S1 — 凝神默念(過場)
+  ==================================================== */
+  .nianter{text-align:center;max-width:380px;}
+  .nianter .mark{font-size:13px;letter-spacing:.3em;text-indent:.3em;color:var(--gold-soft);margin-bottom:26px;}
+  .nianter h2{font-size:25px;letter-spacing:.18em;line-height:1.7;color:var(--rice);font-weight:600;margin-bottom:22px;}
+  .nianter p{font-size:14px;letter-spacing:.1em;line-height:2.2;color:var(--rice-deep);opacity:.78;margin-bottom:14px;}
+  .nianter .next{margin-top:44px;background:transparent;color:var(--rice);
+    border:1px solid var(--gold);border-radius:2px;padding:14px 44px;
+    font-family:inherit;font-size:14px;letter-spacing:.36em;text-indent:.36em;cursor:pointer;transition:.45s;}
+  .nianter .next:hover{background:var(--gold);color:#15200f;box-shadow:0 0 30px rgba(184,134,11,.4);}
+
+  /* ====================================================
+     S2 — 長按起卦(發光能量核心 + 六十四卦大圈)
+  ==================================================== */
+  .qi{display:flex;flex-direction:column;align-items:center;}
+  .qi .guide{font-size:13.5px;letter-spacing:.16em;color:var(--gold-soft);text-align:center;
+    line-height:1.9;margin-bottom:14px;min-height:24px;transition:.4s;}
+  .oracle{position:relative;width:340px;height:340px;max-width:88vw;max-height:88vw;
+    display:flex;align-items:center;justify-content:center;}
+
+  /* 六十四卦圓圖(SVG 注入),極慢轉 */
+  .ring64{position:absolute;inset:0;animation:spin64 280s linear infinite;}
+  .ring64.fast{animation:spin64 6s linear infinite;}
+  @keyframes spin64{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  .ring64 svg{width:100%;height:100%;display:block;}
+
+  /* 金色卦名文字環(易經本家 · 取四維玄空密集符號的玄學密度,反向慢轉) */
+  .glyphring{position:absolute;inset:-4px;z-index:1;pointer-events:none;
+    animation:spinGlyph 340s linear infinite reverse;opacity:.92;}
+  .glyphring.fast{animation:spinGlyph 22s linear infinite reverse;}
+  @keyframes spinGlyph{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  .glyphring svg{width:100%;height:100%;display:block;}
+  .glyphring text{fill:#d8b04a;font-family:"Noto Serif TC","Songti TC",serif;
+    text-shadow:0 0 6px rgba(216,188,94,.5);}
+
+  /* 中層:跑動的卦名環(長按時顯現,卦象在大圈跑) */
+  .runner{position:absolute;width:240px;height:240px;opacity:0;transition:opacity .5s;pointer-events:none;}
+  .runner.show{opacity:1;}
+  .runner .rgua{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    font-size:30px;letter-spacing:.1em;color:var(--gold-lit);opacity:0;
+    text-shadow:0 0 24px rgba(216,188,94,.7);font-weight:600;white-space:nowrap;}
+
+  /* 進度光環 */
+  .prog{position:absolute;width:200px;height:200px;z-index:6;pointer-events:none;transform:rotate(-90deg);}
+  .prog circle{fill:none;stroke-width:2.2;}
+  .prog .tk{stroke:rgba(184,134,11,.1);}
+  .prog .br{stroke:var(--gold-lit);stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;
+    filter:drop-shadow(0 0 6px rgba(216,188,94,.8));transition:none;}
+
+  /* 發光能量核心(非按鈕) */
+  .core{position:relative;z-index:7;width:150px;height:150px;border-radius:50%;cursor:pointer;user-select:none;
+    display:flex;align-items:center;justify-content:center;transition:.4s;
+    background:radial-gradient(circle at 50% 42%, rgba(216,188,94,.32) 0%, rgba(120,90,20,.18) 36%, rgba(16,22,13,.9) 74%);
+    box-shadow:0 0 50px rgba(184,134,11,.28), inset 0 0 40px rgba(0,0,0,.5);}
+  .core::before{content:"";position:absolute;inset:-6px;border-radius:50%;
+    background:radial-gradient(circle, rgba(216,188,94,.22), transparent 68%);
+    animation:breathe 4s ease-in-out infinite;}
+  @keyframes breathe{0%,100%{transform:scale(1);opacity:.55}50%{transform:scale(1.14);opacity:.95}}
+  .core.pressing{transform:scale(.96);
+    box-shadow:0 0 90px rgba(216,188,94,.6), inset 0 0 36px rgba(0,0,0,.4);}
+  .core.pressing::before{animation:breathe 1.3s ease-in-out infinite;}
+  .core .label{position:relative;z-index:2;font-size:12.5px;letter-spacing:.2em;text-indent:.2em;
+    color:var(--rice);opacity:.9;text-align:center;line-height:1.8;transition:.3s;}
+
+  .breathe-txt{margin-top:22px;font-size:12px;letter-spacing:.24em;text-indent:.24em;color:var(--jade);
+    opacity:0;transition:opacity .6s;text-align:center;line-height:2;min-height:20px;}
+  .breathe-txt.show{opacity:.9;}
+
+  /* ====================================================
+     S3 — 卦象浮現
+  ==================================================== */
+  .result{width:100%;max-width:420px;background:var(--paper);color:var(--moss);
+    border-radius:6px;padding:34px 30px 28px;box-shadow:0 28px 80px rgba(0,0,0,.6);
+    animation:rise .8s ease both;}
+  @keyframes rise{from{opacity:0;transform:translateY(20px) scale(.98)}to{opacity:1;transform:none}}
+  .result .rtop{text-align:center;font-size:11px;color:#9a9379;letter-spacing:.12em;
+    border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:22px;}
+  .gmain{text-align:center;}
+  .gmain .sym{font-size:40px;letter-spacing:.16em;color:var(--moss);}
+  .gmain .nm{font-size:30px;letter-spacing:.34em;text-indent:.34em;color:var(--moss);font-weight:600;margin-top:12px;}
+  .gmain .tri{font-size:12px;color:var(--gold);letter-spacing:.12em;margin-top:10px;}
+  .lines{display:flex;flex-direction:column-reverse;gap:7px;width:150px;margin:24px auto 6px;}
+  .yao{height:15px;display:flex;align-items:center;justify-content:center;gap:12px;position:relative;}
+  .yao .seg{height:13px;background:var(--moss);border-radius:2px;}
+  .yao.yang .seg{width:150px;}
+  .yao.yin .seg{width:63px;}
+  .yao.dong .seg{background:var(--gold);box-shadow:0 0 8px rgba(184,134,11,.5);}
+  .yao.dong::after{content:"● 動";position:absolute;right:-46px;font-size:11px;color:var(--gold);letter-spacing:.04em;}
+  .bian{text-align:center;margin-top:16px;padding-top:16px;border-top:1px dashed var(--line);}
+  .bian .l{font-size:11px;color:var(--gold);letter-spacing:.24em;text-indent:.24em;}
+  .bian .b{font-size:19px;letter-spacing:.28em;text-indent:.28em;color:var(--moss);margin-top:8px;}
+
+  /* 老易開口銜接 */
+  .handoff{margin-top:24px;padding-top:20px;border-top:1px solid var(--line);text-align:center;}
+  .handoff .who{font-size:13px;color:var(--gold);letter-spacing:.2em;margin-bottom:12px;}
+  .handoff .ask{font-size:14px;color:var(--moss-soft);line-height:2;letter-spacing:.04em;}
+  .handoff .say-input{width:100%;margin-top:16px;background:rgba(44,62,45,.04);
+    border:1px solid var(--line);border-radius:4px;padding:13px 15px;
+    font-family:inherit;font-size:14.5px;line-height:1.9;color:var(--moss);resize:none;min-height:64px;}
+  .handoff .say-input:focus{outline:none;border-color:var(--gold);background:rgba(184,134,11,.05);}
+  .handoff .say-input::placeholder{color:rgba(44,62,45,.32);}
+  .handoff .send{margin-top:14px;width:100%;background:var(--moss);color:var(--rice);
+    border:1px solid var(--moss);border-radius:2px;padding:13px;font-family:inherit;
+    font-size:13.5px;letter-spacing:.2em;text-indent:.2em;cursor:pointer;transition:.3s;}
+  .handoff .send:hover{background:var(--gold);border-color:var(--gold);color:#15200f;}
+
+  .ractions{display:flex;gap:10px;margin-top:18px;}
+  .ractions .ghost{flex:1;background:transparent;color:var(--moss-soft);border:1px solid var(--line);
+    border-radius:2px;padding:11px;font-family:inherit;font-size:12.5px;letter-spacing:.14em;cursor:pointer;transition:.3s;}
+  .ractions .ghost:hover{background:var(--rice-deep);}
+
+  .devjson{margin-top:16px;background:var(--rice-deep);border-radius:5px;padding:9px 12px;}
+  .devjson .l{font-size:9px;color:var(--gold);letter-spacing:.1em;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;}
+  .devjson pre{font-family:Consolas,monospace;font-size:9.5px;line-height:1.5;color:var(--moss-soft);white-space:pre-wrap;word-break:break-all;}
+  .devjson .cp{background:var(--gold);border:none;color:#15200f;border-radius:3px;padding:2px 8px;font-size:9.5px;cursor:pointer;font-family:inherit;}
+
+  .foot{position:fixed;bottom:14px;left:0;right:0;text-align:center;z-index:40;
+    font-size:9px;letter-spacing:.2em;color:var(--gold-soft);opacity:.38;pointer-events:none;}
+
+  .scene::-webkit-scrollbar{width:0;}
+  #s3.active{overflow-y:auto;padding-top:30px;padding-bottom:60px;justify-content:flex-start;}
+</style>
+</head>
+<body>
+  <div class="cosmos">
+    <div class="glow"></div><div class="glow2"></div>
+    <div class="swirl"></div><div class="dust"></div>
+  </div>
+
+  <!-- S0 推門鎮場 -->
+  <div class="scene active" id="s0">
+    <div class="door">
+      <svg class="taiji-seal" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="47" fill="none" stroke="#B8860B" stroke-width="1.2" opacity=".75"/>
+        <path d="M50 3 A47 47 0 0 1 50 97 A23.5 23.5 0 0 1 50 50 A23.5 23.5 0 0 0 50 3 Z" fill="#F5F1E8" opacity=".92"/>
+        <circle cx="50" cy="26.5" r="6.6" fill="#0f160c"/>
+        <circle cx="50" cy="73.5" r="6.6" fill="#F5F1E8"/>
+      </svg>
+      <h1>命　格</h1>
+      <div class="saying">善 為 易 者 不 占
+        <small>心 有 所 惑 · 方 來 起 卦</small>
+      </div>
+      <div class="scope">事 業 · 決 策 · 進 退 · 時 機</div>
+      <button class="enter" onclick="go(1)">入　內</button>
+    </div>
+  </div>
+
+  <!-- S1 凝神默念過場 -->
+  <div class="scene" id="s1">
+    <div class="nianter">
+      <div class="mark">起 卦 之 前</div>
+      <h2>把心中所問<br>在心裡反覆默念</h2>
+      <p>此刻先不必說、不必寫，只要在心中反覆默念。<br>待卦象浮現，自會請你說說所問。</p>
+      <p style="color:var(--gold-soft);opacity:.9;">心已澄定，<br>便可開始起卦。</p>
+      <button class="next" onclick="go(2)">開　始　起　卦</button>
+    </div>
+  </div>
+
+  <!-- S2 長按起卦 -->
+  <div class="scene" id="s2">
+    <div class="qi">
+      <div class="guide" id="guide">長按下方光點 · 默念你的問題</div>
+      <div class="oracle">
+        <div class="glyphring" id="glyphring"></div>
+        <div class="ring64" id="ring64"></div>
+        <div class="runner" id="runner"><div class="rgua" id="rgua"></div></div>
+        <svg class="prog" id="prog" viewBox="0 0 200 200">
+          <circle class="tk" cx="100" cy="100" r="96"></circle>
+          <circle class="br" id="progBar" cx="100" cy="100" r="96"></circle>
+        </svg>
+        <div class="core" id="core">
+          <div class="label" id="coreLabel">長按<br>默念所問</div>
+        </div>
+      </div>
+      <div class="breathe-txt" id="breatheTxt"></div>
+    </div>
+  </div>
+
+  <!-- S3 卦象浮現 -->
+  <div class="scene" id="s3">
+    <div class="result" id="resultCard">
+      <div class="rtop" id="rTop"></div>
+      <div class="gmain">
+        <div class="sym" id="rSym"></div>
+        <div class="nm" id="rName"></div>
+        <div class="tri" id="rTri"></div>
+      </div>
+      <div class="lines" id="rLines"></div>
+      <div class="bian"><div class="l">變　卦</div><div class="b" id="rBian"></div></div>
+
+      <div class="handoff">
+        <div class="who" id="hoWho">卦象既成 · 老易為你解讀</div>
+        <div class="ask">卦已成形。<br>請寫下你此卦所問。</div>
+        <textarea class="say-input" id="sayInput" placeholder="例如：我在堅持做的這件事，會不會又是過度樂觀了？"></textarea>
+        <button class="send" onclick="sendSay()">交給老易解卦</button>
+      </div>
+
+      <div class="ractions">
+        <button class="ghost" onclick="restart()">再起一卦</button>
+      </div>
+
+      <div class="devjson">
+        <div class="l"><span>gua_result（送 Make / Dify · 內測檢視）</span><button class="cp" onclick="copyJson()">複製</button></div>
+        <pre id="rJson"></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式原型 v0.35 · LIFF-ready</div>
+
+<!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+/* ===== 六十四卦圓圖資料 ===== */
+window.GUA_RING=[{"n":"坤","l":[0,0,0,0,0,0]},{"n":"豫","l":[1,0,0,0,0,0]},{"n":"比","l":[0,1,0,0,0,0]},{"n":"萃","l":[1,1,0,0,0,0]},{"n":"剝","l":[0,0,1,0,0,0]},{"n":"晉","l":[1,0,1,0,0,0]},{"n":"觀","l":[0,1,1,0,0,0]},{"n":"否","l":[1,1,1,0,0,0]},{"n":"復","l":[0,0,0,1,0,0]},{"n":"震","l":[1,0,0,1,0,0]},{"n":"屯","l":[0,1,0,1,0,0]},{"n":"隨","l":[1,1,0,1,0,0]},{"n":"頤","l":[0,0,1,1,0,0]},{"n":"噬嗑","l":[1,0,1,1,0,0]},{"n":"益","l":[0,1,1,1,0,0]},{"n":"無妄","l":[1,1,1,1,0,0]},{"n":"師","l":[0,0,0,0,1,0]},{"n":"解","l":[1,0,0,0,1,0]},{"n":"坎","l":[0,1,0,0,1,0]},{"n":"困","l":[1,1,0,0,1,0]},{"n":"蒙","l":[0,0,1,0,1,0]},{"n":"未濟","l":[1,0,1,0,1,0]},{"n":"渙","l":[0,1,1,0,1,0]},{"n":"訟","l":[1,1,1,0,1,0]},{"n":"臨","l":[0,0,0,1,1,0]},{"n":"歸妹","l":[1,0,0,1,1,0]},{"n":"節","l":[0,1,0,1,1,0]},{"n":"兌","l":[1,1,0,1,1,0]},{"n":"損","l":[0,0,1,1,1,0]},{"n":"睽","l":[1,0,1,1,1,0]},{"n":"中孚","l":[0,1,1,1,1,0]},{"n":"履","l":[1,1,1,1,1,0]},{"n":"謙","l":[0,0,0,0,0,1]},{"n":"小過","l":[1,0,0,0,0,1]},{"n":"蹇","l":[0,1,0,0,0,1]},{"n":"咸","l":[1,1,0,0,0,1]},{"n":"艮","l":[0,0,1,0,0,1]},{"n":"旅","l":[1,0,1,0,0,1]},{"n":"漸","l":[0,1,1,0,0,1]},{"n":"遯","l":[1,1,1,0,0,1]},{"n":"明夷","l":[0,0,0,1,0,1]},{"n":"豐","l":[1,0,0,1,0,1]},{"n":"既濟","l":[0,1,0,1,0,1]},{"n":"革","l":[1,1,0,1,0,1]},{"n":"賁","l":[0,0,1,1,0,1]},{"n":"離","l":[1,0,1,1,0,1]},{"n":"家人","l":[0,1,1,1,0,1]},{"n":"同人","l":[1,1,1,1,0,1]},{"n":"升","l":[0,0,0,0,1,1]},{"n":"恆","l":[1,0,0,0,1,1]},{"n":"井","l":[0,1,0,0,1,1]},{"n":"大過","l":[1,1,0,0,1,1]},{"n":"蠱","l":[0,0,1,0,1,1]},{"n":"鼎","l":[1,0,1,0,1,1]},{"n":"巽","l":[0,1,1,0,1,1]},{"n":"姤","l":[1,1,1,0,1,1]},{"n":"泰","l":[0,0,0,1,1,1]},{"n":"大壯","l":[1,0,0,1,1,1]},{"n":"需","l":[0,1,0,1,1,1]},{"n":"夬","l":[1,1,0,1,1,1]},{"n":"大畜","l":[0,0,1,1,1,1]},{"n":"大有","l":[1,0,1,1,1,1]},{"n":"小畜","l":[0,1,1,1,1,1]},{"n":"乾","l":[1,1,1,1,1,1]}];
+
+/* ===== 梅花易數時間起卦核心(與起卦工具 v0.1 同源) ===== */
+const TRI={1:{n:"乾",s:"☰",l:[1,1,1]},2:{n:"兌",s:"☱",l:[1,1,0]},3:{n:"離",s:"☲",l:[1,0,1]},4:{n:"震",s:"☳",l:[1,0,0]},5:{n:"巽",s:"☴",l:[0,1,1]},6:{n:"坎",s:"☵",l:[0,1,0]},7:{n:"艮",s:"☶",l:[0,0,1]},8:{n:"坤",s:"☷",l:[0,0,0]}};
+const G64={"1,1":"乾為天","1,2":"天澤履","1,3":"天火同人","1,4":"天雷無妄","1,5":"天風姤","1,6":"天水訟","1,7":"天山遯","1,8":"天地否","2,1":"澤天夬","2,2":"兌為澤","2,3":"澤火革","2,4":"澤雷隨","2,5":"澤風大過","2,6":"澤水困","2,7":"澤山咸","2,8":"澤地萃","3,1":"火天大有","3,2":"火澤睽","3,3":"離為火","3,4":"火雷噬嗑","3,5":"火風鼎","3,6":"火水未濟","3,7":"火山旅","3,8":"火地晉","4,1":"雷天大壯","4,2":"雷澤歸妹","4,3":"雷火豐","4,4":"震為雷","4,5":"雷風恆","4,6":"雷水解","4,7":"雷山小過","4,8":"雷地豫","5,1":"風天小畜","5,2":"風澤中孚","5,3":"風火家人","5,4":"風雷益","5,5":"巽為風","5,6":"風水渙","5,7":"風山漸","5,8":"風地觀","6,1":"水天需","6,2":"水澤節","6,3":"水火既濟","6,4":"水雷屯","6,5":"水風井","6,6":"坎為水","6,7":"水山蹇","6,8":"水地比","7,1":"山天大畜","7,2":"山澤損","7,3":"山火賁","7,4":"山雷頤","7,5":"山風蠱","7,6":"山水蒙","7,7":"艮為山","7,8":"山地剝","8,1":"地天泰","8,2":"地澤臨","8,3":"地火明夷","8,4":"地雷復","8,5":"地風升","8,6":"地水師","8,7":"地山謙","8,8":"坤為地"};
+const ZHI=["子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥"];
+const LUNAR_INFO=[0x04bd8,0x04ae0,0x0a570,0x054d5,0x0d260,0x0d950,0x16554,0x056a0,0x09ad0,0x055d2,0x04ae0,0x0a5b6,0x0a4d0,0x0d250,0x1d255,0x0b540,0x0d6a0,0x0ada2,0x095b0,0x14977,0x04970,0x0a4b0,0x0b4b5,0x06a50,0x06d40,0x1ab54,0x02b60,0x09570,0x052f2,0x04970,0x06566,0x0d4a0,0x0ea50,0x06e95,0x05ad0,0x02b60,0x186e3,0x092e0,0x1c8d7,0x0c950,0x0d4a0,0x1d8a6,0x0b550,0x056a0,0x1a5b4,0x025d0,0x092d0,0x0d2b2,0x0a950,0x0b557,0x06ca0,0x0b550,0x15355,0x04da0,0x0a5b0,0x14573,0x052b0,0x0a9a8,0x0e950,0x06aa0,0x0aea6,0x0ab50,0x04b60,0x0aae4,0x0a570,0x05260,0x0f263,0x0d950,0x05b57,0x056a0,0x096d0,0x04dd5,0x04ad0,0x0a4d0,0x0d4d4,0x0d250,0x0d558,0x0b540,0x0b6a0,0x195a6,0x095b0,0x049b0,0x0a974,0x0a4b0,0x0b27a,0x06a50,0x06d40,0x0af46,0x0ab60,0x09570,0x04af5,0x04970,0x064b0,0x074a3,0x0ea50,0x06b58,0x055c0,0x0ab60,0x096d5,0x092e0,0x0c960,0x0d954,0x0d4a0,0x0da50,0x07552,0x056a0,0x0abb7,0x025d0,0x092d0,0x0cab5,0x0a950,0x0b4a0,0x0baa4,0x0ad50,0x055d9,0x04ba0,0x0a5b0,0x15176,0x052b0,0x0a930,0x07954,0x06aa0,0x0ad50,0x05b52,0x04b60,0x0a6e6,0x0a4e0,0x0d260,0x0ea65,0x0d530,0x05aa0,0x076a3,0x096d0,0x04afb,0x04ad0,0x0a4d0,0x1d0b6,0x0d250,0x0d520,0x0dd45,0x0b5a0,0x056d0,0x055b2,0x049b0,0x0a577,0x0a4b0,0x0aa50,0x1b255,0x06d20,0x0ada0];
+function lYearDays(y){let s=348;for(let i=0x8000;i>0x8;i>>=1)s+=(LUNAR_INFO[y-1900]&i)?1:0;return s+leapDays(y);}
+function leapDays(y){if(leapMonth(y))return(LUNAR_INFO[y-1900]&0x10000)?30:29;return 0;}
+function leapMonth(y){return LUNAR_INFO[y-1900]&0xf;}
+function monthDays(y,m){return(LUNAR_INFO[y-1900]&(0x10000>>m))?30:29;}
+function solarToLunar(y,m,d){let offset=(Date.UTC(y,m-1,d)-Date.UTC(1900,0,31))/86400000;let yy=1900,temp=0;
+ for(;yy<2050&&offset>0;yy++){temp=lYearDays(yy);offset-=temp;}if(offset<0){offset+=temp;yy--;}
+ let leap=leapMonth(yy),isLeap=false,mm=1;
+ for(;mm<13&&offset>0;mm++){if(leap>0&&mm==(leap+1)&&!isLeap){--mm;isLeap=true;temp=leapDays(yy);}else temp=monthDays(yy,mm);if(isLeap&&mm==(leap+1))isLeap=false;offset-=temp;}
+ if(offset==0&&leap>0&&mm==leap+1){if(isLeap)isLeap=false;else{isLeap=true;--mm;}}
+ if(offset<0){offset+=temp;--mm;}return {ly:yy,lm:mm,ld:offset+1};}
+function yearZhi(ly){return ((ly-4)%12+12)%12;}
+function hourZhi(h){let idx=Math.floor((h+1)/2)%12;return idx===0?1:idx+1;}
+function findTri(lines){for(const k in TRI){if(TRI[k].l.join()===lines.join())return parseInt(k);}return null;}
+function qiGua(date){const y=date.getFullYear(),m=date.getMonth()+1,d=date.getDate(),h=date.getHours();
+ const lunar=solarToLunar(y,m,d);const yzNum=yearZhi(lunar.ly)+1;const lm=lunar.lm,ld=lunar.ld;const hourIdx=hourZhi(h);
+ const up=((yzNum+lm+ld)%8)||8;const low=((yzNum+lm+ld+hourIdx)%8)||8;const dong=((yzNum+lm+ld+hourIdx)%6)||6;
+ const ben=G64[up+","+low];let upL=[...TRI[up].l],lowL=[...TRI[low].l];
+ if(dong<=3)lowL[dong-1]^=1;else upL[dong-4]^=1;const nUp=findTri(upL),nLow=findTri(lowL);const bian=G64[nUp+","+nLow];
+ return {y,m,d,h,lunar,yzNum,lm,ld,hourIdx,up,low,dong,ben,bian,benLines:[...TRI[low].l,...TRI[up].l]};}
+
+/* ===== 場景切換 ===== */
+let lastG=null;
+function go(n){
+  document.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+  document.getElementById('s'+n).classList.add('active');
+  if(n===2) prepQi();
+}
+function restart(){lastG=null;document.getElementById('sayInput').value='';go(0);}
+
+/* ===== 繪製六十四卦圓圖 ===== */
+function buildRing64(){
+  const ring64=document.getElementById('ring64');
+  if(ring64.dataset.built) return;
+  const N=64, cx=170, cy=170, rOuter=164, gua=window.GUA_RING;
+  let svg=`<svg viewBox="0 0 340 340" xmlns="http://www.w3.org/2000/svg">`;
+  svg+=`<circle cx="${cx}" cy="${cy}" r="${rOuter}" fill="none" stroke="rgba(184,134,11,.3)" stroke-width="0.8"/>`;
+  svg+=`<circle cx="${cx}" cy="${cy}" r="${rOuter-32}" fill="none" stroke="rgba(184,134,11,.14)" stroke-width="0.6"/>`;
+  const yaoH=2.2, yaoGap=3.4, gapMid=3, halfW=6.6, baseR=rOuter-31;
+  for(let i=0;i<N;i++){
+    const deg=(i/N)*360;
+    let g=`<g transform="rotate(${deg} ${cx} ${cy})">`;
+    for(let y=0;y<6;y++){
+      const rr=baseR + y*(yaoH+yaoGap);
+      if(gua[i].l[y]===1){
+        g+=`<rect x="${cx-halfW}" y="${cy-rr-yaoH/2}" width="${halfW*2}" height="${yaoH}" rx="0.6" fill="#d8b04a"/>`;
+      }else{
+        g+=`<rect x="${cx-halfW}" y="${cy-rr-yaoH/2}" width="${halfW-gapMid/2}" height="${yaoH}" rx="0.6" fill="#9aa890"/>`;
+        g+=`<rect x="${cx+gapMid/2}" y="${cy-rr-yaoH/2}" width="${halfW-gapMid/2}" height="${yaoH}" rx="0.6" fill="#9aa890"/>`;
+      }
+    }
+    g+=`</g>`; svg+=g;
+  }
+  svg+=`</svg>`;
+  ring64.innerHTML=svg; ring64.dataset.built='1';
+}
+
+/* ===== 繪製金色卦名文字環(易經本家 · 玄學密度) ===== */
+function buildGlyphRing(){
+  const gr=document.getElementById('glyphring');
+  if(gr.dataset.built) return;
+  const cx=170, cy=170;
+  // 外圈:64 卦名沿圓周鋪滿(取 GUA_RING 卦名,接近四維玄空那種密集符號感)
+  const names=window.GUA_RING.map(g=>g.n);
+  let svg=`<svg viewBox="0 0 340 340" xmlns="http://www.w3.org/2000/svg">`;
+  // 外圈卦名(較大、較亮)
+  const rOut=150, nOut=names.length;
+  for(let i=0;i<nOut;i++){
+    const deg=(i/nOut)*360;
+    const rad=(deg-90)*Math.PI/180;
+    const x=cx+rOut*Math.cos(rad), y=cy+rOut*Math.sin(rad);
+    svg+=`<text x="${x}" y="${y}" font-size="9" text-anchor="middle" dominant-baseline="middle" `
+       + `transform="rotate(${deg} ${x} ${y})" opacity="0.95">${names[i]}</text>`;
+  }
+  // 內圈:太極/卦符號點綴(取代藏文卍,用易經本家的爻符密度)
+  const symbols=['䷀','䷁','䷂','䷃','䷄','䷅','䷆','䷇','䷈','䷉','䷊','䷋','䷌','䷍','䷎','䷏',
+                 '䷐','䷑','䷒','䷓','䷔','䷕','䷖','䷗','䷘','䷙','䷚','䷛','䷜','䷝','䷞','䷟'];
+  const rIn=120, nIn=symbols.length;
+  for(let i=0;i<nIn;i++){
+    const deg=(i/nIn)*360;
+    const rad=(deg-90)*Math.PI/180;
+    const x=cx+rIn*Math.cos(rad), y=cy+rIn*Math.sin(rad);
+    svg+=`<text x="${x}" y="${y}" font-size="11" text-anchor="middle" dominant-baseline="middle" `
+       + `transform="rotate(${deg} ${x} ${y})" opacity="0.55" fill="#c79a2e">${symbols[i]}</text>`;
+  }
+  svg+=`</svg>`;
+  gr.innerHTML=svg; gr.dataset.built='1';
+}
+
+/* ===== S2 起卦互動(放開即成卦模型) ===== */
+const READY_MS=5000;          // 最低凝神門檻:5 秒(不顯示秒數,滿了給「可放開」信號)
+let pressStart=0, raf=null, pressing=false, runTimer=null, ready=false;
+const core=document.getElementById('core');
+const progBar=document.getElementById('progBar');
+const ring64=document.getElementById('ring64');
+const glyphring=document.getElementById('glyphring');
+const runner=document.getElementById('runner');
+const rgua=document.getElementById('rgua');
+const R=96, CIRC=2*Math.PI*R;
+progBar.style.strokeDasharray=CIRC; progBar.style.strokeDashoffset=CIRC;
+
+function prepQi(){
+  buildGlyphRing(); buildRing64();
+  document.getElementById('guide').textContent='按住下方光點 · 心中默念你想問的事';
+  document.getElementById('coreLabel').innerHTML='按住<br>凝神問卦';
+  document.getElementById('breatheTxt').classList.remove('show');
+  progBar.style.strokeDashoffset=CIRC;
+  runner.classList.remove('show'); rgua.style.opacity=0;
+  ready=false;
+}
+
+/* 卦象在大圈跑(按住時) */
+function startRunner(){
+  runner.classList.add('show');
+  const gua=window.GUA_RING;
+  function flip(){
+    rgua.style.opacity=0;
+    setTimeout(()=>{
+      rgua.textContent=gua[Math.floor(Math.random()*64)].n;
+      rgua.style.opacity=1;
+    },90);
+  }
+  flip();
+  runTimer=setInterval(flip, 220);
+}
+function stopRunner(){ if(runTimer){clearInterval(runTimer);runTimer=null;} runner.classList.remove('show'); rgua.style.opacity=0; }
+
+function startPress(){
+  if(pressing)return; pressing=true; ready=false;
+  pressStart=Date.now();
+  core.classList.add('pressing'); ring64.classList.add('fast'); glyphring.classList.add('fast');
+  document.getElementById('coreLabel').innerHTML='凝神…';
+  document.getElementById('guide').textContent='心中反覆默念你想問的事';
+  document.getElementById('breatheTxt').classList.add('show');
+  document.getElementById('breatheTxt').textContent='凝神 · 反覆默念心中所問';
+  startRunner();
+  function tick(){
+    const el=Date.now()-pressStart;
+    // 光環只在凝聚階段(0→5秒)安靜前進,滿了就靜停在圓滿狀態(不催、不閃、非計時器)
+    const p=Math.min(el/READY_MS,1);
+    progBar.style.strokeDashoffset=CIRC*(1-p);
+    // ★ 滿 5 秒只是「門檻已過」的後台標記 —— 畫面完全不變化,不亮、不催、不宣告卦成。
+    //   天地一直安靜地轉、安靜地聽;卦在 TA 放開那一剎那才成。
+    if(p>=1 && !ready){ ready=true; }
+    raf=requestAnimationFrame(tick);
+  }
+  raf=requestAnimationFrame(tick);
+}
+
+function cancelPress(){
+  if(!pressing)return;
+  pressing=false; if(raf)cancelAnimationFrame(raf); stopRunner();
+  if(ready){
+    // 滿 5 秒後放開 → 成卦(取放開那一刻,守 T0)
+    doQi();
+  }else{
+    // 未滿門檻就放開 → 不成卦,提示再凝神久一些
+    core.classList.remove('pressing');
+    ring64.classList.remove('fast'); glyphring.classList.remove('fast');
+    progBar.style.strokeDashoffset=CIRC;
+    document.getElementById('coreLabel').innerHTML='按住<br>凝神問卦';
+    document.getElementById('guide').textContent='心未定 · 按住再凝神久一些，念畢再放開';
+    document.getElementById('breatheTxt').textContent='叩問需誠 · 再凝神片刻';
+  }
+}
+core.addEventListener('mousedown',startPress);
+core.addEventListener('mouseup',cancelPress);
+core.addEventListener('mouseleave',cancelPress);
+core.addEventListener('touchstart',e=>{e.preventDefault();startPress();},{passive:false});
+core.addEventListener('touchend',e=>{e.preventDefault();cancelPress();},{passive:false});
+
+function doQi(){
+  pressing=false; ready=false; if(raf)cancelAnimationFrame(raf); stopRunner();
+  const now=new Date();              // ★ 放開那一刻(qigua_time 來源,守 T0)
+  const g=qiGua(now); lastG=g;
+  core.classList.remove('pressing');
+  ring64.classList.remove('fast'); glyphring.classList.remove('fast');
+  document.getElementById('breatheTxt').textContent='卦　成';
+  setTimeout(()=>{showResult(g,now);go(3);},650);
+}
+
+/* ===== 起卦時間 → 帶 +08:00 的 ISO8601(契約 v1.1 §3.2)=====
+   注意:梅花時間卦用「台灣本地時間」的時/日來算,
+   故 qigua_time 必須是台灣時區(+08:00),不可用 toISOString()(會變 UTC/Z)。 */
+function toISO8601TW(d){
+  const pad=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+       + `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}+08:00`;
+}
+
+/* 模組層級:存放最近一次起卦結果(供 sendSay 取用送出) */
+let lastGuaResult=null;
+
+/* ===== S3 結果 ===== */
+function showResult(g,now){
+  const pad=n=>String(n).padStart(2,'0');
+  const ts=`${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  document.getElementById('rTop').textContent='起卦時刻 · '+ts;
+  document.getElementById('rSym').textContent=TRI[g.up].s+'　'+TRI[g.low].s;
+  document.getElementById('rName').textContent=g.ben;
+  document.getElementById('rTri').textContent=`上${TRI[g.up].n}　下${TRI[g.low].n}`;
+  let lh='';
+  g.benLines.forEach((v,i)=>{
+    const cls=(v===1?'yang':'yin')+(i===(g.dong-1)?' dong':'');
+    lh+=`<div class="yao ${cls}"><div class="seg"></div>${v===0?'<div class="seg"></div>':''}</div>`;
+  });
+  document.getElementById('rLines').innerHTML=lh;
+  document.getElementById('rBian').textContent=g.bian;
+
+  const json={
+    ben_gua:g.ben, bian_gua:g.bian, dong_yao:g.dong,
+    method:"meihua-time", qigua_time:toISO8601TW(now),
+    mian_xiang:null, master_preference:"auto", question_text:""
+  };
+  lastGuaResult=json;
+  document.getElementById('rJson').textContent=JSON.stringify(json,null,2);
+}
+/* ====================================================
+   LIFF + 送出設定(S37 填入真值前,維持 DEV 模式)
+   ──────────────────────────────────────────────
+   DEV_MODE=true  → 不連 LINE,送出時把 payload 印在畫面+console(供瀏覽器測)
+   DEV_MODE=false → 走真實 LIFF:liff.init 拿 line_user_id,POST 進 Make webhook
+==================================================== */
+const DEV_MODE = true;                       // ★ S37 上線時改成 false
+const LIFF_ID  = "〔S37填_LIFF_ID〕";          // ★ S37 註冊 LIFF App 後填(形如 1234567890-abcdEFGH)
+const MAKE_WEBHOOK_URL = "〔S37填_Make_Webhook網址〕"; // ★ S35 那條 Custom Webhook 網址
+
+let liffReady=false, liffUserId=null;
+
+/* LIFF 初始化(DEV 模式下略過,不報錯) */
+async function initLiff(){
+  if(DEV_MODE) return;
+  try{
+    await liff.init({ liffId: LIFF_ID });
+    liffReady=true;
+    if(liff.isLoggedIn()){
+      const prof=await liff.getProfile();
+      liffUserId=prof.userId;            // = 介面B 的 line_user_id
+    }else{
+      liff.login();                       // 未登入 → 導 LINE 登入(回來會帶身分)
+    }
+  }catch(e){
+    console.error('LIFF init failed:', e);
+  }
+}
+
+/* 送出:把卦象 + TA 那句話 → Make webhook(守 T0:時間用前端放開那刻,不重生) */
+async function sendSay(){
+  const t=document.getElementById('sayInput').value.trim();
+  if(!t){alert('請先寫下你此卦所問。');return;}  // question_text 必填
+  if(!lastGuaResult){alert('尚未起卦，請先長按起卦。');return;}
+
+  // 把 TA 的話寫進 gua_result(契約:question_text 必填)
+  lastGuaResult.question_text = t;
+
+  // 組送出 payload(line_user_id 來自 LIFF;DEV 模式給佔位字串)
+  const payload = {
+    ...lastGuaResult,
+    line_user_id: (liffUserId || (DEV_MODE ? "DEV_TEST_USER" : null))
+  };
+
+  if(DEV_MODE){
+    // 瀏覽器測試:不送網路,把實際要送的 payload 攤開來看
+    console.log('[DEV] 將送出的 payload:', payload);
+    const pretty=JSON.stringify(payload,null,2);
+    document.getElementById('rJson').textContent=pretty;   // 直接更新內測檢視區
+    alert('【DEV 模式】payload 已組好(見下方檢視區 / console)。\n\n'
+        + 'S37 填入 LIFF_ID + Webhook 網址、DEV_MODE 改 false 後,\n'
+        + '這一步就會真的把卦象送進 Make → Dify 解卦。');
+    return;
+  }
+
+  // 真實送出(S37 啟用)
+  try{
+    const btn=document.querySelector('.handoff .send');
+    if(btn){btn.disabled=true;btn.textContent='正在送進老易書房…';}
+    const res=await fetch(MAKE_WEBHOOK_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    if(!res.ok) throw new Error('webhook HTTP '+res.status);
+    if(btn){btn.textContent='已送出 · 老易解卦中';}
+    // 回覆由 LINE OA 推回(本頁不負責顯示解卦結果);可在此關閉 LIFF 視窗:
+    // if(liffReady && liff.isInClient()) liff.closeWindow();
+  }catch(e){
+    console.error('send failed:', e);
+    alert('送出時遇到問題,請稍後再試。\n('+e.message+')');
+    const btn=document.querySelector('.handoff .send');
+    if(btn){btn.disabled=false;btn.textContent='交給老易解卦';}
+  }
+}
+function copyJson(){
+  navigator.clipboard.writeText(document.getElementById('rJson').textContent)
+   .then(()=>{const b=event.target;b.textContent='已複製';setTimeout(()=>b.textContent='複製',1200);});
+}
+
+/* 頁面載入即初始化 LIFF(DEV 模式自動略過,不影響瀏覽器測試) */
+initLiff();
+
+</script>
+</body>
+</html>
