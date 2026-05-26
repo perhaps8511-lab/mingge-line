@@ -447,7 +447,9 @@ function startPress(){
 function cancelPress(){
   if(!pressing)return;
   pressing=false; if(raf)cancelAnimationFrame(raf); stopRunner();
-  if(ready){
+  // ★ 用真實時鐘判定門檻(不靠 rAF 累計的 ready,因 LINE webview 可能凍住 rAF)
+  const held = Date.now() - pressStart;
+  if(held >= READY_MS){
     // 滿 5 秒後放開 → 成卦(取放開那一刻,守 T0)
     doQi();
   }else{
@@ -465,6 +467,11 @@ core.addEventListener('mouseup',cancelPress);
 core.addEventListener('mouseleave',cancelPress);
 core.addEventListener('touchstart',e=>{e.preventDefault();startPress();},{passive:false});
 core.addEventListener('touchend',e=>{e.preventDefault();cancelPress();},{passive:false});
+core.addEventListener('touchcancel',e=>{cancelPress();},{passive:false});
+// LINE webview 有時只觸發 pointer 事件,補上更穩(pressing 旗標防重複)
+core.addEventListener('pointerdown',e=>{startPress();});
+core.addEventListener('pointerup',e=>{cancelPress();});
+core.addEventListener('pointercancel',e=>{cancelPress();});
 
 function doQi(){
   pressing=false; ready=false; if(raf)cancelAnimationFrame(raf); stopRunner();
@@ -530,18 +537,27 @@ const RELAY_URL = "https://mingge-relay.perhaps8511.workers.dev/";
 
 let liffReady=false, liffUserId=null, liffIdToken=null;
 
-/* LIFF 初始化(DEV 模式下略過,不報錯) */
+/* LIFF 初始化(DEV 模式下略過,不報錯)
+   方案2:確保拿到 ID Token,前端零固定祕密。 */
 async function initLiff(){
   if(DEV_MODE) return;
   try{
     await liff.init({ liffId: LIFF_ID });
     liffReady=true;
-    if(liff.isLoggedIn()){
+    if(!liff.isLoggedIn()){
+      liff.login();                       // 未登入 → 導 LINE 登入(回來會重載頁面再進來)
+      return;                             // 跳轉後本輪結束,登入完重新載入會再跑一次
+    }
+    // 已登入:拿身分 + ID Token
+    try{
       const prof=await liff.getProfile();
-      liffUserId=prof.userId;            // = 介面B 的 line_user_id(僅供前端參考;後端以驗證過的身分為準)
-      liffIdToken=liff.getIDToken();     // ★ 方案2:LINE 簽發的 ID Token,送 Worker 驗證用
-    }else{
-      liff.login();                       // 未登入 → 導 LINE 登入(回來會帶身分)
+      liffUserId=prof.userId;             // 僅供前端參考;後端以驗證過的身分為準
+    }catch(_){}
+    liffIdToken=liff.getIDToken();        // ★ 方案2:LINE 簽發的 ID Token
+    if(!liffIdToken){
+      // 極少數情況 token 尚未就緒 → 重新登入一次以取得
+      console.warn('ID token 未取得,重新登入');
+      liff.login();
     }
   }catch(e){
     console.error('LIFF init failed:', e);
