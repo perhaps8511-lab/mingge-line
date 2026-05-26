@@ -323,7 +323,7 @@ function go(n){
   document.getElementById('s'+n).classList.add('active');
   if(n===2) prepQi();
 }
-function restart(){lastG=null;document.getElementById('sayInput').value='';go(0);}
+function restart(){lastG=null;sayText='';document.getElementById('sayInput').value='';go(0);}
 
 /* ===== 繪製六十四卦圓圖 ===== */
 function buildRing64(){
@@ -516,13 +516,19 @@ function showResult(g,now){
    LIFF + 送出設定(S37 填入真值前,維持 DEV 模式)
    ──────────────────────────────────────────────
    DEV_MODE=true  → 不連 LINE,送出時把 payload 印在畫面+console(供瀏覽器測)
-   DEV_MODE=false → 走真實 LIFF:liff.init 拿 line_user_id,POST 進 Make webhook
+   DEV_MODE=false → 走真實 LIFF:liff.init 拿 line_user_id + ID Token,
+                    帶 token POST 進 Worker 轉發層 → Make webhook
 ==================================================== */
-const DEV_MODE = true;                       // ★ S37 上線時改成 false
-const LIFF_ID  = "〔S37填_LIFF_ID〕";          // ★ S37 註冊 LIFF App 後填(形如 1234567890-abcdEFGH)
-const MAKE_WEBHOOK_URL = "〔S37填_Make_Webhook網址〕"; // ★ S35 那條 Custom Webhook 網址
+const DEV_MODE = false;                      // ★ 正式上線:走真實 LIFF + ID Token
+const LIFF_ID  = "2010192384-9AwjI8qH";       // S37 已建:命格進場儀式 LIFF App
 
-let liffReady=false, liffUserId=null;
+/* 送出目標 = Cloudflare Worker 轉發層(方案2)
+   ──────────────────────────────────────────────
+   前端只知道轉發層,永遠看不到真實 Make webhook(藏在 Worker 的 Secret)。
+   前端不持有任何固定密語;認證靠 LINE 簽發的 ID Token(每次即時拿、會過期、不可偽造)。 */
+const RELAY_URL = "https://mingge-relay.perhaps8511.workers.dev/";
+
+let liffReady=false, liffUserId=null, liffIdToken=null;
 
 /* LIFF 初始化(DEV 模式下略過,不報錯) */
 async function initLiff(){
@@ -532,7 +538,8 @@ async function initLiff(){
     liffReady=true;
     if(liff.isLoggedIn()){
       const prof=await liff.getProfile();
-      liffUserId=prof.userId;            // = 介面B 的 line_user_id
+      liffUserId=prof.userId;            // = 介面B 的 line_user_id(僅供前端參考;後端以驗證過的身分為準)
+      liffIdToken=liff.getIDToken();     // ★ 方案2:LINE 簽發的 ID Token,送 Worker 驗證用
     }else{
       liff.login();                       // 未登入 → 導 LINE 登入(回來會帶身分)
     }
@@ -541,9 +548,30 @@ async function initLiff(){
   }
 }
 
-/* 送出:把卦象 + TA 那句話 → Make webhook(守 T0:時間用前端放開那刻,不重生) */
+/* 送出:把卦象 + TA 那句話 → Worker 轉發層(守 T0:時間用前端放開那刻,不重生) */
+
+/* ── Typeless / 語音外掛相容防呆 ──────────────────────────
+   有些語音打字外掛(如 Typeless)注入文字時不觸發標準 input 事件,
+   導致 textarea.value 沒更新(畫面有字、value 空)。
+   故另用多重事件即時抓取內容存進 sayText,送出時雙來源取值。 */
+let sayText = "";
+(function bindSayInput(){
+  const el = document.getElementById('sayInput');
+  if(!el) return;
+  ['input','change','keyup','paste'].forEach(evt=>{
+    el.addEventListener(evt, ()=>{ sayText = el.value; });
+  });
+})();
+/* 送出時的統一取值:value 為主,sayText 為備,取兩者較有內容者 */
+function readSayInput(){
+  const el = document.getElementById('sayInput');
+  const v = (el ? el.value : "").trim();
+  const s = (sayText || "").trim();
+  return v.length >= s.length ? v : s;   // 取較長(較完整)的那個
+}
+
 async function sendSay(){
-  const t=document.getElementById('sayInput').value.trim();
+  const t=readSayInput();
   if(!t){alert('請先寫下你此卦所問。');return;}  // question_text 必填
   if(!lastGuaResult){alert('尚未起卦，請先長按起卦。');return;}
 
@@ -562,21 +590,28 @@ async function sendSay(){
     const pretty=JSON.stringify(payload,null,2);
     document.getElementById('rJson').textContent=pretty;   // 直接更新內測檢視區
     alert('【DEV 模式】payload 已組好(見下方檢視區 / console)。\n\n'
-        + 'S37 填入 LIFF_ID + Webhook 網址、DEV_MODE 改 false 後,\n'
-        + '這一步就會真的把卦象送進 Make → Dify 解卦。');
+        + 'DEV_MODE 改 false 後,這一步會帶 LINE ID Token 送進\n'
+        + 'Worker 轉發層 → Make → Dify 解卦。');
     return;
   }
 
-  // 真實送出(S37 啟用)
+  // 真實送出(方案2:帶 ID Token 送 Worker 轉發層,前端不持有任何固定密語)
+  if(!liffIdToken){
+    alert('尚未取得 LINE 身分,請從 LINE 重新開啟本頁。');
+    return;
+  }
   try{
     const btn=document.querySelector('.handoff .send');
     if(btn){btn.disabled=true;btn.textContent='正在送進老易書房…';}
-    const res=await fetch(MAKE_WEBHOOK_URL,{
+    const res=await fetch(RELAY_URL,{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{
+        'Content-Type':'application/json',
+        'X-Line-IdToken':liffIdToken        // ★ 方案2:Worker 會向 LINE 驗這個 token 才放行
+      },
       body:JSON.stringify(payload)
     });
-    if(!res.ok) throw new Error('webhook HTTP '+res.status);
+    if(!res.ok) throw new Error('relay HTTP '+res.status);
     if(btn){btn.textContent='已送出 · 老易解卦中';}
     // 回覆由 LINE OA 推回(本頁不負責顯示解卦結果);可在此關閉 LIFF 視窗:
     // if(liffReady && liff.isInClient()) liff.closeWindow();
