@@ -553,12 +553,8 @@ async function initLiff(){
       const prof=await liff.getProfile();
       liffUserId=prof.userId;             // 僅供前端參考;後端以驗證過的身分為準
     }catch(_){}
-    liffIdToken=liff.getIDToken();        // ★ 方案2:LINE 簽發的 ID Token
-    if(!liffIdToken){
-      // 極少數情況 token 尚未就緒 → 重新登入一次以取得
-      console.warn('ID token 未取得,重新登入');
-      liff.login();
-    }
+    liffIdToken=liff.getIDToken();        // ★ 方案2:LINE 簽發的 ID Token(送出時會再即時重抓一次)
+    console.log('[LIFF] init done. token at init:', liffIdToken ? 'OK' : 'null(送出時會重抓)');
   }catch(e){
     console.error('LIFF init failed:', e);
   }
@@ -612,8 +608,15 @@ async function sendSay(){
   }
 
   // 真實送出(方案2:帶 ID Token 送 Worker 轉發層,前端不持有任何固定密語)
+  // ★ 送出此刻即時重抓 token(LIFF 此時已完全就緒,避免 init 時 token 尚未就緒的競態)
+  if(liffReady && liff.isLoggedIn()){
+    const freshToken = liff.getIDToken();
+    if(freshToken) liffIdToken = freshToken;
+  }
   if(!liffIdToken){
-    alert('尚未取得 LINE 身分,請從 LINE 重新開啟本頁。');
+    // 仍拿不到 → 引導重新登入(而非死路)
+    alert('正在重新確認 LINE 身分,請稍候再按一次。');
+    if(liffReady && !liff.isLoggedIn()) liff.login();
     return;
   }
   try{
