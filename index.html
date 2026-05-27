@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v0.2</title>
+<title>命格 · 進場儀式 v0.8</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -535,10 +535,10 @@ const LIFF_ID  = "2010192384-9AwjI8qH";       // S37 已建:命格進場儀式 L
    前端不持有任何固定密語;認證靠 LINE 簽發的 ID Token(每次即時拿、會過期、不可偽造)。 */
 const RELAY_URL = "https://mingge-relay.perhaps8511.workers.dev/";
 
-let liffReady=false, liffUserId=null, liffIdToken=null;
+let liffReady=false, liffUserId=null, liffAccessToken=null;
 
 /* LIFF 初始化(DEV 模式下略過,不報錯)
-   方案2:確保拿到 ID Token,前端零固定祕密。 */
+   方案3:改用 Access Token(SDK 自動續期,解決 ID Token 不續期會過期的問題);前端零固定祕密。 */
 async function initLiff(){
   if(DEV_MODE) return;
   try{
@@ -553,8 +553,8 @@ async function initLiff(){
       const prof=await liff.getProfile();
       liffUserId=prof.userId;             // 僅供前端參考;後端以驗證過的身分為準
     }catch(_){}
-    liffIdToken=liff.getIDToken();        // ★ 方案2:LINE 簽發的 ID Token(送出時會再即時重抓一次)
-    console.log('[LIFF] init done. token at init:', liffIdToken ? 'OK' : 'null(送出時會重抓)');
+    liffAccessToken=liff.getAccessToken();  // ★ 方案3:Access Token(SDK 管理、會自動續期;送出時會再即時重抓一次)
+    console.log('[LIFF] init done. accessToken at init:', liffAccessToken ? 'OK' : 'null(送出時會重抓)');
   }catch(e){
     console.error('LIFF init failed:', e);
   }
@@ -607,20 +607,18 @@ async function sendSay(){
     return;
   }
 
-  // 真實送出(方案2:帶 ID Token 送 Worker 轉發層,前端不持有任何固定密語)
-  // ★ 送出此刻即時重抓 token(LIFF 此時已完全就緒,避免 init 時 token 尚未就緒的競態)
+  // 真實送出(方案3:帶 Access Token 送 Worker 轉發層,前端不持有任何固定密語)
+  // ★ 送出此刻即時重抓 token(Access Token 由 SDK 管理,此時取得最新鮮、未過期的)
   if(liffReady && liff.isLoggedIn()){
-    const freshToken = liff.getIDToken();
-    if(freshToken) liffIdToken = freshToken;
+    const freshToken = liff.getAccessToken();
+    if(freshToken) liffAccessToken = freshToken;
   }
-  if(!liffIdToken){
+  if(!liffAccessToken){
     // 仍拿不到 → 引導重新登入(而非死路)
     alert('正在重新確認 LINE 身分,請稍候再按一次。');
     if(liffReady && !liff.isLoggedIn()) liff.login();
     return;
   }
-  // 【臨時偵錯 DEBUG ─ 確診 401 後請刪除這一行】
-  alert('DEBUG · token 狀態:' + (liffIdToken ? ('有token(前10碼:'+liffIdToken.slice(0,10)+')') : 'token 是 NULL'));
   try{
     const btn=document.querySelector('.handoff .send');
     if(btn){btn.disabled=true;btn.textContent='正在送進老易書房…';}
@@ -628,7 +626,7 @@ async function sendSay(){
       method:'POST',
       headers:{
         'Content-Type':'application/json',
-        'X-Line-IdToken':liffIdToken        // ★ 方案2:Worker 會向 LINE 驗這個 token 才放行
+        'X-Line-AccessToken':liffAccessToken   // ★ 方案3:Worker 會向 LINE 驗這個 access token 才放行
       },
       body:JSON.stringify(payload)
     });
