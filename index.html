@@ -619,6 +619,8 @@ async function sendSay(){
     if(liffReady && !liff.isLoggedIn()) liff.login();
     return;
   }
+  // 【臨時偵錯 DEBUG ─ 確診 401 後請刪除這一行】
+  alert('DEBUG · token 狀態:' + (liffIdToken ? ('有token(前10碼:'+liffIdToken.slice(0,10)+')') : 'token 是 NULL'));
   try{
     const btn=document.querySelector('.handoff .send');
     if(btn){btn.disabled=true;btn.textContent='正在送進老易書房…';}
