@@ -553,10 +553,10 @@ function renderLiffDiag(tag){
     if(!box){
       box=document.createElement('div');
       box.id='liffDiag';
-      box.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;'
-        +'font:12px/1.5 monospace;background:rgba(18,28,22,.96);color:#d8c89a;'
-        +'border:1px solid #b9912f;border-radius:8px;padding:8px;white-space:pre-wrap;'
-        +'max-height:44vh;overflow:auto';
+      box.style.cssText='position:fixed;left:6px;right:6px;top:6px;z-index:99999;'
+        +'font:10px/1.35 monospace;background:rgba(18,28,22,.82);color:#d8c89a;'
+        +'border:1px solid rgba(185,145,47,.6);border-radius:6px;padding:5px 7px;'
+        +'white-space:pre-wrap;max-height:30vh;overflow:auto;pointer-events:none;opacity:.92';
       document.body.appendChild(box);
     }
     const has = (typeof liff!=='undefined');
