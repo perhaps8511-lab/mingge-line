@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.0</title>
+<title>命格 · 進場儀式 v1.1</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -201,6 +201,27 @@
   .devjson pre{font-family:Consolas,monospace;font-size:9.5px;line-height:1.5;color:var(--moss-soft);white-space:pre-wrap;word-break:break-all;}
   .devjson .cp{background:var(--gold);border:none;color:#15200f;border-radius:3px;padding:2px 8px;font-size:9.5px;cursor:pointer;font-family:inherit;}
 
+  /* ====================================================
+     S4 — 送出後過場:解卦中(顯示引導後自動收合回聊天室)
+     S79 三件套①②;凍結區(起卦演算法/gua_result/qigua_time)零接觸
+  ==================================================== */
+  .sending{position:fixed;inset:0;z-index:60;display:none;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;
+    background:rgba(7,11,7,.96);padding:40px 24px;}
+  .sending.show{display:flex;}
+  /* TA 此卦本卦六爻 · 金線安靜呼吸(卦象是主角,不發光、不炫技) */
+  .sending .slines{display:flex;flex-direction:column-reverse;gap:9px;width:132px;
+    margin:0 auto 32px;animation:sendBreathe 2.6s ease-in-out infinite;}
+  @keyframes sendBreathe{0%,100%{opacity:.5}50%{opacity:1}}
+  .sending .syao{height:12px;display:flex;justify-content:center;gap:12px;}
+  .sending .syao .seg{height:10px;background:var(--gold-lit);border-radius:1px;}
+  .sending .syao.yang .seg{width:132px;}
+  .sending .syao.yin .seg{width:56px;}
+  .sending .st1{font-size:17px;letter-spacing:.28em;text-indent:.28em;color:var(--gold-lit);margin-bottom:16px;}
+  .sending .st2{font-size:13px;letter-spacing:.14em;line-height:2.2;color:var(--rice-deep);opacity:.85;}
+  .sending .st3{margin-top:28px;font-size:11.5px;letter-spacing:.1em;color:var(--jade);opacity:.85;display:none;}
+  @media (prefers-reduced-motion: reduce){.sending .slines{animation:none;opacity:.9;}}
+
   .foot{position:fixed;bottom:14px;left:0;right:0;text-align:center;z-index:40;
     font-size:9px;letter-spacing:.2em;color:var(--gold-soft);opacity:.38;pointer-events:none;}
 
@@ -290,7 +311,15 @@
     </div>
   </div>
 
-  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.0(logo＋免責＋起卦指引)</div>
+  <!-- S4 送出後過場:解卦中 → 自動收合回聊天室(非 LINE 內開啟則顯示手動提示) -->
+  <div class="sending" id="sending">
+    <div class="slines" id="sendLines"></div>
+    <div class="st1">卦已成形 · 老易讀卦中</div>
+    <div class="st2">信箋約半炷香後送達<br>請回到對話中等候</div>
+    <div class="st3" id="sendHint">可關閉此頁，回到 LINE 對話等候信箋</div>
+  </div>
+
+  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.1(送出收合＋解卦中引導)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -542,59 +571,29 @@ const LIFF_ID  = "2010192384-9AwjI8qH";       // S37 已建:命格進場儀式 L
    前端不持有任何固定密語;認證靠 LINE 簽發的 ID Token(每次即時拿、會過期、不可偽造)。 */
 const RELAY_URL = "https://mingge-relay.perhaps8511.workers.dev/";
 
-let liffReady=false, liffUserId=null, liffAccessToken=null, liffInitError=null;
+let liffReady=false, liffUserId=null, liffAccessToken=null;
 
-/* ── 螢幕內診斷框(手機看不到 console 時的真相來源)──
-   ★ 這是「診斷版」用的;確認問題解決後可整段移除。 */
-function _safe(fn){ try{ return String(fn()); }catch(e){ return 'err:'+e.message; } }
-function renderLiffDiag(tag){
-  try{
-    let box=document.getElementById('liffDiag');
-    if(!box){
-      box=document.createElement('div');
-      box.id='liffDiag';
-      box.style.cssText='position:fixed;left:6px;right:6px;top:6px;z-index:99999;'
-        +'font:10px/1.35 monospace;background:rgba(18,28,22,.82);color:#d8c89a;'
-        +'border:1px solid rgba(185,145,47,.6);border-radius:6px;padding:5px 7px;'
-        +'white-space:pre-wrap;max-height:30vh;overflow:auto;pointer-events:none;opacity:.92';
-      document.body.appendChild(box);
-    }
-    const has = (typeof liff!=='undefined');
-    box.textContent =
-      '[LIFF 診斷 · '+(tag||'')+']\n'
-      +'url        : '+location.href+'\n'
-      +'sdkLoaded  : '+has+'\n'
-      +'liffReady  : '+liffReady+'\n'
-      +'isInClient : '+(has&&liff.isInClient? _safe(()=>liff.isInClient()):'n/a')+'\n'
-      +'isLoggedIn : '+(has&&liff.isLoggedIn? _safe(()=>liff.isLoggedIn()):'n/a')+'\n'
-      +'OS/version : '+(has&&liff.getOS? _safe(()=>liff.getOS()):'n/a')+' / '+(has&&liff.getVersion? _safe(()=>liff.getVersion()):'n/a')+'\n'
-      +'userId     : '+(liffUserId||'(null)')+'\n'
-      +'accessTok  : '+(liffAccessToken? ('OK '+liffAccessToken.slice(0,6)+'…'):'(null)')+'\n'
-      +'initError  : '+(liffInitError||'(none)');
-  }catch(_){}
-}
-
-/* LIFF 初始化(DEV 模式下略過)
-   方案3:Access Token(SDK 自動續期);前端零固定祕密。
-   ★ 改:init 失敗不再靜靜吞掉,寫進 liffInitError + 印在畫面;只有外部瀏覽器才導登入。 */
+/* LIFF 初始化(DEV 模式下略過,不報錯)
+   方案3:改用 Access Token(SDK 自動續期,解決 ID Token 不續期會過期的問題);前端零固定祕密。 */
 async function initLiff(){
   if(DEV_MODE) return;
-  if(typeof liff==='undefined'){ liffInitError='LIFF SDK 未載入(sdk.js 被擋?)'; renderLiffDiag('no-sdk'); return; }
   try{
     await liff.init({ liffId: LIFF_ID });
     liffReady=true;
-    // 在 LINE App 內(isInClient)永遠已登入;只有「外部瀏覽器且未登入」才需要導登入
-    if(!liff.isLoggedIn() && !liff.isInClient()){
-      renderLiffDiag('need-login');
-      liff.login({ redirectUri: location.href });   // 帶 redirectUri,避免回來 isLoggedIn 仍 false
-      return;
+    if(!liff.isLoggedIn()){
+      liff.login();                       // 未登入 → 導 LINE 登入(回來會重載頁面再進來)
+      return;                             // 跳轉後本輪結束,登入完重新載入會再跑一次
     }
-    try{ const prof=await liff.getProfile(); liffUserId=prof.userId; }catch(e){ liffInitError='getProfile: '+e.message; }
-    try{ liffAccessToken=liff.getAccessToken(); }catch(e){ liffInitError='getAccessToken: '+e.message; }
+    // 已登入:拿身分 + ID Token
+    try{
+      const prof=await liff.getProfile();
+      liffUserId=prof.userId;             // 僅供前端參考;後端以驗證過的身分為準
+    }catch(_){}
+    liffAccessToken=liff.getAccessToken();  // ★ 方案3:Access Token(SDK 管理、會自動續期;送出時會再即時重抓一次)
+    console.log('[LIFF] init done. accessToken at init:', liffAccessToken ? 'OK' : 'null(送出時會重抓)');
   }catch(e){
-    liffInitError='init: '+((e&&e.message)? e.message : String(e));
+    console.error('LIFF init failed:', e);
   }
-  renderLiffDiag('after-init');
 }
 
 /* 送出:把卦象 + TA 那句話 → Worker 轉發層(守 T0:時間用前端放開那刻,不重生) */
@@ -651,16 +650,9 @@ async function sendSay(){
     if(freshToken) liffAccessToken = freshToken;
   }
   if(!liffAccessToken){
-    // 仍拿不到 → 把真實原因印在畫面,並做正確重試(而非死路)
-    renderLiffDiag('send-no-token');
-    alert('拿不到 LINE 身分權杖。\n請看畫面底部診斷框的 initError / isInClient 那兩行。\n（isInClient=false 代表這頁不是從 LINE 內開啟）');
-    if(liffReady){
-      if(!liff.isLoggedIn() && !liff.isInClient()){
-        liff.login({ redirectUri: location.href });   // 外部瀏覽器:導登入
-      }else{
-        try{ liffAccessToken=liff.getAccessToken(); }catch(_){}  // LINE 內:重抓一次
-      }
-    }
+    // 仍拿不到 → 引導重新登入(而非死路)
+    alert('正在重新確認 LINE 身分,請稍候再按一次。');
+    if(liffReady && !liff.isLoggedIn()) liff.login();
     return;
   }
   try{
@@ -676,8 +668,9 @@ async function sendSay(){
     });
     if(!res.ok) throw new Error('relay HTTP '+res.status);
     if(btn){btn.textContent='已送出 · 老易解卦中';}
-    // 回覆由 LINE OA 推回(本頁不負責顯示解卦結果);可在此關閉 LIFF 視窗:
-    // if(liffReady && liff.isInClient()) liff.closeWindow();
+    // 回覆由 LINE OA 推回(本頁不負責顯示解卦結果)。
+    // S79:送出成功 → 顯示「解卦中」引導 → 自動收合 LIFF 回聊天室等信箋。
+    showSendingAndClose();
   }catch(e){
     console.error('send failed:', e);
     alert('送出時遇到問題,請稍後再試。\n('+e.message+')');
@@ -688,6 +681,30 @@ async function sendSay(){
 function copyJson(){
   navigator.clipboard.writeText(document.getElementById('rJson').textContent)
    .then(()=>{const b=event.target;b.textContent='已複製';setTimeout(()=>b.textContent='複製',1200);});
+}
+
+/* ===== S79:送出後過場 =====
+   顯示「卦已成形 · 老易讀卦中」引導(畫 TA 此卦本卦六爻,卦象是主角,守關5源頭主從),
+   約 2.6 秒後以 LIFF SDK 原生 liff.closeWindow() 自動收合回聊天室;
+   非 LINE 內開啟(外部瀏覽器)→ 不收合,改顯示手動提示。
+   凍結區零接觸:不碰起卦演算法 / gua_result / qigua_time。 */
+function showSendingAndClose(){
+  const box=document.getElementById('sendLines');
+  if(box && lastG && lastG.benLines){
+    let h='';
+    lastG.benLines.forEach(v=>{
+      h+=`<div class="syao ${v===1?'yang':'yin'}"><div class="seg"></div>${v===0?'<div class="seg"></div>':''}</div>`;
+    });
+    box.innerHTML=h;
+  }
+  document.getElementById('sending').classList.add('show');
+  setTimeout(()=>{
+    try{
+      if(liffReady && liff.isInClient()){ liff.closeWindow(); return; }
+    }catch(_){/* closeWindow 不可用時走手動提示 */}
+    const hint=document.getElementById('sendHint');
+    if(hint) hint.style.display='block';
+  }, 2600);
 }
 
 /* 頁面載入即初始化 LIFF(DEV 模式自動略過,不影響瀏覽器測試) */
