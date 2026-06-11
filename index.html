@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.2.1</title>
+<title>命格 · 進場儀式 v1.2.3</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -319,7 +319,7 @@
     <div class="st3" id="sendHint">可關閉此頁，回到 LINE 對話等候信箋</div>
   </div>
 
-  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2.1(過場5秒＋稍候片刻)</div>
+  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2.3(過場10秒＋聊天室承接＋卦記session_id)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -571,6 +571,22 @@ const LIFF_ID  = "2010192384-9AwjI8qH";       // S37 已建:命格進場儀式 L
    前端不持有任何固定密語;認證靠 LINE 簽發的 ID Token(每次即時拿、會過期、不可偽造)。 */
 const RELAY_URL = "https://mingge-relay.perhaps8511.workers.dev/";
 
+/* ★ v1.2.3:卦記會話編號(D3 卦記 schema 唯一缺口補件)
+   ──────────────────────────────────────────────
+   頁面載入時生成一次、存 sessionStorage(同 tab 內登入返航 reload 不換 ID,
+   與 mg_pending_say 同機制);送出 payload 帶上,供 Make M26 寫入 Divination_Log。
+   凍結區零接觸:不碰起卦演算法 / gua_result / qigua_time。 */
+const SESSION_ID = (function(){
+  const gen = () => (window.crypto && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : 'mg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+  try{
+    let s = sessionStorage.getItem('mg_session_id');
+    if(!s){ s = gen(); sessionStorage.setItem('mg_session_id', s); }
+    return s;
+  }catch(_){ return gen(); }   // sessionStorage 不可用 → 退一次性 ID,卦記仍有值
+})();
+
 let liffReady=false, liffUserId=null, liffAccessToken=null;
 
 /* LIFF 初始化(DEV 模式下略過,不報錯)
@@ -630,7 +646,8 @@ async function sendSay(){
   // 組送出 payload(line_user_id 來自 LIFF;DEV 模式給佔位字串)
   const payload = {
     ...lastGuaResult,
-    line_user_id: (liffUserId || (DEV_MODE ? "DEV_TEST_USER" : null))
+    line_user_id: (liffUserId || (DEV_MODE ? "DEV_TEST_USER" : null)),
+    session_id: SESSION_ID                          // ★ v1.2.3:卦記會話編號
   };
 
   if(DEV_MODE){
@@ -774,7 +791,7 @@ function showSendingAndClose(){
     }catch(_){/* closeWindow 不可用時走手動提示 */}
     const hint=document.getElementById('sendHint');
     if(hint) hint.style.display='block';
-  }, 5000);   // v1.2.1:過場至少停 5 秒再收合(2.6s 體感太快)
+  }, 10000);  // v1.2.2:過場 10 秒完成儀式感後收合;等待主場交給聊天室承接語(方案甲)
 }
 
 /* 頁面載入即初始化 LIFF(DEV 模式自動略過,不影響瀏覽器測試) */
