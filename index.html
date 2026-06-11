@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.2</title>
+<title>命格 · 進場儀式 v1.2.1</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -315,11 +315,11 @@
   <div class="sending" id="sending">
     <div class="slines" id="sendLines"></div>
     <div class="st1">卦已成形 · 老易讀卦中</div>
-    <div class="st2">信箋約半炷香後送達<br>請回到對話中等候</div>
+    <div class="st2">信箋稍候片刻便到<br>請回到對話中等候</div>
     <div class="st3" id="sendHint">可關閉此頁，回到 LINE 對話等候信箋</div>
   </div>
 
-  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2(送出自救＋登入返航)</div>
+  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2.1(過場5秒＋稍候片刻)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -774,7 +774,7 @@ function showSendingAndClose(){
     }catch(_){/* closeWindow 不可用時走手動提示 */}
     const hint=document.getElementById('sendHint');
     if(hint) hint.style.display='block';
-  }, 2600);
+  }, 5000);   // v1.2.1:過場至少停 5 秒再收合(2.6s 體感太快)
 }
 
 /* 頁面載入即初始化 LIFF(DEV 模式自動略過,不影響瀏覽器測試) */
