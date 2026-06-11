@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.1</title>
+<title>命格 · 進場儀式 v1.2</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -319,7 +319,7 @@
     <div class="st3" id="sendHint">可關閉此頁，回到 LINE 對話等候信箋</div>
   </div>
 
-  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.1(送出收合＋解卦中引導)</div>
+  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2(送出自救＋登入返航)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -591,6 +591,7 @@ async function initLiff(){
     }catch(_){}
     liffAccessToken=liff.getAccessToken();  // ★ 方案3:Access Token(SDK 管理、會自動續期;送出時會再即時重抓一次)
     console.log('[LIFF] init done. accessToken at init:', liffAccessToken ? 'OK' : 'null(送出時會重抓)');
+    restorePendingIfAny();                  // ★ v1.2:若是登入跳轉返回,還原送出前暫存的卦(qigua_time 原封,守 T0)
   }catch(e){
     console.error('LIFF init failed:', e);
   }
@@ -650,9 +651,19 @@ async function sendSay(){
     if(freshToken) liffAccessToken = freshToken;
   }
   if(!liffAccessToken){
-    // 仍拿不到 → 引導重新登入(而非死路)
-    alert('正在重新確認 LINE 身分,請稍候再按一次。');
-    if(liffReady && !liff.isLoggedIn()) liff.login();
+    // ★ v1.2 自救第一層:就地重 init + 重抓 token,救得回就直接續送(TA 不用再按)
+    liffAccessToken = await recoverLiffToken();
+  }
+  if(!liffAccessToken){
+    // ★ v1.2 自救第二層:真需重新登入 → 先暫存此卦(qigua_time 原封不動,守 T0 不重生時間),
+    //   登入返回後 restorePendingIfAny() 會自動還原 S3 與問句,TA 按一次送出即可。
+    stashPending(t);
+    alert('需要重新確認 LINE 身分。登入後會自動回到此卦,再按一次送出即可。');
+    if(liffReady){ liff.login(); }
+    else{
+      try{ await liff.init({ liffId: LIFF_ID }); liffReady=true; liff.login(); }
+      catch(e){ alert('LINE 身分初始化失敗,請改由 LINE 內的命格入口開啟本頁。'); }
+    }
     return;
   }
   try{
@@ -683,6 +694,64 @@ function copyJson(){
    .then(()=>{const b=event.target;b.textContent='已複製';setTimeout(()=>b.textContent='複製',1200);});
 }
 
+/* ===== v1.2:送出自救 + 登入返航 =====
+   原則:卦既成,時間不重生(T0)。暫存與還原只搬運 lastGuaResult 原物與顯示字串,
+   絕不重跑起卦、絕不重算 qigua_time。 */
+let restoredBenLines=null;   // 登入返航後,過場畫爻的備援來源(lastG 在 reload 後不存在)
+
+async function recoverLiffToken(){
+  try{
+    if(!liffReady){ await liff.init({ liffId: LIFF_ID }); liffReady=true; }
+  }catch(e){ console.warn('[LIFF] re-init:', e && e.message); liffReady=true; /* 已初始化過也會丟錯,繼續往下試 */ }
+  try{
+    if(liff.isLoggedIn()){
+      const tk=liff.getAccessToken();
+      if(tk){ console.log('[LIFF] token 自救成功,直接續送'); return tk; }
+    }
+  }catch(_){}
+  return null;
+}
+
+function stashPending(say){
+  try{
+    const gid=id=>document.getElementById(id);
+    sessionStorage.setItem('mg_pending_say', JSON.stringify({
+      gua: lastGuaResult,                                  // qigua_time 原封在內
+      say: say,
+      benLines: (lastG && lastG.benLines) || null,
+      disp:{
+        top: gid('rTop')?gid('rTop').textContent:'',
+        sym: gid('rSym')?gid('rSym').textContent:'',
+        name:gid('rName')?gid('rName').textContent:'',
+        tri: gid('rTri')?gid('rTri').textContent:'',
+        lines:gid('rLines')?gid('rLines').innerHTML:'',
+        bian:gid('rBian')?gid('rBian').textContent:''
+      }
+    }));
+  }catch(_){/* sessionStorage 不可用時,退回 TA 重起一卦 */}
+}
+
+function restorePendingIfAny(){
+  let p=null;
+  try{
+    const s=sessionStorage.getItem('mg_pending_say');
+    if(s){ p=JSON.parse(s); sessionStorage.removeItem('mg_pending_say'); }
+  }catch(_){}
+  if(!p || !p.gua) return;
+  lastGuaResult = p.gua;                 // ★ 原卦原時間,逐位元還原(禁呼叫 showResult,那會重生時間)
+  restoredBenLines = p.benLines || null;
+  const set=(id,v,html)=>{ const el=document.getElementById(id); if(el && v!=null){ if(html) el.innerHTML=v; else el.textContent=v; } };
+  const d=p.disp||{};
+  set('rTop',d.top); set('rSym',d.sym); set('rName',d.name);
+  set('rTri',d.tri); set('rLines',d.lines,true); set('rBian',d.bian);
+  const si=document.getElementById('sayInput');
+  if(si && p.say){ si.value=p.say; if(typeof sayText!=='undefined') sayText=p.say; }
+  const rj=document.getElementById('rJson');
+  if(rj) rj.textContent=JSON.stringify(lastGuaResult,null,2);
+  go(3);
+  console.log('[LIFF] 登入返航:已還原暫存卦,qigua_time =', lastGuaResult.qigua_time);
+}
+
 /* ===== S79:送出後過場 =====
    顯示「卦已成形 · 老易讀卦中」引導(畫 TA 此卦本卦六爻,卦象是主角,守關5源頭主從),
    約 2.6 秒後以 LIFF SDK 原生 liff.closeWindow() 自動收合回聊天室;
@@ -690,9 +759,10 @@ function copyJson(){
    凍結區零接觸:不碰起卦演算法 / gua_result / qigua_time。 */
 function showSendingAndClose(){
   const box=document.getElementById('sendLines');
-  if(box && lastG && lastG.benLines){
+  const bl=(lastG && lastG.benLines) || restoredBenLines;   // v1.2:登入返航後 lastG 不在,用還原備援
+  if(box && bl){
     let h='';
-    lastG.benLines.forEach(v=>{
+    bl.forEach(v=>{
       h+=`<div class="syao ${v===1?'yang':'yin'}"><div class="seg"></div>${v===0?'<div class="seg"></div>':''}</div>`;
     });
     box.innerHTML=h;
