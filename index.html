@@ -227,6 +227,17 @@
 
   .scene::-webkit-scrollbar{width:0;}
   #s3.active{overflow-y:auto;padding-top:30px;padding-bottom:60px;justify-content:flex-start;}
+
+  /* 同意閘門(S124 加) */
+  .door .consent-row{display:flex;align-items:flex-start;gap:10px;max-width:316px;
+    margin:46px auto 0;font-size:11.5px;line-height:1.9;letter-spacing:.02em;
+    color:var(--rice-deep);text-align:left;cursor:pointer;
+    animation:fadeUp 1.8s ease 2.2s both;}
+  .door .consent-row input{margin-top:3px;width:15px;height:15px;flex:0 0 auto;
+    accent-color:var(--gold);cursor:pointer;}
+  .door .consent-row .terms-word{color:var(--gold-soft);text-decoration:underline;text-underline-offset:2px;}
+  .door .enter:disabled{opacity:.32;cursor:not-allowed;box-shadow:none;}
+  .door .enter:disabled:hover{background:transparent;color:var(--rice);box-shadow:none;}
 </style>
 </head>
 <body>
@@ -245,7 +256,11 @@
         <small>心 有 所 惑 · 方 來 起 卦</small>
       </div>
       <div class="scope">事 業 · 決 策 · 進 退 · 時 機</div>
-      <button class="enter" onclick="go(1)">入　內</button>
+      <label class="consent-row">
+        <input type="checkbox" id="consentChk" onchange="onConsentToggle()">
+        <span>我已閱讀並同意 <span class="terms-word">服務條款</span>，且同意命格為提供卜卦服務所需，蒐集與使用必要之個人資料。</span>
+      </label>
+      <button class="enter" id="enterBtn" onclick="enterWithConsent()" disabled>入　內</button>
       <div class="legal">本服務以《易經》卜卦為本，卦象所示僅供參考啟發，不保證準確或特定結果，亦不構成醫療、投資理財、法律之專業建議。一切決策與後果，請您自行斟酌承擔。</div>
     </div>
   </div>
@@ -792,6 +807,54 @@ function showSendingAndClose(){
     const hint=document.getElementById('sendHint');
     if(hint) hint.style.display='block';
   }, 10000);  // v1.2.2:過場 10 秒完成儀式感後收合;等待主場交給聊天室承接語(方案甲)
+}
+
+/* ===== 同意閘門(S124 加)=====
+   勾了才 enable 入內;按入內 → 靜默送 consent_granted 給 relay(走 Route A 建檔)→ 進 s1。
+   身分(line_user_id/display_name)由 relay 用 LINE 驗證覆蓋,前端不自填(守 S37)。 */
+const CONSENT_VERSION = "compliance_01_v0.4";   // 對齊現行同意書版本;改版時同步改這裡
+
+function onConsentToggle(){
+  const chk = document.getElementById('consentChk');
+  const btn = document.getElementById('enterBtn');
+  if(btn) btn.disabled = !(chk && chk.checked);
+}
+
+async function enterWithConsent(){
+  const chk = document.getElementById('consentChk');
+  if(!chk || !chk.checked) return;            // 沒勾不放行(雙保險)
+  // 先進 s1,不讓建檔的網路延遲卡住使用者體驗
+  go(1);
+  // 背景靜默送出 consent_granted(失敗也不擋,只記 log)
+  try{
+    let token = liffAccessToken;
+    if(liffReady && !DEV_MODE && liff.isLoggedIn()){
+      try{ token = liff.getAccessToken(); }catch(_){}   // 送出時重抓最新 token
+    }
+    if(DEV_MODE || !token){
+      console.log('[consent] DEV/無 token,略過送出(瀏覽器測試正常現象)');
+      return;
+    }
+    // consent_at:帶 +08:00 在地時間(守凍結區⑤,不用 toISOString 變 UTC)
+    const consentAt = (function(){
+      const d = new Date(), p = n => String(n).padStart(2,'0');
+      return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())
+        +'T'+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())+'+08:00';
+    })();
+    await fetch(RELAY_URL,{
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'X-Line-AccessToken':token },
+      body:JSON.stringify({
+        event:'consent_granted',
+        consent_at:consentAt,
+        consent_version:CONSENT_VERSION,
+        share_ref:''                        // 之後做分享導流再帶來源碼,現在留空
+      })
+    });
+    console.log('[consent] consent_granted 已送出');
+  }catch(e){
+    console.warn('[consent] 送出失敗(不擋使用者):', e && e.message);
+  }
 }
 
 /* 頁面載入即初始化 LIFF(DEV 模式自動略過,不影響瀏覽器測試) */
