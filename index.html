@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.2.6</title>
+<title>命格 · 進場儀式 v1.2.7</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -268,6 +268,14 @@
   .log-card{border-bottom:1px solid rgba(216,207,188,.12);padding:16px 0;}
   .log-card .lc-gua{font-size:18px;color:var(--rice);letter-spacing:.12em;margin-bottom:6px;}
   .log-card .lc-meta{font-size:11px;color:var(--jade);letter-spacing:.08em;opacity:.75;}
+  /* ====================================================
+     E13 易經書房
+  ==================================================== */
+  .study-section{margin-bottom:28px;}
+  .study-section h3{font-size:15px;letter-spacing:.18em;color:var(--gold-lit);margin-bottom:10px;}
+  .study-section p{font-size:13.5px;line-height:2.1;letter-spacing:.06em;color:var(--rice-deep);opacity:.82;}
+  .study-divider{border:none;border-top:1px solid rgba(216,207,188,.1);margin:24px 0;}
+  .study-coming{font-size:12px;color:var(--jade);opacity:.55;letter-spacing:.12em;}
 </style>
 </head>
 <body>
@@ -360,6 +368,36 @@
     <div class="st3" id="sendHint">可關閉此頁，回到 LINE 對話等候信箋</div>
   </div>
 
+  <!-- P-STUDY 格4 易經書房 (E13 · 靜態 · action=study) -->
+  <div class="liff-page" id="page-study">
+    <div class="lp-header">
+      <div class="lp-icon">📚</div>
+      <h1>易經書房</h1>
+      <div class="lp-sub">主人讀易的地方，也擱著些可看的東西。</div>
+    </div>
+    <div class="lp-body">
+      <div class="study-section">
+        <h3>① 易經是什麼（白話）</h3>
+        <p class="study-coming">書房整理中，稍候。</p>
+      </div>
+      <hr class="study-divider">
+      <div class="study-section">
+        <h3>② 六十四卦淺說</h3>
+        <p class="study-coming">書房整理中，稍候。</p>
+      </div>
+      <hr class="study-divider">
+      <div class="study-section">
+        <h3>③ 卦象與商業時節</h3>
+        <p class="study-coming">書房整理中，稍候。</p>
+      </div>
+      <hr class="study-divider">
+      <div class="study-section">
+        <h3>④ 老易讀卦隨筆</h3>
+        <p class="study-coming">書房整理中，稍候。</p>
+      </div>
+    </div>
+  </div>
+
   <!-- P-LOG 格2 區① 歷史卦例 (E09 · action=log) -->
   <div class="liff-page" id="page-log">
     <div class="lp-header">
@@ -388,7 +426,7 @@
     </div>
   </div>
 
-  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2.6(E09 歷史卦例)</div>
+  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2.7(E13 易經書房)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
