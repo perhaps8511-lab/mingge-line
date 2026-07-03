@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.2.8</title>
+<title>命格 · 進場儀式 v1.2.9</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -266,7 +266,8 @@
   .log-empty{text-align:center;padding:48px 0;color:var(--jade);font-size:13px;letter-spacing:.15em;opacity:.7;}
   .log-loading{text-align:center;padding:40px 0;color:var(--jade);font-size:13px;letter-spacing:.18em;opacity:.65;}
   .log-card{border-bottom:1px solid rgba(216,207,188,.12);padding:16px 0;}
-  .log-card .lc-gua{font-size:18px;color:var(--rice);letter-spacing:.12em;margin-bottom:6px;}
+  .log-card .lc-q{font-size:14px;color:var(--rice-deep);letter-spacing:.06em;margin-bottom:6px;line-height:1.7;}
+  .log-card .lc-gua{font-size:16px;color:var(--rice);letter-spacing:.12em;margin-bottom:4px;}
   .log-card .lc-meta{font-size:11px;color:var(--jade);letter-spacing:.08em;opacity:.75;}
   /* ====================================================
      E13 易經書房
@@ -479,7 +480,7 @@
     </div>
   </div>
 
-  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2.8(E12 訂閱方案)</div>
+      <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2.9(E09 欄位修正)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -524,7 +525,13 @@ async function initLogPage(){
       listEl.innerHTML='<div class="log-empty">尚無卦記。</div>';
     }else{
       listEl.innerHTML=data.records.map(function(r){
-        return '<div class="log-card"><div class="lc-gua">'+r.gua_name+'</div><div class="lc-meta">'+r.created_at+'</div></div>';
+        var guaLine=(r.ben_gua||'')+(r.bian_gua?(' → '+r.bian_gua):'');
+        var meta=[(r.dong_yao?('動爻 '+r.dong_yao):''),r.qigua_time].filter(Boolean).join(' · ');
+        return '<div class="log-card">'
+          +(r.question_text?('<div class="lc-q">'+r.question_text+'</div>'):'')
+          +(guaLine?('<div class="lc-gua">'+guaLine+'</div>'):'')
+          +(meta?('<div class="lc-meta">'+meta+'</div>'):'')
+          +'</div>';
       }).join('');
     }
   }catch(e){
