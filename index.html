@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.2.4</title>
+<title>命格 · 進場儀式 v1.2.5</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -238,6 +238,24 @@
   .door .consent-row .terms-word{color:var(--gold-soft);text-decoration:underline;text-underline-offset:2px;}
   .door .enter:disabled{opacity:.32;cursor:not-allowed;box-shadow:none;}
   .door .enter:disabled:hover{background:transparent;color:var(--rice);box-shadow:none;}
+
+  /* ====================================================
+     LIFF 子頁面通用（action=about/log/study/pay）
+  ==================================================== */
+  .liff-page{
+    position:absolute;inset:0;z-index:20;overflow-y:auto;
+    display:none;flex-direction:column;padding:0 0 60px;background:transparent;}
+  .liff-page.active{display:flex;}
+  .lp-header{padding:52px 28px 20px;text-align:center;border-bottom:1px solid rgba(184,134,11,.18);margin-bottom:4px;}
+  .lp-header .lp-icon{font-size:28px;margin-bottom:10px;}
+  .lp-header h1{font-size:22px;letter-spacing:.22em;text-indent:.22em;color:var(--rice);font-weight:600;}
+  .lp-header .lp-sub{font-size:13px;letter-spacing:.16em;color:var(--gold-soft);margin-top:10px;line-height:1.8;}
+  .lp-body{padding:28px 28px 0;flex:1;}
+  .lp-body p{font-size:14.5px;line-height:2.3;letter-spacing:.06em;color:var(--rice-deep);margin-bottom:16px;}
+  .lp-body strong{color:var(--gold-lit);}
+  .lp-quote{
+    border-left:2px solid var(--gold-soft);padding-left:16px;margin:20px 0;
+    font-size:14px;line-height:2.2;letter-spacing:.06em;color:var(--rice-deep);}
 </style>
 </head>
 <body>
@@ -330,11 +348,41 @@
     <div class="st3" id="sendHint">可關閉此頁，回到 LINE 對話等候信箋</div>
   </div>
 
-  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2.4(過場10秒＋聊天室承接＋卦記session_id)</div>
+  <!-- P-ABOUT 格5 老易介紹 (E14 · 靜態 · action=about) -->
+  <div class="liff-page" id="page-about">
+    <div class="lp-header">
+      <div class="lp-icon">👤</div>
+      <h1>老易</h1>
+    </div>
+    <div class="lp-body">
+      <p>老易，六十出頭，讀了大半輩子的《易經》。</p>
+      <p>他不是算命的，也不替您決定什麼——他是替您把卦讀清楚的人。</p>
+      <p>您向天問了一卦，卦象天成；老易做的，是把這一卦的本卦、變卦、動爻，一樣樣為您讀出來，看清這件事此刻的形勢、往哪裡轉。</p>
+      <div class="lp-quote">「善為易者不占。」<br>真正懂易的人，不求一個算定的答案，是看懂當下形勢、自己拿主意。</div>
+      <p>老易在這裡，陪您把要緊的決定，看得更清楚一點。</p>
+    </div>
+  </div>
+
+  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2.5(E14 老易介紹)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
+/* ===== LIFF 子頁面路由 (E14/E09/E13/E12) ===== */
+(function(){
+  var action = new URLSearchParams(window.location.search).get('action') || 'divine';
+  var pageMap = {about:'page-about', log:'page-log', study:'page-study', pay:'page-pay'};
+  var pageId = pageMap[action];
+  if(!pageId) return;
+  document.addEventListener('DOMContentLoaded', function(){
+    document.querySelectorAll('.scene, .sending').forEach(function(el){ el.style.display='none'; });
+    var page = document.getElementById(pageId);
+    if(page){ page.classList.add('active'); }
+    if(action==='log'){ initLogPage(); }
+    if(action==='pay'){ initPayPage(); }
+  });
+})();
+
 /* ===== 六十四卦圓圖資料 ===== */
 window.GUA_RING=[{"n":"坤","l":[0,0,0,0,0,0]},{"n":"豫","l":[1,0,0,0,0,0]},{"n":"比","l":[0,1,0,0,0,0]},{"n":"萃","l":[1,1,0,0,0,0]},{"n":"剝","l":[0,0,1,0,0,0]},{"n":"晉","l":[1,0,1,0,0,0]},{"n":"觀","l":[0,1,1,0,0,0]},{"n":"否","l":[1,1,1,0,0,0]},{"n":"復","l":[0,0,0,1,0,0]},{"n":"震","l":[1,0,0,1,0,0]},{"n":"屯","l":[0,1,0,1,0,0]},{"n":"隨","l":[1,1,0,1,0,0]},{"n":"頤","l":[0,0,1,1,0,0]},{"n":"噬嗑","l":[1,0,1,1,0,0]},{"n":"益","l":[0,1,1,1,0,0]},{"n":"無妄","l":[1,1,1,1,0,0]},{"n":"師","l":[0,0,0,0,1,0]},{"n":"解","l":[1,0,0,0,1,0]},{"n":"坎","l":[0,1,0,0,1,0]},{"n":"困","l":[1,1,0,0,1,0]},{"n":"蒙","l":[0,0,1,0,1,0]},{"n":"未濟","l":[1,0,1,0,1,0]},{"n":"渙","l":[0,1,1,0,1,0]},{"n":"訟","l":[1,1,1,0,1,0]},{"n":"臨","l":[0,0,0,1,1,0]},{"n":"歸妹","l":[1,0,0,1,1,0]},{"n":"節","l":[0,1,0,1,1,0]},{"n":"兌","l":[1,1,0,1,1,0]},{"n":"損","l":[0,0,1,1,1,0]},{"n":"睽","l":[1,0,1,1,1,0]},{"n":"中孚","l":[0,1,1,1,1,0]},{"n":"履","l":[1,1,1,1,1,0]},{"n":"謙","l":[0,0,0,0,0,1]},{"n":"小過","l":[1,0,0,0,0,1]},{"n":"蹇","l":[0,1,0,0,0,1]},{"n":"咸","l":[1,1,0,0,0,1]},{"n":"艮","l":[0,0,1,0,0,1]},{"n":"旅","l":[1,0,1,0,0,1]},{"n":"漸","l":[0,1,1,0,0,1]},{"n":"遯","l":[1,1,1,0,0,1]},{"n":"明夷","l":[0,0,0,1,0,1]},{"n":"豐","l":[1,0,0,1,0,1]},{"n":"既濟","l":[0,1,0,1,0,1]},{"n":"革","l":[1,1,0,1,0,1]},{"n":"賁","l":[0,0,1,1,0,1]},{"n":"離","l":[1,0,1,1,0,1]},{"n":"家人","l":[0,1,1,1,0,1]},{"n":"同人","l":[1,1,1,1,0,1]},{"n":"升","l":[0,0,0,0,1,1]},{"n":"恆","l":[1,0,0,0,1,1]},{"n":"井","l":[0,1,0,0,1,1]},{"n":"大過","l":[1,1,0,0,1,1]},{"n":"蠱","l":[0,0,1,0,1,1]},{"n":"鼎","l":[1,0,1,0,1,1]},{"n":"巽","l":[0,1,1,0,1,1]},{"n":"姤","l":[1,1,1,0,1,1]},{"n":"泰","l":[0,0,0,1,1,1]},{"n":"大壯","l":[1,0,0,1,1,1]},{"n":"需","l":[0,1,0,1,1,1]},{"n":"夬","l":[1,1,0,1,1,1]},{"n":"大畜","l":[0,0,1,1,1,1]},{"n":"大有","l":[1,0,1,1,1,1]},{"n":"小畜","l":[0,1,1,1,1,1]},{"n":"乾","l":[1,1,1,1,1,1]}];
 
