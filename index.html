@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.2.9</title>
+<title>命格 · 進場儀式 v1.3.0</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -277,6 +277,10 @@
   .study-section p{font-size:13.5px;line-height:2.1;letter-spacing:.06em;color:var(--rice-deep);opacity:.82;}
   .study-divider{border:none;border-top:1px solid rgba(216,207,188,.1);margin:24px 0;}
   .study-coming{font-size:12px;color:var(--jade);opacity:.55;letter-spacing:.12em;}
+.study-article{padding:10px 0;border-bottom:1px solid rgba(216,207,188,.07);}
+.study-article:last-child{border-bottom:none;}
+.sa-title{font-size:14px;color:var(--rice);letter-spacing:.1em;margin-bottom:6px;line-height:1.7;}
+.sa-body{font-size:13px;line-height:2.0;letter-spacing:.05em;color:var(--rice-deep);opacity:.78;}
   /* ====================================================
      E12 訂閱方案
   ==================================================== */
@@ -429,26 +433,8 @@
       <h1>易經書房</h1>
       <div class="lp-sub">主人讀易的地方，也擱著些可看的東西。</div>
     </div>
-    <div class="lp-body">
-      <div class="study-section">
-        <h3>① 易經是什麼（白話）</h3>
-        <p class="study-coming">書房整理中，稍候。</p>
-      </div>
-      <hr class="study-divider">
-      <div class="study-section">
-        <h3>② 六十四卦淺說</h3>
-        <p class="study-coming">書房整理中，稍候。</p>
-      </div>
-      <hr class="study-divider">
-      <div class="study-section">
-        <h3>③ 卦象與商業時節</h3>
-        <p class="study-coming">書房整理中，稍候。</p>
-      </div>
-      <hr class="study-divider">
-      <div class="study-section">
-        <h3>④ 老易讀卦隨筆</h3>
-        <p class="study-coming">書房整理中，稍候。</p>
-      </div>
+        <div class="lp-body" id="studyBody">
+      <div class="log-loading" id="studyLoading">æ¸æ¿ééä¸­â¦â¦</div>
     </div>
   </div>
 
@@ -480,11 +466,54 @@
     </div>
   </div>
 
-      <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2.9(E09 欄位修正)</div>
+      <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.3.0(E09 欄位修正)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
+/* ===== E13 易經書房頁 ===== */
+async function initStudyPage(){
+  var bodyEl=document.getElementById('studyBody');
+  var loadEl=document.getElementById('studyLoading');
+  var CATS=['節氣信','人際小文','時節問候'];
+  try{
+    var resp=await fetch(RELAY_URL+'study',{method:'GET'});
+    if(!resp.ok){throw new Error('HTTP '+resp.status);}
+    var data=await resp.json();
+    if(loadEl)loadEl.remove();
+    var articles=data.articles||[];
+    if(articles.length===0){
+      bodyEl.innerHTML='<div class="log-empty">書房整理中，稍候。</div>';
+      return;
+    }
+    var grouped={};
+    CATS.forEach(function(c){grouped[c]=[];});
+    articles.forEach(function(a){
+      var ct=a.content_type||'其他';
+      if(!grouped[ct])grouped[ct]=[];
+      grouped[ct].push(a);
+    });
+    var html='';
+    Object.keys(grouped).forEach(function(cat,i){
+      if(grouped[cat].length===0)return;
+      if(i>0)html+='<hr class="study-divider">';
+      html+='<div class="study-section"><h3>'+cat+'</h3>';
+      grouped[cat].forEach(function(a){
+        html+='<div class="study-article">'
+          +'<div class="sa-title">'+a.title+'</div>'
+          +(a.body?('<div class="sa-body">'+a.body+'</div>'):'')
+          +'</div>';
+      });
+      html+='</div>';
+    });
+    bodyEl.innerHTML=html;
+  }catch(e){
+    if(loadEl)loadEl.remove();
+    bodyEl.innerHTML='<div class="log-empty">書房暫時無法開門，請稍後再試。</div>';
+    console.warn('[study page]',e);
+  }
+}
+
 /* ===== E12 訂閱方案頁 ===== */
 async function initPayPage(){
   var subActiveEl=document.getElementById('paySubActive');
@@ -554,6 +583,7 @@ async function initLogPage(){
     if(page){ page.classList.add('active'); }
     if(action==='log'){ initLogPage(); }
     if(action==='pay'){ initPayPage(); }
+    if(action==='study'){ initStudyPage(); }
   });
 })();
 
