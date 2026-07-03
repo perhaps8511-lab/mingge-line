@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.2.7</title>
+<title>命格 · 進場儀式 v1.2.8</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -276,6 +276,32 @@
   .study-section p{font-size:13.5px;line-height:2.1;letter-spacing:.06em;color:var(--rice-deep);opacity:.82;}
   .study-divider{border:none;border-top:1px solid rgba(216,207,188,.1);margin:24px 0;}
   .study-coming{font-size:12px;color:var(--jade);opacity:.55;letter-spacing:.12em;}
+  /* ====================================================
+     E12 訂閱方案
+  ==================================================== */
+  .pay-sub-active{
+    border:1px solid rgba(122,154,114,.3);border-radius:4px;
+    padding:16px 18px;font-size:13px;letter-spacing:.08em;
+    color:var(--jade);margin-bottom:20px;background:rgba(122,154,114,.06);
+    line-height:1.8;}
+  .pay-plan{
+    border:1px solid rgba(184,134,11,.22);border-radius:4px;
+    padding:20px 20px;margin-bottom:16px;}
+  .pay-plan h3{font-size:15px;letter-spacing:.14em;color:var(--gold-lit);margin-bottom:10px;}
+  .pay-plan p{font-size:13.5px;line-height:2.1;letter-spacing:.05em;color:var(--rice-deep);}
+  .pay-plan p+p{margin-top:10px;}
+  .pay-btn{
+    display:block;width:100%;background:transparent;color:var(--rice);
+    border:1px solid var(--gold);border-radius:2px;
+    padding:14px;font-family:inherit;font-size:14px;
+    letter-spacing:.3em;text-indent:.3em;cursor:pointer;
+    transition:.45s;margin-top:20px;text-align:center;}
+  .pay-btn:hover{background:var(--gold);color:#15200f;box-shadow:0 0 30px rgba(184,134,11,.4);}
+  .pay-btn[data-placeholder]{opacity:.35;cursor:not-allowed;}
+  .pay-btn[data-placeholder]:hover{background:transparent;color:var(--rice);box-shadow:none;}
+  .pay-note{
+    font-size:11.5px;line-height:2.0;letter-spacing:.04em;
+    color:var(--jade);opacity:.65;margin-top:20px;}
 </style>
 </head>
 <body>
@@ -368,6 +394,33 @@
     <div class="st3" id="sendHint">可關閉此頁，回到 LINE 對話等候信箋</div>
   </div>
 
+  <!-- P-PAY 格3 訂閱方案殼 (E12 · action=pay) -->
+  <div class="liff-page" id="page-pay">
+    <div class="lp-header">
+      <div class="lp-icon">🪙</div>
+      <h1>書房的來法</h1>
+      <div class="lp-sub">書房不關門，來的方式您可自己挑。</div>
+    </div>
+    <div class="lp-body">
+      <div class="pay-sub-active" id="paySubActive" style="display:none"></div>
+      <div class="pay-plan">
+        <h3>初訪（免費）</h3>
+        <p>一輩子相贈 <strong>3 枚問卦銅錢</strong>。一枚一問；卦象、解讀都是真的，先進來問問看。</p>
+      </div>
+      <div class="pay-plan">
+        <h3>問一卦｜149</h3>
+        <p>銅錢用盡，仍有事要問，便來一卦。老易為您讀本卦、變卦、動爻，把這一程攤開看清。</p>
+        <p>讀完若想再往深處走，同一卦，可再請老易多開幾面——<strong>四鏡·深卜 200</strong>，看互卦、序卦、變與不變裡的「轉」。不換卦、不重卜，只把這一卦讀到透。</p>
+        <button class="pay-btn" data-placeholder>前往付款（即將開放）</button>
+      </div>
+      <p class="pay-note">
+        付款在書房外頭辦（點上方連結），書房裡不收錢——這是規矩。<br>
+        退費：還沒起過任何一卦，14 天內全退；起過了，便算書房已為您開講，這次就不退了（取消後不再續扣，服務用到當期末）。<br>
+        ——不催您、不限時、不打折。書房的價錢，就是書房的價錢。
+      </p>
+    </div>
+  </div>
+
   <!-- P-STUDY 格4 易經書房 (E13 · 靜態 · action=study) -->
   <div class="liff-page" id="page-study">
     <div class="lp-header">
@@ -426,11 +479,28 @@
     </div>
   </div>
 
-  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2.7(E13 易經書房)</div>
+  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2.8(E12 訂閱方案)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
+/* ===== E12 訂閱方案頁 ===== */
+async function initPayPage(){
+  var subActiveEl=document.getElementById('paySubActive');
+  try{
+    await liff.init({liffId:LIFF_ID});
+    if(!liff.isLoggedIn()){return;}
+    var token=liff.getAccessToken();
+    var resp=await fetch(RELAY_URL+'subscription',{method:'GET',headers:{'X-Line-AccessToken':token}});
+    if(!resp.ok){return;}
+    var data=await resp.json();
+    if(data.subscription&&data.subscription.active&&subActiveEl){
+      subActiveEl.textContent='訂閱中，書房為您常開（有效至 '+data.subscription.expires_at+'）。';
+      subActiveEl.style.display='';
+    }
+  }catch(e){console.warn('[pay page]',e);}
+}
+
 /* ===== E09 歷史卦例頁 ===== */
 async function initLogPage(){
   var statusEl=document.getElementById('logStatus');
