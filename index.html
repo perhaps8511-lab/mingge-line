@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.2.5</title>
+<title>命格 · 進場儀式 v1.2.6</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -256,6 +256,18 @@
   .lp-quote{
     border-left:2px solid var(--gold-soft);padding-left:16px;margin:20px 0;
     font-size:14px;line-height:2.2;letter-spacing:.06em;color:var(--rice-deep);}
+  /* ====================================================
+     E09 歷史卦例
+  ==================================================== */
+  .log-status{
+    background:rgba(184,134,11,.07);border:1px solid rgba(184,134,11,.18);
+    border-radius:4px;padding:14px 18px;font-size:13px;
+    letter-spacing:.08em;color:var(--gold-soft);margin-bottom:24px;line-height:1.8;}
+  .log-empty{text-align:center;padding:48px 0;color:var(--jade);font-size:13px;letter-spacing:.15em;opacity:.7;}
+  .log-loading{text-align:center;padding:40px 0;color:var(--jade);font-size:13px;letter-spacing:.18em;opacity:.65;}
+  .log-card{border-bottom:1px solid rgba(216,207,188,.12);padding:16px 0;}
+  .log-card .lc-gua{font-size:18px;color:var(--rice);letter-spacing:.12em;margin-bottom:6px;}
+  .log-card .lc-meta{font-size:11px;color:var(--jade);letter-spacing:.08em;opacity:.75;}
 </style>
 </head>
 <body>
@@ -348,6 +360,19 @@
     <div class="st3" id="sendHint">可關閉此頁，回到 LINE 對話等候信箋</div>
   </div>
 
+  <!-- P-LOG 格2 區① 歷史卦例 (E09 · action=log) -->
+  <div class="liff-page" id="page-log">
+    <div class="lp-header">
+      <div class="lp-icon">📅</div>
+      <h1>我的卦記</h1>
+      <div class="lp-sub">您問過的卦，都在這裡記著。</div>
+    </div>
+    <div class="lp-body">
+      <div class="log-status" id="logStatus">載入中……</div>
+      <div id="logList"><div class="log-loading" id="logLoading">讀取記錄中……</div></div>
+    </div>
+  </div>
+
   <!-- P-ABOUT 格5 老易介紹 (E14 · 靜態 · action=about) -->
   <div class="liff-page" id="page-about">
     <div class="lp-header">
@@ -363,11 +388,45 @@
     </div>
   </div>
 
-  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2.5(E14 老易介紹)</div>
+  <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.2.6(E09 歷史卦例)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
+/* ===== E09 歷史卦例頁 ===== */
+async function initLogPage(){
+  var statusEl=document.getElementById('logStatus');
+  var listEl=document.getElementById('logList');
+  var loadingEl=document.getElementById('logLoading');
+  try{
+    await liff.init({liffId:LIFF_ID});
+    if(!liff.isLoggedIn()){liff.login();return;}
+    var token=liff.getAccessToken();
+    var resp=await fetch(RELAY_URL+'history',{method:'GET',headers:{'X-Line-AccessToken':token}});
+    if(!resp.ok){throw new Error('HTTP '+resp.status);}
+    var data=await resp.json();
+    if(data.subscription&&data.subscription.active){
+      statusEl.textContent='訂閱中，書房為您常開（有效至 '+data.subscription.expires_at+'）。';
+    }else{
+      var coins=typeof data.coins==='number'?data.coins:'—';
+      statusEl.textContent='尚餘 '+coins+' 枚問卦銅錢。';
+    }
+    if(loadingEl)loadingEl.remove();
+    if(!data.records||data.records.length===0){
+      listEl.innerHTML='<div class="log-empty">尚無卦記。</div>';
+    }else{
+      listEl.innerHTML=data.records.map(function(r){
+        return '<div class="log-card"><div class="lc-gua">'+r.gua_name+'</div><div class="lc-meta">'+r.created_at+'</div></div>';
+      }).join('');
+    }
+  }catch(e){
+    if(loadingEl)loadingEl.remove();
+    statusEl.textContent='—';
+    listEl.innerHTML='<div class="log-empty">載入失敗，請稍後再試。</div>';
+    console.warn('[log page]',e);
+  }
+}
+
 /* ===== LIFF 子頁面路由 (E14/E09/E13/E12) ===== */
 (function(){
   var action = new URLSearchParams(window.location.search).get('action') || 'divine';
