@@ -537,16 +537,22 @@ async function initLogPage(){
   var listEl=document.getElementById('logList');
   var loadingEl=document.getElementById('logLoading');
   try{
+    statusEl.textContent='驗證身分中……';
     await liff.init({liffId:LIFF_ID});
-    if(!liff.isLoggedIn()){liff.login();return;}
+    if(!liff.isLoggedIn()){statusEl.textContent='導向登入中……';liff.login();return;}
     var token=liff.getAccessToken();
+    statusEl.textContent='讀取卦記中……';
     var resp=await fetch(RELAY_URL+'history',{method:'GET',headers:{'X-Line-AccessToken':token}});
     if(!resp.ok){throw new Error('HTTP '+resp.status);}
     var data=await resp.json();
-    if(data.subscription&&data.subscription.active){
-      statusEl.textContent='訂閱中，書房為您常開（有效至 '+data.subscription.expires_at+'）。';
+    // ★ S137-R02:契約對齊 — Worker /history 回傳的是 subscriber:{tier,
+    //   trial_quota_remaining, monthly_quota_remaining, subscription_start}，
+    //   不是 subscription:{active,expires_at} / coins；原判斷永遠落到 else 分支。
+    var sub=data.subscriber;
+    if(sub&&sub.tier==='subscriber'){
+      statusEl.textContent='訂閱中，書房為您常開。';
     }else{
-      var coins=typeof data.coins==='number'?data.coins:'—';
+      var coins=sub?((sub.trial_quota_remaining||0)+(sub.monthly_quota_remaining||0)):0;
       statusEl.textContent='尚餘 '+coins+' 枚問卦銅錢。';
     }
     if(loadingEl)loadingEl.remove();
@@ -556,11 +562,15 @@ async function initLogPage(){
       listEl.innerHTML=data.records.map(function(r){
         var guaLine=(r.ben_gua||'')+(r.bian_gua?(' → '+r.bian_gua):'');
         var meta=[(r.dong_yao?('動爻 '+r.dong_yao):''),r.qigua_time].filter(Boolean).join(' · ');
-        return '<div class="log-card">'
+        var card=''
           +(r.question_text?('<div class="lc-q">'+r.question_text+'</div>'):'')
           +(guaLine?('<div class="lc-gua">'+guaLine+'</div>'):'')
-          +(meta?('<div class="lc-meta">'+meta+'</div>'):'')
-          +'</div>';
+          +(meta?('<div class="lc-meta">'+meta+'</div>'):'');
+        // ★ S137-R02 E23:log_id 由 Worker /history 補上,包成可點連結進卦記詳情頁
+        if(r.log_id){
+          return '<a class="log-card" href="./log.html?log_id='+encodeURIComponent(r.log_id)+'">'+card+'</a>';
+        }
+        return '<div class="log-card">'+card+'</div>';
       }).join('');
     }
   }catch(e){
