@@ -576,7 +576,10 @@ async function initLogPage(){
   }catch(e){
     if(loadingEl)loadingEl.remove();
     statusEl.textContent='—';
-    listEl.innerHTML='<div class="log-empty">載入失敗，請稍後再試。</div>';
+    // ★ S137-R04 暫時診斷埋樁:把真正錯誤顯示在畫面上,方便手機端不連 devtools 也能回報。
+    //   問題定位完成後應改回原本的通用文字「載入失敗，請稍後再試。」,不留在正式版面上。
+    var __diag = (e && e.name ? e.name+': ' : '') + (e && e.message ? e.message : String(e));
+    listEl.innerHTML='<div class="log-empty">載入失敗:<br><span style="font-size:12px;opacity:.7;">'+__diag.replace(/</g,'&lt;')+'</span></div>';
     console.warn('[log page]',e);
   }
 }
