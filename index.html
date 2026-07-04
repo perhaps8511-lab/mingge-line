@@ -1115,8 +1115,13 @@ async function enterWithConsent(){
   }
 }
 
-/* 頁面載入即初始化 LIFF(DEV 模式自動略過,不影響瀏覽器測試) */
-initLiff();
+/* 頁面載入即初始化 LIFF(DEV 模式自動略過,不影響瀏覽器測試)
+   ★ S137-R03:action≠divine 時(log/study/pay/about 子頁)不呼叫 —— 這些子頁各自的
+   initLogPage()/initStudyPage()/initPayPage() 已自帶各自的 liff.init()。若這裡仍無條件
+   呼叫,會跟子頁的 liff.init() 同頁面雙重初始化搶跑,LIFF SDK 不支援重複初始化,
+   第二個呼叫會卡死(不 resolve 也不 reject)——這正是 E09「驗證身分中」卡住不動的根因。 */
+var __bootAction = new URLSearchParams(window.location.search).get('action') || 'divine';
+if (__bootAction === 'divine') { initLiff(); }
 
 </script>
 </body>
