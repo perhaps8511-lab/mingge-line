@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>命格 · 卦記詳情</title>
+<!--
+  E23 卦記詳情頁 — 點單筆看完整解讀
+  S137 · 從 /log?log_id= 拉完整 output_json + ai_report
+  凍結區：墨綠金美學、不修起卦演算法 / gua_result / qigua_time
+-->
+<style>
+  :root{
+    --ink:#2C3E2D; --ink-2:#3a4f3b; --ink-soft:#6b7d6c;
+    --gold:#C9A84C; --gold-soft:#d8c07e;
+    --paper:#F5F1E8; --paper-card:#fbf9f3;
+    --line:#e3dcc9;
+    --serif:"Noto Serif TC","Songti TC","Source Han Serif TC",serif;
+    --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;background:var(--paper);}
+  body{font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased;}
+
+  /* ---- TOP BAR ---- */
+  .topbar{
+    background:var(--ink);color:var(--paper);
+    padding:14px 18px 13px;display:flex;align-items:center;gap:12px;
+    position:sticky;top:0;z-index:20;
+  }
+  .back-btn{
+    font-size:20px;line-height:1;opacity:.85;cursor:pointer;
+    background:none;border:none;color:var(--paper);padding:0;
+  }
+  .topbar .ttl{font-family:var(--serif);font-weight:600;font-size:17px;letter-spacing:.06em;}
+  .topbar .seal{
+    margin-left:auto;width:26px;height:26px;border-radius:50%;
+    border:1.5px solid var(--gold);color:var(--gold);
+    font-family:var(--serif);font-size:13px;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  /* ---- STATE VIEWS ---- */
+  .state-view{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-height:240px;padding:40px 24px;text-align:center;
+    font-family:var(--serif);color:var(--ink-soft);font-size:15px;line-height:2;
+  }
+  .state-view.hidden{display:none;}
+  .spinner{
+    width:28px;height:28px;border:2px solid rgba(44,62,45,.15);
+    border-top-color:var(--gold);border-radius:50%;
+    animation:spin .8s linear infinite;margin:0 auto 16px;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .err-msg{color:#8a5c2e;font-size:14px;}
+
+  /* ---- DETAIL ---- */
+  .detail-wrap{display:none;padding:0 0 48px;}
+
+  /* 卦頭 */
+  .gua-header{
+    padding:22px 22px 20px;
+    background:radial-gradient(120% 80% at 100% 0%,rgba(201,168,76,.10),transparent 60%),var(--paper);
+    border-bottom:1px solid var(--line);
+    text-align:center;
+  }
+  .gua-header .sym{font-family:var(--serif);font-size:52px;color:var(--ink);line-height:1;margin-bottom:8px;}
+  .gua-header .names{font-family:var(--serif);font-size:20px;font-weight:700;letter-spacing:.1em;margin-bottom:6px;}
+  .gua-header .dong{font-size:13px;color:var(--gold);letter-spacing:.08em;}
+  .gua-header .qtime{font-size:12px;color:var(--ink-soft);margin-top:10px;letter-spacing:.05em;}
+  .gua-header .question-block{
+    margin-top:14px;padding:12px 16px;border-radius:10px;
+    background:var(--ink);color:var(--paper);
+    font-family:var(--serif);font-size:14px;line-height:1.8;text-align:left;
+  }
+
+  /* 區塊通用 */
+  .section{padding:20px 22px;border-bottom:1px solid var(--line);}
+  .section:last-child{border-bottom:none;}
+  .sec-title{
+    font-family:var(--serif);font-size:12px;letter-spacing:.18em;color:var(--gold);
+    margin-bottom:12px;font-weight:600;
+  }
+  .sec-body{font-family:var(--serif);font-size:15px;line-height:1.9;color:var(--ink);}
+  .sec-body p{margin-bottom:10px;}
+  .sec-body p:last-child{margin-bottom:0;}
+
+  /* output_json 各欄 */
+  .gua-pair{display:flex;gap:16px;margin-bottom:14px;}
+  .gua-box{
+    flex:1;background:var(--paper-card);border:1px solid var(--line);
+    border-radius:10px;padding:12px 14px;text-align:center;
+  }
+  .gua-box .box-sym{font-family:var(--serif);font-size:30px;line-height:1;margin-bottom:4px;}
+  .gua-box .box-label{font-size:11px;color:var(--gold);letter-spacing:.12em;margin-bottom:6px;}
+  .gua-box .box-name{font-family:var(--serif);font-size:16px;font-weight:600;}
+
+  /* 爻位列表 */
+  .yao-list{list-style:none;}
+  .yao-list li{
+    display:flex;align-items:flex-start;gap:10px;
+    padding:8px 0;border-bottom:1px solid rgba(227,220,201,.6);
+    font-size:14px;line-height:1.7;
+  }
+  .yao-list li:last-child{border-bottom:none;}
+  .yao-pos{
+    flex-shrink:0;width:28px;height:28px;border-radius:50%;
+    background:var(--gold);color:#fff;font-size:12px;font-weight:600;
+    display:flex;align-items:center;justify-content:center;margin-top:1px;
+  }
+  .yao-pos.dong{background:var(--ink);}
+
+  /* ai_report Markdown 渲染後的段落 */
+  .report-body h1,.report-body h2,.report-body h3{
+    font-family:var(--serif);color:var(--ink);margin:16px 0 8px;
+    font-size:15px;font-weight:700;letter-spacing:.06em;
+  }
+  .report-body p{margin-bottom:12px;font-size:14.5px;line-height:1.9;color:var(--ink);}
+  .report-body strong{color:var(--ink);font-weight:700;}
+  .report-body em{color:var(--ink-soft);}
+  .report-body hr{border:none;border-top:1px solid var(--line);margin:16px 0;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <button class="back-btn" onclick="history.back()">‹</button>
+  <span class="ttl">卦記詳情</span>
+  <div class="seal">命</div>
+</div>
+
+<!-- 載入中 -->
+<div class="state-view" id="viewLoading">
+  <div class="spinner"></div>
+  載入中……
+</div>
+
+<!-- 錯誤 -->
+<div class="state-view hidden" id="viewError">
+  <p class="err-msg" id="errMsg">無法載入此卦記。</p>
+</div>
+
+<!-- 詳情 -->
+<div class="detail-wrap" id="viewDetail"></div>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+const LIFF_ID   = "2010192384-9AwjI8qH";
+const RELAY_URL = "https://mingge-relay.perhaps8511.workers.dev/";
+
+const GUA_SYM = [
+  "","䷀","䷁","䷂","䷃","䷄","䷅","䷆","䷇","䷈","䷉",
+  "䷊","䷋","䷌","䷍","䷎","䷏","䷐","䷑","䷒","䷓","䷔","䷕","䷖","䷗",
+  "䷘","䷙","䷚","䷛","䷜","䷝","䷞","䷟","䷠","䷡","䷢","䷣","䷤","䷥",
+  "䷦","䷧","䷨","䷩","䷪","䷫","䷬","䷭","䷮","䷯","䷰","䷱","䷲","䷳",
+  "䷴","䷵","䷶","䷷","䷸","䷹","䷺","䷻","䷼","䷽","䷾","䷿"
+];
+const GUA_NAMES = [
+  "","乾","坤","屯","蒙","需","訟","師","比","小畜","履",
+  "泰","否","同人","大有","謙","豫","隨","蠱","臨","觀","噬嗑","賁","剝","復",
+  "無妄","大畜","頤","大過","坎","離","咸","恆","遯","大壯","晉","明夷","家人","睽",
+  "蹇","解","損","益","夬","姤","萃","升","困","井","革","鼎","震","艮",
+  "漸","歸妹","豐","旅","巽","兌","渙","節","中孚","小過","既濟","未濟"
+];
+
+function guaSymbol(name) {
+  const idx = GUA_NAMES.indexOf(name);
+  return idx > 0 ? GUA_SYM[idx] : "卦";
+}
+
+function show(id) {
+  ["viewLoading","viewError"].forEach(v => {
+    document.getElementById(v).classList[v === id ? "remove" : "add"]("hidden");
+  });
+  document.getElementById("viewDetail").style.display = id === "viewDetail" ? "block" : "none";
+}
+
+function fmtDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso.slice(0,16).replace("T"," ");
+  const p = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}年${p(d.getMonth()+1)}月${p(d.getDate())}日　${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function textToHtml(t) {
+  return esc(t).trim().replace(/\n/g,"<br>");
+}
+
+/* ===== output_json 欄位解析(S137-R01 修正)=====
+   欄位名叫 output_json,但實際內容不是 JSON —— 是 Dify v1.6 標記散文,
+   格式規格見 mingge_mg44_flex_parse_buildpack_v0_1.md。
+   三種骨架(依 R01 真輸出反推):
+     ① 一般綠燈: #META → [[J1]]~[[J6]] → [[ZY]] → [[NEXT]] → [[END]]
+     ② 黃燈混合: #META → [[GZ]] → [[J1]]~[[ZY]](→[[NEXT]]) → [[END]]
+     ③ 紅/黑線: #META → [[SR]] → [[END]](無 J 段、無 ZY、無 NEXT)
+   容錯規則③:整體 no-match → 原文當純文字顯示,不硬套解析。 */
+function parseReading(raw) {
+  if (!raw || typeof raw !== "string") return null;
+
+  const grab = (re) => { const m = raw.match(re); return m ? m[1].trim() : null; };
+
+  // ③ 紅/黑線標準回應優先判(SR 命中 = 唯一內容,不含 J 段)
+  const sr = grab(/\[\[SR\]\]([\s\S]*?)\[\[END\]\]/);
+  if (sr) return { type: "sr", sr };
+
+  // ② GZ(黃燈收束,optional,在 J1 之前)
+  const gz = grab(/\[\[GZ\]\]([\s\S]*?)(?=\[\[J1\]\])/);
+
+  // ① J1~J6(六味解讀,固定六段)
+  const mirrors = [];
+  for (let i = 1; i <= 6; i++) {
+    const nextTag = i < 6 ? `\\[\\[J${i+1}\\]\\]` : `\\[\\[ZY\\]\\]`;
+    const re = new RegExp(`\\[\\[J${i}\\]\\]([\\s\\S]*?)(?=${nextTag})`);
+    const m = raw.match(re);
+    if (m) mirrors.push(m[1].trim());
+  }
+  if (mirrors.length === 0) return null;  // 沒抓到任何 J 段 → 整體 no-match,走 fallback
+
+  const zy   = grab(/\[\[ZY\]\]([\s\S]*?)(?=\[\[NEXT\]\]|\[\[END\]\])/);
+  const next = grab(/\[\[NEXT\]\]([\s\S]*?)\[\[END\]\]/);
+
+  return { type: "letter", gz, mirrors, zy, next };
+}
+
+function renderDetail(rec) {
+  const wrap = document.getElementById("viewDetail");
+
+  const benSym  = guaSymbol(rec.ben_gua  || "");
+  const bianSym = guaSymbol(rec.bian_gua || "");
+  const dongYao = rec.dong_yao || "";
+  const qtime   = fmtDate(rec.qigua_time);
+  const q       = rec.question_text || "（未留問句）";
+
+  let html = `
+    <div class="gua-header">
+      <div class="sym">${benSym}</div>
+      <div class="names">${rec.ben_gua || "—"}${rec.bian_gua ? " → " + rec.bian_gua : ""}</div>
+      ${dongYao ? `<div class="dong">動爻第 ${dongYao} 爻</div>` : ""}
+      <div class="qtime">${qtime}</div>
+      <div class="question-block">${esc(q)}</div>
+    </div>`;
+
+  // 本卦 / 變卦資訊
+  html += `<div class="section">
+    <div class="sec-title">卦象</div>
+    <div class="gua-pair">
+      <div class="gua-box">
+        <div class="box-sym">${benSym}</div>
+        <div class="box-label">本　卦</div>
+        <div class="box-name">${rec.ben_gua || "—"}</div>
+      </div>
+      ${rec.bian_gua ? `
+      <div class="gua-box">
+        <div class="box-sym">${bianSym}</div>
+        <div class="box-label">變　卦</div>
+        <div class="box-name">${rec.bian_gua}</div>
+      </div>` : ""}
+    </div>
+  </div>`;
+
+  // ★ S137-R01:非 divination 類型（deepdive/fupan/mood）先不硬套六味解析
+  const entryType = rec.entry_type || "divination";
+  if (entryType !== "divination") {
+    html += `<div class="section">
+      <div class="sec-body" style="color:var(--ink-soft);font-size:14px;text-align:center;padding:20px 0;">
+        此類型（${esc(entryType)}）詳情頁尚未支援。
+      </div>
+    </div>`;
+    wrap.innerHTML = html;
+    return;
+  }
+
+  const parsed = parseReading(rec.output_json);
+
+  if (!parsed) {
+    // 規則③ 整體 no-match 降級:原文純文字顯示,不假裝有結構
+    if (rec.output_json) {
+      html += `<div class="section">
+        <div class="sec-title">解讀</div>
+        <div class="sec-body">${textToHtml(rec.output_json)}</div>
+      </div>`;
+    } else {
+      html += `<div class="section">
+        <div class="sec-body" style="color:var(--ink-soft);font-size:14px;text-align:center;padding:20px 0;">
+          解讀尚未生成，請稍後查看。
+        </div>
+      </div>`;
+    }
+  } else if (parsed.type === "sr") {
+    // 紅/黑線標準回應:純文字,不套六味結構
+    html += `<div class="section">
+      <div class="sec-title">回覆</div>
+      <div class="sec-body">${textToHtml(parsed.sr)}</div>
+    </div>`;
+  } else {
+    // 一般信箋(可能含黃燈 GZ 收束)
+    if (parsed.gz) {
+      html += `<div class="section">
+        <div class="sec-title">提醒</div>
+        <div class="sec-body">${textToHtml(parsed.gz)}</div>
+      </div>`;
+    }
+    const labels = ["第一鏡","第二鏡","第三鏡","第四鏡","第五鏡","第六鏡"];
+    parsed.mirrors.forEach((m, i) => {
+      html += `<div class="section">
+        <div class="sec-title">${labels[i] || `J${i+1}`}</div>
+        <div class="sec-body">${textToHtml(m)}</div>
+      </div>`;
+    });
+    if (parsed.zy) {
+      html += `<div class="section">
+        <div class="sec-title">主理人贈言</div>
+        <div class="sec-body" style="font-style:italic;color:var(--gold-soft);">${textToHtml(parsed.zy)}</div>
+      </div>`;
+    }
+    if (parsed.next) {
+      html += `<div class="section">
+        <div class="sec-title">下一步</div>
+        <div class="sec-body">${textToHtml(parsed.next)}</div>
+      </div>`;
+    }
+  }
+
+  wrap.innerHTML = html;
+}
+
+async function init() {
+  const params = new URLSearchParams(window.location.search);
+  const logId = params.get("log_id");
+  if (!logId) {
+    show("viewError");
+    document.getElementById("errMsg").textContent = "缺少卦記編號，請從卦記列表進入。";
+    return;
+  }
+
+  try {
+    await liff.init({ liffId: LIFF_ID });
+  } catch (e) {
+    show("viewError");
+    document.getElementById("errMsg").textContent = "LINE 初始化失敗，請從 LINE 內開啟。";
+    return;
+  }
+
+  if (!liff.isLoggedIn()) {
+    liff.login();
+    return;
+  }
+
+  const token = liff.getAccessToken();
+  if (!token) {
+    show("viewError");
+    document.getElementById("errMsg").textContent = "無法取得身分憑證，請重新開啟。";
+    return;
+  }
+
+  let data;
+  try {
+    const res = await fetch(`${RELAY_URL}log?log_id=${encodeURIComponent(logId)}`, {
+      method: "GET",
+      headers: { "X-Line-AccessToken": token },
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status}${body ? ": " + body : ""}`);
+    }
+    data = await res.json();
+  } catch (e) {
+    show("viewError");
+    document.getElementById("errMsg").textContent = `無法載入：${e.message}`;
+    return;
+  }
+
+  if (!data.record) {
+    show("viewError");
+    document.getElementById("errMsg").textContent = "找不到此卦記，或無查看權限。";
+    return;
+  }
+
+  renderDetail(data.record);
+  show("viewDetail");
+}
+
+init();
+</script>
+</body>
+</html>

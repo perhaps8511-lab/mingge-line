@@ -265,10 +265,24 @@
     letter-spacing:.08em;color:var(--gold-soft);margin-bottom:24px;line-height:1.8;}
   .log-empty{text-align:center;padding:48px 0;color:var(--jade);font-size:13px;letter-spacing:.15em;opacity:.7;}
   .log-loading{text-align:center;padding:40px 0;color:var(--jade);font-size:13px;letter-spacing:.18em;opacity:.65;}
-  .log-card{border-bottom:1px solid rgba(216,207,188,.12);padding:16px 0;}
-  .log-card .lc-q{font-size:14px;color:var(--rice-deep);letter-spacing:.06em;margin-bottom:6px;line-height:1.7;}
-  .log-card .lc-gua{font-size:16px;color:var(--rice);letter-spacing:.12em;margin-bottom:4px;}
-  .log-card .lc-meta{font-size:11px;color:var(--jade);letter-spacing:.08em;opacity:.75;}
+  /* ★ S138 格2卡片版(E09視覺升級①②;③蓋金印留痕另排E25,本輪不動) */
+  .log-card{
+    display:block;text-decoration:none;
+    border:1px solid rgba(216,207,188,.14);border-left:3px solid var(--gold-soft);
+    border-radius:10px;padding:16px 18px;margin-bottom:13px;
+    background:rgba(245,241,232,.03);
+    transition:background .2s ease,border-color .2s ease;
+  }
+  .log-card:hover,.log-card:focus{background:rgba(245,241,232,.06);border-left-color:var(--gold-lit);}
+  .log-card .lc-head{display:flex;align-items:baseline;gap:11px;margin-bottom:9px;}
+  .log-card .lc-glyph{font-size:26px;line-height:1;color:var(--gold-lit);flex-shrink:0;}
+  .log-card .lc-gua{font-size:14.5px;color:var(--rice);letter-spacing:.1em;}
+  .log-card .lc-date{margin-left:auto;font-size:11px;color:var(--jade);letter-spacing:.04em;
+    font-variant-numeric:tabular-nums;opacity:.85;flex-shrink:0;}
+  .log-card .lc-q{font-size:14px;color:var(--rice-deep);letter-spacing:.04em;line-height:1.75;margin-bottom:11px;}
+  .log-card .lc-foot{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--jade);
+    letter-spacing:.06em;opacity:.8;}
+  .log-card .lc-arrow{margin-left:auto;color:var(--gold-soft);letter-spacing:.02em;flex-shrink:0;}
   /* ====================================================
      E13 易經書房
   ==================================================== */
@@ -531,22 +545,52 @@ async function initPayPage(){
   }catch(e){console.warn('[pay page]',e);}
 }
 
+/* ===== E09 歷史卦例頁 · 卡片版輔助(S138) ===== */
+// 64卦「本卦全稱→King Wen序號」— 逐字取自 mingge_gua64_lookup_v1_0.json(RAG_02實機檔),非虛構/非記憶。
+// Unicode 易經卦符區塊(U+4DC0起)依 King Wen序排列，玄機無涉，純字型對照，符命格凍結區⑥「用易經本家符號」。
+var GUA_KW_BY_NAME={"乾為天":1,"坤為地":2,"水雷屯":3,"山水蒙":4,"水天需":5,"天水訟":6,"地水師":7,"水地比":8,
+  "風天小畜":9,"天澤履":10,"地天泰":11,"天地否":12,"天火同人":13,"火天大有":14,"地山謙":15,"雷地豫":16,
+  "澤雷隨":17,"山風蠱":18,"地澤臨":19,"風地觀":20,"火雷噬嗑":21,"山火賁":22,"山地剝":23,"地雷復":24,
+  "天雷無妄":25,"山天大畜":26,"山雷頤":27,"澤風大過":28,"坎為水":29,"離為火":30,"澤山咸":31,"雷風恆":32,
+  "天山遯":33,"雷天大壯":34,"火地晉":35,"地火明夷":36,"風火家人":37,"火澤睽":38,"水山蹇":39,"雷水解":40,
+  "山澤損":41,"風雷益":42,"澤天夬":43,"天風姤":44,"澤地萃":45,"地風升":46,"澤水困":47,"水風井":48,
+  "澤火革":49,"火風鼎":50,"震為雷":51,"艮為山":52,"風山漸":53,"雷澤歸妹":54,"雷火豐":55,"火山旅":56,
+  "巽為風":57,"兌為澤":58,"風水渙":59,"水澤節":60,"風澤中孚":61,"雷山小過":62,"水火既濟":63,"火水未濟":64};
+function guaGlyph(name){
+  var kw=GUA_KW_BY_NAME[name];
+  return kw?String.fromCodePoint(0x4DC0+kw-1):'䷀';
+}
+function lcEsc(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function lcDate(qiguaTime){
+  if(!qiguaTime) return '';
+  var m=String(qiguaTime).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m? (parseInt(m[2],10)+'/'+m[3]) : String(qiguaTime).slice(0,10);
+}
+
 /* ===== E09 歷史卦例頁 ===== */
 async function initLogPage(){
   var statusEl=document.getElementById('logStatus');
   var listEl=document.getElementById('logList');
   var loadingEl=document.getElementById('logLoading');
   try{
+    statusEl.textContent='驗證身分中……';
     await liff.init({liffId:LIFF_ID});
-    if(!liff.isLoggedIn()){liff.login();return;}
+    if(!liff.isLoggedIn()){statusEl.textContent='導向登入中……';liff.login();return;}
     var token=liff.getAccessToken();
+    statusEl.textContent='讀取卦記中……';
     var resp=await fetch(RELAY_URL+'history',{method:'GET',headers:{'X-Line-AccessToken':token}});
     if(!resp.ok){throw new Error('HTTP '+resp.status);}
     var data=await resp.json();
-    if(data.subscription&&data.subscription.active){
-      statusEl.textContent='訂閱中，書房為您常開（有效至 '+data.subscription.expires_at+'）。';
+    // ★ S137-R02:契約對齊 — Worker /history 回傳的是 subscriber:{tier,
+    //   trial_quota_remaining, monthly_quota_remaining, subscription_start}，
+    //   不是 subscription:{active,expires_at} / coins；原判斷永遠落到 else 分支。
+    var sub=data.subscriber;
+    if(sub&&sub.tier==='subscriber'){
+      statusEl.textContent='訂閱中，書房為您常開。';
     }else{
-      var coins=typeof data.coins==='number'?data.coins:'—';
+      var coins=sub?((sub.trial_quota_remaining||0)+(sub.monthly_quota_remaining||0)):0;
       statusEl.textContent='尚餘 '+coins+' 枚問卦銅錢。';
     }
     if(loadingEl)loadingEl.remove();
@@ -554,19 +598,39 @@ async function initLogPage(){
       listEl.innerHTML='<div class="log-empty">尚無卦記。</div>';
     }else{
       listEl.innerHTML=data.records.map(function(r){
-        var guaLine=(r.ben_gua||'')+(r.bian_gua?(' → '+r.bian_gua):'');
-        var meta=[(r.dong_yao?('動爻 '+r.dong_yao):''),r.qigua_time].filter(Boolean).join(' · ');
-        return '<div class="log-card">'
-          +(r.question_text?('<div class="lc-q">'+r.question_text+'</div>'):'')
-          +(guaLine?('<div class="lc-gua">'+guaLine+'</div>'):'')
-          +(meta?('<div class="lc-meta">'+meta+'</div>'):'')
+        // ★ S138 格2卡片版①②:大卦符(真實King Wen對照)+本卦→變卦+日期 / 事由 / 動爻+型態+查看信箋箭頭
+        var glyph=guaGlyph(r.ben_gua);
+        var guaLine=lcEsc(r.ben_gua||'')+(r.bian_gua?(' → '+lcEsc(r.bian_gua)):'');
+        var dateStr=lcDate(r.qigua_time);
+        var footBits=[
+          (r.dong_yao?('動爻 '+lcEsc(String(r.dong_yao))):''),
+          (r.entry_type&&r.entry_type!=='divination'?lcEsc(r.entry_type):'')
+        ].filter(Boolean).join(' · ');
+        var card=''
+          +'<div class="lc-head">'
+            +'<span class="lc-glyph">'+glyph+'</span>'
+            +(guaLine?('<span class="lc-gua">'+guaLine+'</span>'):'')
+            +(dateStr?('<span class="lc-date">'+dateStr+'</span>'):'')
+          +'</div>'
+          +(r.question_text?('<div class="lc-q">'+lcEsc(r.question_text)+'</div>'):'')
+          +'<div class="lc-foot">'
+            +(footBits?('<span>'+footBits+'</span>'):'')
+            +'<span class="lc-arrow">查看信箋 ›</span>'
           +'</div>';
+        // log_id 由 Worker /history 補上(S137-R02),包成可點連結進卦記詳情頁(E23,現役已驗證,不重寫)
+        if(r.log_id){
+          return '<a class="log-card" href="./log.html?log_id='+encodeURIComponent(r.log_id)+'">'+card+'</a>';
+        }
+        return '<div class="log-card">'+card+'</div>';
       }).join('');
     }
   }catch(e){
     if(loadingEl)loadingEl.remove();
     statusEl.textContent='—';
-    listEl.innerHTML='<div class="log-empty">載入失敗，請稍後再試。</div>';
+    // ★ S137-R04 暫時診斷埋樁:把真正錯誤顯示在畫面上,方便手機端不連 devtools 也能回報。
+    //   問題定位完成後應改回原本的通用文字「載入失敗，請稍後再試。」,不留在正式版面上。
+    var __diag = (e && e.name ? e.name+': ' : '') + (e && e.message ? e.message : String(e));
+    listEl.innerHTML='<div class="log-empty">載入失敗:<br><span style="font-size:12px;opacity:.7;">'+__diag.replace(/</g,'&lt;')+'</span></div>';
     console.warn('[log page]',e);
   }
 }
@@ -1105,8 +1169,13 @@ async function enterWithConsent(){
   }
 }
 
-/* 頁面載入即初始化 LIFF(DEV 模式自動略過,不影響瀏覽器測試) */
-initLiff();
+/* 頁面載入即初始化 LIFF(DEV 模式自動略過,不影響瀏覽器測試)
+   ★ S137-R03:action≠divine 時(log/study/pay/about 子頁)不呼叫 —— 這些子頁各自的
+   initLogPage()/initStudyPage()/initPayPage() 已自帶各自的 liff.init()。若這裡仍無條件
+   呼叫,會跟子頁的 liff.init() 同頁面雙重初始化搶跑,LIFF SDK 不支援重複初始化,
+   第二個呼叫會卡死(不 resolve 也不 reject)——這正是 E09「驗證身分中」卡住不動的根因。 */
+var __bootAction = new URLSearchParams(window.location.search).get('action') || 'divine';
+if (__bootAction === 'divine') { initLiff(); }
 
 </script>
 </body>
