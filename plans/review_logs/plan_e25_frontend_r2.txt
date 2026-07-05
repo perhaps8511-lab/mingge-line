@@ -1,0 +1,433 @@
+Reading additional input from stdin...
+OpenAI Codex v0.142.3
+--------
+workdir: D:\20260702 Begining\BB_BU Project\mingge-line
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019f316f-1563-79a2-95a7-4390fb8cb1dd
+--------
+user
+上一輪你審這份前端計畫,提了9條BLOCKER,已逐條回應:
+
+1. 文案範圍外洩(蓋章中/🔶金印) → Perth已裁示不新增任何文字:loading態按鈕文字全程不變,列表徽章只用emoji不搭文字
+2. log.html零修改矛盾 → 改為明確允許清單:renderDetail()/parseReading()零diff,其餘允許新增CSS+新函式+init()內一行呼叫
+3. .question-block之後 vs header.appendChild不一致 → 已說明.question-block目前就是header最後一個子節點,appendChild天然排在其後,並註明未來若模板改動需重新檢視
+4. mountGoldSeal非冪等 → 已加掛載前移除既有.goldseal-block的邏輯
+5. log_id來源不足 → 已證明Worker /log 路由本就回傳log_id(worker.js:117),並加URL query fallback雙重保險
+6. sealed_at為null時文案未定義 → 已說明沿用既有fmtDate(null)回傳空字串的防禦邏輯,自然退化為「金印已落」無日期尾綴,非新增文案分支
+7. curl基礎驗證不足以證明live → 已改用-fsSL明確要求HTTP 200,否則curl直接失敗
+8. 文案驗收只測存在不測排他 → 已加負面稽核(grep確認舊文字不殘留)
+9. 失敗驗收不足 → 已拆成5種獨立失敗情境個別測試(ok:false/payload不合法/JSON parse fail/network reject/log_id缺失)
+
+3條SUGGEST(badge固定literal鎖定、lc-foot排版檢查、DevTools注入時機)也已處理或說明。
+
+請重新審查完整計畫全文,確認以上是否解決,若無問題請VERDICT: APPROVED。
+
+修改後計畫全文:
+# plan_e25_frontend_v0_1
+
+## 0. 基礎檔紅線證明(§6-8之一:禁記憶/禁本機舊副本)
+
+🔴 **更正前一版的誤判(供互審與稽核回溯留痕)**:前一版計畫曾主張 `mingge-line` repo 內的 `index.html`/`log.html` 是「與 GitHub Pages 上線版本完全不同的化石副本」,結論錯誤 —— 該次 diff 顯示逐行不同,實際原因是**本機 checkout 為 CRLF、GitHub raw 為 LF 的換行符差異**,把換行符標準化(`tr -d '\r'`)後兩者 **0 行差異,內容完全一致**。特此更正,repo 內這兩份檔案並非化石,只是行尾格式不同。
+
+- 依 Perth 指示,本次**不再用 GitHub Pages URL 或私有 repo 查詢**當基礎檔真相源,一律登記為 **Live_Artifacts**:
+  ```
+  curl -fsSL -w "\nHTTP_STATUS:%{http_code}\n" https://raw.githubusercontent.com/perhaps8511-lab/mingge-line/main/index.html
+  curl -fsSL -w "\nHTTP_STATUS:%{http_code}\n" https://raw.githubusercontent.com/perhaps8511-lab/mingge-line/main/log.html
+  ```
+  🔴 **第 1 輪互審後修正(BLOCKER:原命令可能把 404/錯誤頁一併 hash,且未記錄 pinned baseline)**:改用 `-fsSL`(HTTP 錯誤時 curl 直接失敗退出,不會把錯誤頁內容當正常回應處理)並印出明確 HTTP 狀態碼,確認狀態碼為 `200` 才可信任內容。
+  - 2026-07-05 執行結果(已用此嚴格命令重新驗證):`index.html` HTTP_STATUS:200,167658 bytes,SHA-256 已於施工前重新計算並記錄於 `plans/dispatch/mingge_task_dispatch_e25_frontend_v1_0.md`;`log.html` HTTP_STATUS:200,14196 bytes,同上。
+  - Pinned baseline(供施工方比對用,見 §5 機讀驗證第 0 步):派工卡發出時的 `sha256sum` 值以派工卡記載為準,計畫本文不重複貼一份可能過期的 hash 值,避免計畫與派工卡兩處數字不同步。
+- 首行/版本註記(原文摘錄):
+  - `log.html`:
+    ```html
+    <!DOCTYPE html>
+    <html lang="zh-Hant">
+    <head>
+    <meta charset="UTF-8">
+    <title>命格 · 卦記詳情</title>
+    <!--
+      E23 卦記詳情頁 — 點單筆看完整解讀
+      S137 · 從 /log?log_id= 拉完整 output_json + ai_report
+      凍結區:墨綠金美學、不修起卦演算法 / gua_result / qigua_time
+    -->
+    ```
+  - `index.html`:
+    ```html
+    <!DOCTYPE html>
+    <html lang="zh-Hant">
+    <head>
+    <title>命格 · 進場儀式 v1.3.0</title>
+    ```
+- 現役邏輯清單(本計畫只新增、不改動既有邏輯):
+  - `log.html`:LIFF 登入 → `GET {RELAY_URL}log?log_id=` → `renderDetail(rec)` 渲染卦象/六味信箋;`.topbar .seal`(顯示「命」字的圓形裝飾,與本次金印**無關**,命名上刻意避開衝突)。
+  - `index.html`:LIFF 登入 → `GET {RELAY_URL}history` → 卡片列表渲染(`.log-card`,含 `.lc-head`/`.lc-q`/`.lc-foot`),`log_id` 存在時包成連往 `log.html?log_id=` 的連結。
+  - 兩檔共用 `RELAY_URL = "https://mingge-relay.perhaps8511.workers.dev/"`(與 Worker 端 `ALLOWED_ORIGIN="https://perhaps8511-lab.github.io"` 對應)。
+- Worker 端依據(已於 `plan_e25_goldenseal_v0_1.md` APPROVED 並施工,見 `workers/mingge-relay/worker.js`):
+  - `POST /log/seal`:payload `{"log_id":"rec..."}`,header `X-Line-AccessToken`,回傳 `{sealed, sealed_at, already_sealed}` 或對應錯誤碼(401/400/403/404/502/503)。
+  - `/history`、`/log` 已追加 `golden_seal`(boolean)、`golden_seal_time`(ISO string 或 null)欄位。
+- 範圍外變動聲明:本計畫**不修改**`renderDetail()`/`parseReading()`/起卦演算法/`gua_result`/`qigua_time`/LIFF 登入流程/`RELAY_URL`/現有卡片點擊導頁邏輯;**不改動**任何既有 CSS 變數或既有元件的既有樣式規則,只新增新的 class/元素。
+- 🔴 **順手變動(Perth 指示,列入本次範圍)**:`index.html` 頭部 `<title>命格 · 進場儀式 v1.3.0</title>` 版本號 bump 為 `v1.3.2`(僅改這一處版本字串,標題其餘文字與整個頁面其他版本相關註解若有殘留 v1.3.0 字樣,一併同步為 v1.3.2;不涉及功能邏輯變動)。
+
+---
+
+## 1. TA 可見文案定案(🔴 禁自創,逐字使用)
+
+| 情境 | 文案 |
+|---|---|
+| 按鈕未蓋章 | `蓋金印` |
+| 已蓋章徽章 | `金印已落 <日期>`(`<日期>` 用既有 `fmtDate()` 函式格式化 `golden_seal_time`,不重寫該函式) |
+| 任何失敗(無論 401/403/404/502/503/payload 契約異常) | `金印未落,請稍後再試` |
+
+- 已過 T0+五關判定(Perth 已載明):蓋章主語是「TA 自己留痕」,不是系統替 TA 下判斷;三文案皆無介面僭越、無替天給答案、無催促字眼。
+- 🔴 **簡化錯誤處理(相較前版修正)**:不再依 HTTP 狀態碼分岐不同錯誤文案,任何非成功情況一律顯示同一句 `金印未落,請稍後再試`,不暴露內部錯誤細節給 TA(內部除錯訊息仍可 `console.warn`,只是不顯示在畫面上)。
+- 🔴 **第 1 輪互審後修正(BLOCKER:文案範圍外洩)**:Codex 指出計畫原稿還混入兩處不在此三句定案內的 TA 可見文字 ——「蓋章中……」(按鈕 loading 態)、「🔶 金印」(列表頁徽章)。經 Perth 確認,**一律不新增任何文字**:
+  - 送出後 loading 狀態**不改變按鈕文字**,`蓋金印` 三字維持不變,只靠 `disabled` + CSS `opacity` 做視覺區分(見 §2 `.goldseal-btn:disabled` 樣式),不產生第四種文案。
+  - `index.html` 列表頁的金印標記**只用 emoji `🔶`,不搭配任何文字標籤**(emoji 本身是圖形符號,不算「新創文案」;但為避免爭議,明確排除任何漢字/英文標籤陪襯)。
+
+---
+
+## 2. `log.html`(卦記詳情頁)新增:金印按鈕
+
+採用 **post-render DOM API 掛載**,完全不碰 `renderDetail()` 函式本體(不新增字串到它的 `html +=` 模板、不改它的回傳值),在 `renderDetail()` **執行完畢之後**,用原生 DOM API 找到已經渲染出來的 `.gua-header` 節點,`appendChild` 一個新建立的區塊。此法確保:
+1. `renderDetail()` 原始碼**逐字元不變**(diff 對這個函式應為零差異)。
+2. 不會有「HTML 字串裡插入未轉義動態資料」的 XSS 路徑(一律用 `textContent`,不用 `innerHTML` 拼字串)。
+
+### 放置位置
+`.gua-header`(卦頭區塊)內、`.question-block` 之後,用 `appendChild` 插入新元素 `.goldseal-block`。不占用/不修改現有 `.topbar .seal`(裝飾用「命」字圓章,語意不同,新元件一律用 `goldseal` 前綴命名)。
+
+### 新增函式(全部用 DOM API 建構,不使用 `innerHTML` 拼接動態資料,杜絕 XSS)
+```js
+function mountGoldSeal(rec) {
+  const header = document.querySelector(".gua-header");
+  if (!header) return; // 防禦性:找不到掛載點時靜默跳過,不拋錯中斷詳情頁渲染
+
+  // 🔴 第1輪互審後修正(BLOCKER:非冪等,重複呼叫會疊加多個 .goldseal-block/#goldsealBtn):
+  // 掛載前先移除已存在的舊區塊,保證同一頁面內多次呼叫(例如手動測試時)結果一致、不重複
+  const existing = header.querySelector(".goldseal-block");
+  if (existing) existing.remove();
+
+  const block = document.createElement("div");
+  block.className = "goldseal-block";
+
+  const isSealed = rec.golden_seal === true; // 嚴格布林比對,契約:Worker 保證 boolean(worker.js:61-62 /history、126-127 /log)
+  if (isSealed) {
+    renderSealedBadge(block, rec.golden_seal_time);
+  } else {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "goldseal-btn";
+    btn.id = "goldsealBtn";
+    btn.textContent = "蓋金印"; // 定案文案,禁自創
+    btn.addEventListener("click", () => {
+      // 🔴 第1輪互審後修正(BLOCKER:log_id 來源假設不足):
+      // 主要來源是 rec.log_id(Worker /log 路由已保證回傳,見 worker.js:117 `log_id: rec.id`),
+      // 但仍加一層防禦性 fallback,取當前頁面 URL 的 log_id query 參數(init() 既有邏輯本來就已解析過這個值),
+      // 雙重來源皆缺失才視為資料異常。
+      const urlLogId = new URLSearchParams(window.location.search).get("log_id");
+      const logId = (typeof rec.log_id === "string" && rec.log_id) ? rec.log_id
+                   : (typeof urlLogId === "string" && urlLogId) ? urlLogId
+                   : null;
+      if (!logId) {
+        showGoldSealError(block);
+        return;
+      }
+      sealGoldenSeal(logId, btn, block);
+    });
+    block.appendChild(btn);
+  }
+
+  // 🔴 第1輪互審後修正(BLOCKER:計畫文字說插在 .question-block 之後,程式卻用 header.appendChild 塞到 header 尾端,兩者不一致):
+  // 明確採用「header 尾端」為準(.gua-header 目前的既有子節點就是 .sym/.names/.dong/.qtime/.question-block,
+  // 全部依序排列,appendChild 天然會排在 .question-block 之後,因為它是目前最後一個子節點;
+  // 若未來 renderDetail() 模板改動導致 .question-block 不再是最後一個子節點,此行為需重新檢視)。
+  header.appendChild(block);
+}
+
+function renderSealedBadge(block, sealedAtIso) {
+  // 一律用 textContent,不用 innerHTML,杜絕 XSS(無論 fmtDate() 回傳什麼都不會被當標籤解析)
+  block.className = "goldseal-block goldseal-sealed";
+  // 🔴 第1輪互審後修正(BLOCKER:sealed_at 為 null 時 fmtDate(null) 該怎麼顯示未定義):
+  // 既有 fmtDate() 對 falsy 輸入本來就回傳空字串(見 log.html 現役程式碼 `if (!iso) return "";`,本計畫沿用不改),
+  // 因此 sealedAtIso 為 null 時,文案自然退化為「金印已落 」(尾端無日期,無多餘空白外的視覺差異);
+  // 這不是新增文案分支,只是既有 fmtDate() 防禦邏輯的自然結果,不違反「僅用三句定案文案」的鐵律(核心句子未變)。
+  block.textContent = `金印已落 ${fmtDate(sealedAtIso)}`.trimEnd();
+}
+
+function showGoldSealError(block) {
+  let toast = block.querySelector(".goldseal-toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.className = "goldseal-toast";
+    block.appendChild(toast);
+  }
+  toast.textContent = "金印未落,請稍後再試"; // 定案文案,禁自創,不分錯誤類型
+}
+```
+
+### CSS(新增,不修改既有規則)
+```css
+.goldseal-block{margin-top:14px;text-align:center;}
+.goldseal-btn{
+  font-family:var(--serif);font-size:14px;letter-spacing:.08em;
+  padding:10px 22px;border-radius:20px;
+  background:var(--gold);color:#fff;border:none;cursor:pointer;
+}
+.goldseal-btn:disabled{opacity:.5;cursor:not-allowed;}
+.goldseal-block.goldseal-sealed{
+  font-family:var(--serif);font-size:13px;color:var(--gold);
+  letter-spacing:.06em;padding:8px 0;
+}
+.goldseal-toast{
+  margin-top:8px;font-size:12.5px;color:#8a5c2e;text-align:center;
+}
+```
+
+### 互動邏輯
+```js
+async function sealGoldenSeal(logId, btn, block) {
+  // 🔴 第1輪互審後修正(BLOCKER:「蓋章中……」不在三句定案文案內):
+  // loading 態不改按鈕文字,只 disabled,靠 CSS opacity 呈現「處理中」視覺,文字全程維持「蓋金印」直到成功/失敗改變。
+  btn.disabled = true; // 送出即 disabled,防連打
+  const oldToast = block.querySelector(".goldseal-toast");
+  if (oldToast) oldToast.remove(); // 重試前清掉舊錯誤 toast
+
+  try {
+    const res = await fetch(`${RELAY_URL}log/seal`, {
+      method: "POST",
+      headers: {
+        "X-Line-AccessToken": liff.getAccessToken(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ log_id: logId }),
+    });
+    const data = await res.json().catch(() => null);
+
+    // 不只信任 HTTP 200,還要驗證 body 的資料契約本身合法,否則視同失敗,不佯裝成功
+    const sealedOk = res.ok && data && data.sealed === true &&
+      (data.sealed_at === null || typeof data.sealed_at === "string");
+    if (!sealedOk) {
+      throw new Error("seal-failed"); // 內部用,畫面文案統一在 catch 內處理,不分錯誤類型
+    }
+
+    renderSealedBadge(block, data.sealed_at); // 樂觀更新只在通過驗證後才套用
+  } catch (e) {
+    console.warn("[goldseal] seal failed:", e); // 內部除錯用,不顯示給 TA(涵蓋:HTTP非2xx、200但payload不合法、JSON parse失敗、fetch本身reject/網路錯誤,全部落入這個 catch,統一處理)
+    btn.disabled = false;
+    // 按鈕文字全程未變,不需要「恢復」動作,此行僅為防禦性保險(若未來有人不慎在別處改了 textContent)
+    btn.textContent = "蓋金印";
+    if (block && block.isConnected) {
+      showGoldSealError(block); // 統一文案「金印未落,請稍後再試」
+    }
+  }
+}
+```
+- 呼叫時機:在 `init()` 函式內、`renderDetail(data.record)` 之後追加一行 `mountGoldSeal(data.record)`(`data.record.log_id` 保證存在,見 `workers/mingge-relay/worker.js:117` `record: { log_id: rec.id, ... }`,並有 §2 `mountGoldSeal` 內的 URL query fallback 作雙重保險)。此為 §2 全部新增邏輯在 `init()` 內**唯一**的整合點。
+- 送出即 disable:`btn.disabled = true` 在 `fetch` 呼叫前立即執行,防連打;disabled 期間瀏覽器不會再觸發該按鈕的 `click` 事件,不需額外 debounce。
+
+---
+
+## 3. `index.html`(卦記列表頁)新增:金印標記顯示
+
+### 位置
+在既有卡片模板的 `.lc-foot` 區塊(`footBits` 與 `.lc-arrow` 之間)新增金印小標記,**不改動** `footBits` 既有組成邏輯,只在其後插入一個新的 `<span>`。
+
+### 程式碼變更
+`r.golden_seal` 契約與 `log.html` 完全一致 —— Worker 端已保證回傳嚴格 boolean(`!!f.golden_seal`,見 `workers/mingge-relay/worker.js:61`),前端**一律用嚴格比對** `r.golden_seal === true`,不用真值轉換,避免萬一未來 Worker 端契約漂移時 truthy 判斷誤判。
+
+🔴 **第 1 輪互審後修正(BLOCKER:「🔶 金印」文字標籤不在三句定案文案內)**:徽章**只用 emoji `🔶`,不搭配任何文字**,避免產生第四種未經 Perth 定案的 TA 可見文案。
+
+於 `listEl.innerHTML = data.records.map(...)` 內的卡片組裝邏輯新增一行(`goldsealBadge` 本身是固定字面字串,無使用者輸入,無 XSS 疑慮;§4 驗收會鎖定此變數必須維持固定 literal,不可未來混入 `golden_seal_time` 等動態值):
+```js
+var goldsealBadge = r.golden_seal === true ? '<span class="lc-goldseal">🔶</span>' : '';
+```
+
+🔴 這是 `index.html` 本計畫**唯一**允許修改既有行的整合點(卡片是整段字串一次性塞進 `innerHTML`,無法像 `log.html` 一樣做純 DOM append),精準列出:
+```js
+// 原始三行(existing):
+  +'<div class="lc-foot">'
+    +(footBits?('<span>'+footBits+'</span>'):'')
+    +'<span class="lc-arrow">查看信箋 ›</span>'
+  +'</div>';
+
+// 改為:
+  +'<div class="lc-foot">'
+    +(footBits?('<span>'+footBits+'</span>'):'')
+    +goldsealBadge
+    +'<span class="lc-arrow">查看信箋 ›</span>'
+  +'</div>';
+```
+此 4 行區塊(含 `var goldsealBadge = ...` 那行共 5 行)加上 §0 提到的 `<title>` 版本號那 1 行,是 `index.html` 本計畫**僅有**允許出現在 diff 裡的「修改」而非「純新增」,其餘全部程式碼逐字不動。
+
+### CSS(新增)
+```css
+.log-card .lc-goldseal{color:var(--gold-lit);font-size:10.5px;letter-spacing:.04em;}
+```
+- 純顯示,無互動(蓋章操作只在 `log.html` 詳情頁進行)。列表頁badge 用固定 emoji + 「金印」二字標籤(非 §1 表格中的三句 TA 互動文案,屬狀態標記而非互動提示,沿用原計畫既定的 `🔶 金印` 標籤設計)。
+
+---
+
+## 4. 🔴 安全與範圍紅線
+
+- **不重新驗證身份**:前端沿用既有 `liff.getAccessToken()` 取 token 方式,沿用既有 `RELAY_URL` 常數,不新增任何直連 Airtable/其他後端的呼叫。
+- **不接受/組裝額外欄位**:`POST log/seal` 的 body 固定只有 `{log_id}`。
+- **不假資料混入真資料**:樂觀更新只在收到 Worker 200 且 payload 契約驗證通過後套用,失敗一律回復原按鈕狀態並顯示統一文案。
+- **不碰凍結區**:`renderDetail()`、`parseReading()`、起卦演算法、`gua_result`、`qigua_time`、LIFF 登入流程、`RELAY_URL` 賦值、既有 `/history`、`/log` 兩個 fetch 呼叫本身、既有卡片點擊導頁邏輯 — 全部原樣不動,只新增。
+- **不碰真金鑰**:前端本來就不持有任何後端金鑰,本次新增邏輯延續此模式,無新增機密。
+
+---
+
+## 5. 封閉驗收集(全過才算完成)
+
+- [ ] **功能代表 case**:未蓋章卦記進入 `log.html`,點「蓋金印」→ 按鈕立即 disable+「蓋章中……」文案 → 成功後變成「金印已落 <日期>」徽章,`index.html` 重新整理後該筆卡片出現「🔶 金印」標記。
+- [ ] **已蓋章直接顯示 case**:對已蓋章的卦記開 `log.html`,一開始就直接渲染徽章(不出現按鈕)。
+- [ ] **失敗 case(第 1 輪互審後拆細,原「合併測一種」不足以證明所有分支都導向同一出口)**:以下 5 種狀況**個別**測試,結果都必須是「按鈕恢復可點擊 + 顯示金印未落,請稍後再試」:
+  - `res.ok === false`(如 403)
+  - `res.ok === true` 但 `data.sealed !== true`(payload 契約不合法)
+  - `res.json()` 拋出例外(non-JSON body)
+  - `fetch()` 本身 reject(模擬網路中斷)
+  - 點擊時 `logId` 解析為 `null`(`rec.log_id` 與 URL query 的 `log_id` 都缺失)
+- [ ] **重複蓋章 case**:對已回 `already_sealed:true` 的成功回應(200)→ 視為成功,更新為徽章顯示原始蓋章時間。
+- [ ] **`sealed_at` 缺值 case(第 1 輪互審後新增)**:`{sealed:true, sealed_at:null, already_sealed:true}` → 徽章顯示「金印已落」(無日期尾綴,`fmtDate(null)` 回傳空字串的自然結果),不拋錯、不誤判為失敗。
+- [ ] **連打防護 case**:連續快速點擊按鈕兩次 → 第一次點擊後按鈕已 disabled,第二次點擊不觸發第二個 fetch。
+- [ ] **重複掛載 case(第 1 輪互審後新增,對應 `mountGoldSeal` 冪等性修正)**:對同一 `.gua-header` 連續呼叫兩次 `mountGoldSeal()`(不同資料)→ DOM 內只存在一個 `.goldseal-block`,不疊加。
+- [ ] **列表頁無金印 case**:`golden_seal` 為 `false`/非嚴格 `true` 的卡片,`.lc-foot` 不出現金印標記,且不影響既有 `footBits`/`.lc-arrow` 排版。
+- [ ] **文案範圍 case(第 1 輪互審後修正,原本只驗證存在,未驗證排他性)**:
+  - 正面:交回檔案中出現的三句文案(`蓋金印`/`金印已落`/`金印未落,請稍後再試`)與 §1 定案表格逐字相符。
+  - 負面(白名單稽核):`log.html`、`index.html` 內所有新增的 `textContent`/字面字串賦值,逐一列出後不得出現三句定案文案以外的任何新增 TA 可見文字(含先前誤入的「蓋章中……」「🔶 金印」搭配文字,兩者皆已在本版移除)。
+- [ ] **版本號 case**:`index.html` `<title>` 含 `v1.3.2`,不再殘留 `v1.3.0`。
+- [ ] **紅線 case(第 1 輪互審後修正判定方式)**:`renderDetail()`/`parseReading()` 兩個既有函式本體逐字元零 diff;`log.html` 其餘允許的變動僅限「新增 CSS 規則 + 新增函式(`mountGoldSeal`/`renderSealedBadge`/`showGoldSealError`/`sealGoldenSeal`)+ `init()` 內新增一行 `mountGoldSeal(data.record)` 呼叫」;`index.html` 僅 §3 與 §0 明確列出的整合點被修改,其餘逐字不動(用還原後 diff 驗證,見下方機讀驗證)。
+
+### 機讀驗證指令(headless-first;下方為 bash 語法,PowerShell 環境用對應指令)
+```
+# 0. 施工前重新 curl 這兩個 raw 檔,確認與計畫記載的基準內容一致(或記錄新差異回報)
+curl -s https://raw.githubusercontent.com/perhaps8511-lab/mingge-line/main/index.html | sha256sum
+curl -s https://raw.githubusercontent.com/perhaps8511-lab/mingge-line/main/log.html   | sha256sum
+
+# 1. log.html 結構驗證:應為純新增(換行符標準化後比對,避免重演 §0 的 CRLF/LF 誤判)
+diff <(curl -s https://raw.githubusercontent.com/perhaps8511-lab/mingge-line/main/log.html | tr -d '\r') <(tr -d '\r' < 交回的log.html)
+
+# 2. index.html 結構驗證:除 §3、§0 列出的整合點外,其餘應與基礎檔逐行相同(同樣先標準化換行符)
+diff <(curl -s https://raw.githubusercontent.com/perhaps8511-lab/mingge-line/main/index.html | tr -d '\r') <(tr -d '\r' < 交回的index.html)
+# 施工回報須附上此 diff 全文,並逐條說明每個差異對應 §0/§3 哪一個允許整合點
+
+# 3. leakage scan(真值,不含既有 RELAY_URL/LIFF_ID 常數本身)
+grep -Ei "airtable_api_key|make_.*webhook|line_channel_secret" 交回檔 && echo "LEAK FOUND" || echo "CLEAN"
+
+# 4. 文案正面比對(三句定案文案必須逐字出現)
+grep -F "蓋金印" 交回的log.html && grep -F "金印已落" 交回的log.html && grep -F "金印未落,請稍後再試" 交回的log.html && echo "三句文案齊全"
+
+# 5. 文案負面稽核(第1輪互審後新增):新增區塊內不得出現已排除的舊文字殘留
+grep -F "蓋章中" 交回的log.html && echo "違規:蓋章中殘留" || echo "CLEAN:無蓋章中"
+grep -E "金印</span>|>金印<" 交回的index.html && echo "違規:金印文字標籤殘留" || echo "CLEAN:徽章只有emoji"
+```
+
+### 瀏覽器層行為驗證(靜態頁無測試框架,採 DevTools Console 手動注入驗證法)
+1. 開啟交回的 `log.html`,DevTools Console 執行 `window.liff = { getAccessToken: () => "fake-token" };`
+2. 先呼叫既有 `renderDetail()` 產生 `.gua-header`:
+   ```js
+   renderDetail({ ben_gua:"乾", bian_gua:null, dong_yao:"", qigua_time:"2026-07-05T09:00:00.000Z",
+     question_text:"測試", entry_type:"divination", output_json:"[[SR]]測試[[END]]",
+     golden_seal:false, golden_seal_time:null });
+   ```
+3. 呼叫 `mountGoldSeal({log_id:"recAAAAAAAAAAAAAA", golden_seal:false})` → 應出現「蓋金印」按鈕(文字全程不變,包含之後點擊 loading 期間)。
+4. 再測 `mountGoldSeal({log_id:"recBBBBBBBBBBBBBB", golden_seal:true, golden_seal_time:"2026-07-05T10:00:00.000Z"})` → 應直接顯示「金印已落 ...」徽章;**重複呼叫**同一行三次,確認 `.gua-header` 內始終只有一個 `.goldseal-block`(驗證冪等性修正)。
+5. 再測 `mountGoldSeal({log_id:"recCCCCCCCCCCCCCC", golden_seal:"true"})`(非法非 boolean)→ 應視為未蓋章,出現按鈕(證明嚴格比對生效)。
+6. 對步驟 3 的按鈕,依序測試以下 5 種攔截,每種都應顯示「金印未落,請稍後再試」且按鈕恢復可點擊:
+   - `window.fetch = () => Promise.resolve({ok:false, status:403, json:async()=>({error:"Forbidden"})})`
+   - `window.fetch = () => Promise.resolve({ok:true, json:async()=>({sealed:false})})`(payload 契約不合法)
+   - `window.fetch = () => Promise.resolve({ok:true, json:async()=>{throw new Error("bad json")}})`
+   - `window.fetch = () => Promise.reject(new Error("network down"))`
+   - 額外情境:呼叫 `mountGoldSeal({golden_seal:false})`(無 `log_id`,且測試頁 URL 也無 `?log_id=` query)→ 點擊按鈕應直接顯示「金印未落,請稍後再試」,不觸發任何 `fetch`。
+   - 再測 `{sealed:true, sealed_at:null, already_sealed:true}` → 應成功顯示「金印已落」(無日期尾綴),不進入失敗分支。
+7. `index.html` 開啟後,Console 執行:
+   ```js
+   window.liff = { init: async () => {}, isLoggedIn: () => true, getAccessToken: () => "fake-token" };
+   window.fetch = async (url) => String(url).includes("history")
+     ? { ok:true, json: async () => ({ subscriber:{tier:"free"}, records:[
+         {log_id:"recAAAAAAAAAAAAAA", ben_gua:"乾", qigua_time:"2026-07-05T09:00:00.000Z", question_text:"case1", entry_type:"divination", golden_seal:true},
+         {log_id:"recBBBBBBBBBBBBBB", ben_gua:"坤", qigua_time:"2026-07-05T09:00:00.000Z", question_text:"case2", entry_type:"divination", golden_seal:false},
+         {log_id:"recCCCCCCCCCCCCCC", ben_gua:"屯", qigua_time:"2026-07-05T09:00:00.000Z", question_text:"case3", entry_type:"divination", golden_seal:"true"},
+       ]}) }
+     : { ok:true, json: async () => ({}) };
+   init();
+   ```
+   肉眼確認只有第 1 筆(嚴格 `=== true`)出現「🔶 金印」標記,第 2、3 筆都不出現。
+
+---
+
+## 🔴 邊界(每次動工前重讀)
+- 本計畫只涵蓋 `log.html` 新增金印按鈕互動、`index.html` 新增金印徽章顯示 + 版本號 bump;**不**碰任何其他既有功能(進場儀式、易經書房、訂閱狀態顯示、起卦流程)。
+- 基礎檔一律以 §0 記載的 `raw.githubusercontent.com` 版本為準,施工前重新 curl 核對(見機讀驗證第 0 步);若與計畫記載內容不同,停工回報,不逕自套用。
+- 交付物為**完整檔案**(供逐行 diff),交付後**不由 Claude Code 或 Codex 部署**;依 Perth 指示,完工後由 Perth 親自 push 到 `mingge-line` repo(那才是真正的部署動作),本計畫不含、也不執行任何 git push/部署步驟。
+- Worker 端 `POST /log/seal` 需已上線才能實測 end-to-end;若尚未部署,前端邏輯仍可交付,回報時標明「結構完成,待 Worker 上線後端到端實測」。
+- 卡在遠端閘(基礎檔漂移、Worker 未上線)= 停 + 回報,禁自行繞道或用本機舊副本頂替。
+
+<!-- 待互審:本檔尾將由 codex-review Skill 附加 APPROVED / ESCALATED Marker -->
+codex
+我會先做一個很短的脈絡核對，再讀本機相關檔案確認計畫裡引用的實際程式事實，不改檔。這次是前端計畫互審，不會進部署或不可逆動作。
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Force' in D:\20260702 Begining\BB_BU Project\mingge-line
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:\\Users\\ivych\\.codex\\memories\\MEMORY.md' -Pattern 'Mingge|mingge|AGENTS|命格|frontend|金印|golden' -Context 2,2" in D:\20260702 Begining\BB_BU Project\mingge-line
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"function fmtDate|fmtDate\\(|renderDetail|parseReading|golden_seal|log_id: rec.id|/log/seal|RELAY_URL|<title>\" -S ." in D:\20260702 Begining\BB_BU Project\mingge-line
+2026-07-05T08:40:14.341594Z ERROR codex_core::exec: exec error: windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\20260702 Begining\BB_BU Project\mingge-line, log=C:\Users\ivych\.codex\.sandbox\sandbox.2026-07-05.log, error=program not found
+2026-07-05T08:40:14.342029Z ERROR codex_core::tools::router: error=execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\20260702 Begining\\BB_BU Project\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-05.log, error=program not found" })
+ exited -1 in 0ms:
+execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\20260702 Begining\\BB_BU Project\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-05.log, error=program not found" })
+2026-07-05T08:40:14.344493Z ERROR codex_core::exec: exec error: windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\20260702 Begining\BB_BU Project\mingge-line, log=C:\Users\ivych\.codex\.sandbox\sandbox.2026-07-05.log, error=program not found
+2026-07-05T08:40:14.344883Z ERROR codex_core::tools::router: error=execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\20260702 Begining\\BB_BU Project\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-05.log, error=program not found" })
+ exited -1 in 0ms:
+execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\20260702 Begining\\BB_BU Project\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-05.log, error=program not found" })
+2026-07-05T08:40:14.345189Z ERROR codex_core::exec: exec error: windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\20260702 Begining\BB_BU Project\mingge-line, log=C:\Users\ivych\.codex\.sandbox\sandbox.2026-07-05.log, error=program not found
+2026-07-05T08:40:14.345333Z ERROR codex_core::tools::router: error=execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\20260702 Begining\\BB_BU Project\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-05.log, error=program not found" })
+ exited -1 in 0ms:
+execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\20260702 Begining\\BB_BU Project\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-05.log, error=program not found" })
+codex
+我這裡嘗試讀本機 repo 和記憶索引時，Windows sandbox helper 沒啟動成功，所以這輪無法用檔案行號實證 `worker.js`/`log.html` 現況。先以你貼的完整計畫做內文一致性互審；目前已看到幾個「舊文案殘留」仍在驗收與說明段裡。
+codex
+VERDICT: NOT APPROVED
+
+還有 3 個要先修掉，其中前 2 個是你上一輪 BLOCKER 的殘留。
+
+**Findings**
+
+1. **BLOCKER: 文案範圍外洩仍殘留在計畫內。**  
+   §5 功能代表 case 仍寫「按鈕立即 disable+『蓋章中……』文案」與「出現『🔶 金印』標記」。§3 尾段也仍寫「固定 emoji +『金印』二字標籤」。這會讓施工方照驗收把舊違規文案帶回來。  
+   修正為：loading 只 disabled，按鈕文字維持「蓋金印」；列表只顯示 `🔶`，所有說明與 browser 驗收也只能寫 `🔶`。
+
+2. **BLOCKER: live/raw 驗證命令又退回 `curl -s`。**  
+   §0 說已改 `-fsSL`，但 §5 機讀驗證第 0-2 步仍是 `curl -s`。這還是會把 404/錯誤頁拿去 hash/diff。  
+   修正：驗證指令也全部改成 `curl -fsSL`，並明確比對派工卡 pinned hash。
+
+3. **MAJOR: version bump 的 diff allowlist 前後不一致。**  
+   §0 說若其他註解有 `v1.3.0` 也一併同步到 `v1.3.2`；但 §3 又說 `index.html` 只允許 `<title>` 那 1 行版本 diff。  
+   需要二選一：只允許 title，就把「其他殘留一併同步」刪掉；若真的允許其他版本字串同步，就把允許 diff 清單列完整。
+
+其餘 9 條中的 #2/#3/#4/#6/#8/#9 以計畫文字看已大致解掉；#5 的 `worker.js:117` 我這輪無法用本機工具實證，因為 sandbox helper 啟動失敗，但即使不看這點，上面三項已足以不放行。
+tokens used
+44,244
+VERDICT: NOT APPROVED
+
+還有 3 個要先修掉，其中前 2 個是你上一輪 BLOCKER 的殘留。
+
+**Findings**
+
+1. **BLOCKER: 文案範圍外洩仍殘留在計畫內。**  
+   §5 功能代表 case 仍寫「按鈕立即 disable+『蓋章中……』文案」與「出現『🔶 金印』標記」。§3 尾段也仍寫「固定 emoji +『金印』二字標籤」。這會讓施工方照驗收把舊違規文案帶回來。  
+   修正為：loading 只 disabled，按鈕文字維持「蓋金印」；列表只顯示 `🔶`，所有說明與 browser 驗收也只能寫 `🔶`。
+
+2. **BLOCKER: live/raw 驗證命令又退回 `curl -s`。**  
+   §0 說已改 `-fsSL`，但 §5 機讀驗證第 0-2 步仍是 `curl -s`。這還是會把 404/錯誤頁拿去 hash/diff。  
+   修正：驗證指令也全部改成 `curl -fsSL`，並明確比對派工卡 pinned hash。
+
+3. **MAJOR: version bump 的 diff allowlist 前後不一致。**  
+   §0 說若其他註解有 `v1.3.0` 也一併同步到 `v1.3.2`；但 §3 又說 `index.html` 只允許 `<title>` 那 1 行版本 diff。  
+   需要二選一：只允許 title，就把「其他殘留一併同步」刪掉；若真的允許其他版本字串同步，就把允許 diff 清單列完整。
+
+其餘 9 條中的 #2/#3/#4/#6/#8/#9 以計畫文字看已大致解掉；#5 的 `worker.js:117` 我這輪無法用本機工具實證，因為 sandbox helper 啟動失敗，但即使不看這點，上面三項已足以不放行。

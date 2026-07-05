@@ -74,6 +74,20 @@
     background:var(--ink);color:var(--paper);
     font-family:var(--serif);font-size:14px;line-height:1.8;text-align:left;
   }
+  .goldseal-block{margin-top:14px;text-align:center;}
+  .goldseal-btn{
+    font-family:var(--serif);font-size:14px;letter-spacing:.08em;
+    padding:10px 22px;border-radius:20px;
+    background:var(--gold);color:#fff;border:none;cursor:pointer;
+  }
+  .goldseal-btn:disabled{opacity:.5;cursor:not-allowed;}
+  .goldseal-block.goldseal-sealed{
+    font-family:var(--serif);font-size:13px;color:var(--gold);
+    letter-spacing:.06em;padding:8px 0;
+  }
+  .goldseal-toast{
+    margin-top:8px;font-size:12.5px;color:#8a5c2e;text-align:center;
+  }
 
   /* 區塊通用 */
   .section{padding:20px 22px;border-bottom:1px solid var(--line);}
@@ -329,6 +343,86 @@ function renderDetail(rec) {
   wrap.innerHTML = html;
 }
 
+function mountGoldSeal(rec) {
+  const header = document.querySelector(".gua-header");
+  if (!header) return;
+
+  const existing = header.querySelector(".goldseal-block");
+  if (existing) existing.remove();
+
+  const block = document.createElement("div");
+  block.className = "goldseal-block";
+
+  if (rec.golden_seal === true) {
+    renderSealedBadge(block, rec.golden_seal_time);
+  } else {
+    const urlLogId = new URLSearchParams(window.location.search).get("log_id");
+    const logId = (typeof rec.log_id === "string" && rec.log_id) ? rec.log_id
+      : (typeof urlLogId === "string" && urlLogId) ? urlLogId
+      : null;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "goldseal-btn";
+    btn.id = "goldsealBtn";
+    btn.textContent = "蓋金印";
+    btn.addEventListener("click", () => {
+      if (!logId) {
+        showGoldSealError(block);
+        return;
+      }
+      sealGoldenSeal(logId, btn, block);
+    });
+    block.appendChild(btn);
+  }
+
+  header.appendChild(block);
+}
+
+function renderSealedBadge(block, sealedAtIso) {
+  block.className = "goldseal-block goldseal-sealed";
+  block.textContent = `金印已落 ${fmtDate(sealedAtIso)}`.trimEnd();
+}
+
+function showGoldSealError(block) {
+  let toast = block.querySelector(".goldseal-toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.className = "goldseal-toast";
+    block.appendChild(toast);
+  }
+  toast.textContent = "金印未落,請稍後再試";
+}
+
+async function sealGoldenSeal(logId, btn, block) {
+  btn.disabled = true;
+  const oldToast = block.querySelector(".goldseal-toast");
+  if (oldToast) oldToast.remove();
+
+  try {
+    const res = await fetch(`${RELAY_URL}log/seal`, {
+      method: "POST",
+      headers: {
+        "X-Line-AccessToken": liff.getAccessToken(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ log_id: logId }),
+    });
+    const data = await res.json().catch(() => null);
+    const sealedOk = res.ok && data && data.sealed === true &&
+      (data.sealed_at === null || typeof data.sealed_at === "string");
+    if (!sealedOk) throw new Error("seal-failed");
+
+    renderSealedBadge(block, data.sealed_at);
+  } catch (e) {
+    console.warn("[goldseal] seal failed:", e);
+    btn.disabled = false;
+    btn.textContent = "蓋金印";
+    if (block && block.isConnected) {
+      showGoldSealError(block);
+    }
+  }
+}
+
 async function init() {
   const params = new URLSearchParams(window.location.search);
   const logId = params.get("log_id");
@@ -382,6 +476,7 @@ async function init() {
   }
 
   renderDetail(data.record);
+  mountGoldSeal(data.record);
   show("viewDetail");
 }
 
