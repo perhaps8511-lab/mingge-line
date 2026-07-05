@@ -1,0 +1,252 @@
+Reading additional input from stdin...
+OpenAI Codex v0.142.3
+--------
+workdir: D:\20260702 Begining\BB_BU Project\mingge-line
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019f30d2-592a-7162-a824-0ab45b026f5b
+--------
+user
+你是資深後端架構審稿人。嚴格審查以下實作計畫,找出:遺漏的 corner case、邊界條件、錯誤處理缺口、資料契約矛盾、與驗收標準不符之處。逐條列出,每條標 [BLOCKER](不改不能過)或 [SUGGEST](建議)。若無問題,回覆 VERDICT: APPROVED。
+
+特別注意這些驗收標準是否都被涵蓋:
+1. Airtable Divination_Log 新欄位設計(只存標記不存自由文字)
+2. Worker 新寫入端點路徑/方法/payload schema
+3. 安全紅線:前端不持有真endpoint/key、驗LIFF token真偽、擁有權驗證防越權、寫入白名單只改金印欄位、冪等與防連打
+4. 前端互動狀態與失敗提示
+5. 封閉驗收集含功能/越權/無效token/重複蓋章 case
+6. 基礎檔是否確實引用live源
+
+計畫全文:
+# plan_e25_goldenseal_v0_1
+
+## 0. 基礎檔紅線證明(§6-8之一:禁記憶/禁本機舊副本)
+- 基礎檔:Cloudflare Worker script **`mingge-relay`**(id tag `a325768bf5f64151bd8bccebe2818ad6`,modified_on `2026-07-04T11:32:53.924488Z`)
+- 抓取方式:2026-07-05 透過 Cloudflare API(`workers_get_worker_code`)**直接自雲端抓現役部署版**,非本機檔案、非記憶。
+- 首行版本註記(原文摘錄,證明取自 live 源):
+  ```
+  // ====================================================
+  // mingge-relay — 命格轉發層 Worker v6
+  // S39: 方案3 LIFF Access Token 驗證(POST / → Make webhook)
+  // S135+: 新增 GET /history (E09 歷史卦例 + 會員狀態)
+  //         需要 Secret: AIRTABLE_API_KEY (Perth 貼進 Cloudflare Secrets)
+  // S137-R02: 新增 GET /log (E23 卦記詳情) + /history 加 log_id 欄位
+  // ====================================================
+  ```
+- 現役路由清單(v6 已有,本計畫只新增、不改動既有路由邏輯):`OPTIONS`(CORS 預檢)、`GET /history`、`GET /log`、`GET /study`、`POST /`(起卦轉發)。
+- Airtable 已查證 ID(沿用現役常數,不重新猜測):`AT_BASE=apptFfyVBYE4ygW3E`、`AT_DIV_LOG=tblVyf8WfTQxvtpEg`(Divination_Log)。
+- 範圍外變動聲明:本計畫**不修改**現有 `/history`、`/log`、`/study`、`POST /` 任一路由的行為或回傳格式;`resolveUserId()`、`corsHeaders()`、`json()` 等既有 helper **原樣沿用**,不重寫。
+
+---
+
+## 1. Airtable Divination_Log 新欄位設計
+
+| 欄位名 | 型別 | 說明 |
+|---|---|---|
+| `golden_seal` | Checkbox(boolean) | 是否已蓋金印。預設 false/未勾選。**只存布林標記,不存任何自由文字**。 |
+| `golden_seal_time` | Date(含時間,ISO 8601,系統寫入) | 蓋章當下時間戳,供留痕稽核與冪等判斷;非自由輸入欄,值恆為伺服器端 `new Date().toISOString()`。 |
+
+- 兩欄皆為**新增**欄位,不覆用/不改型別於任何既有欄位(`line_user_id_raw`、`session_id` 等維持原樣)。
+- 不新增任何 `multilineText` / `singleLineText` 型別的「自由文字」留痕欄位 — 符合「只存標記」要求。
+- Perth 需在 Airtable 後台手動建這兩個欄位(本計畫不含 schema migration 腳本,Worker 端假設欄位已存在;若欄位不存在,Airtable PATCH 會回 422,Worker 需能辨識並回報,見 §2 錯誤處理)。
+
+---
+
+## 2. Worker 新寫入端點
+
+### 路徑與方法
+```
+POST /log/seal
+```
+(選擇獨立子路徑而非覆用 `/log`,因 `/log` 現為 GET-only 唯讀路由;新增 POST 於同路徑會混淆既有路由判斷邏輯,獨立路徑保持路由表清晰、範圍不外溢。)
+
+### Request Headers(與現役 `/log`、`/history` 一致慣例)
+```
+X-Line-AccessToken: <LIFF getAccessToken() 取得之 token>
+Content-Type: application/json
+```
+
+### Request Payload Schema
+```json
+{
+  "log_id": "recXXXXXXXXXXXXXX"
+}
+```
+- `log_id`:必填,string,Airtable record ID(對應 Divination_Log 的 `recId`)。
+- 🔴 **禁止**接受任何其他欄位(如 `golden_seal`、`note`、`user_id` 等一律忽略,見 §3-d 白名單鐵律)。若 payload 含 `log_id` 以外欄位,Worker **不報錯**(維持前端相容性)但**完全略過**,只取 `log_id`。
+
+### Response Schema
+- 成功(首次蓋章):`200 { "sealed": true, "sealed_at": "<ISO時間>", "already_sealed": false }`
+- 成功(已蓋過,冪等回覆):`200 { "sealed": true, "sealed_at": "<原蓋章時間>", "already_sealed": true }`
+- 缺 token:`401 { "error": "Missing access token" }`
+- token 無效/非本 channel:`401 { "error": "<resolveUserId 拋出訊息>" }`
+- 缺 log_id:`400 { "error": "Missing log_id" }`
+- 查無此卦記:`404 { "record": null }`
+- 越權(卦記不屬於此 user):`403 { "error": "Forbidden" }`
+- Airtable 寫入失敗(含欄位未建好的 422):`502 { "error": "Airtable write failed" }`
+- `AIRTABLE_API_KEY` 未設定:`503 { "error": "AIRTABLE_API_KEY not configured" }`
+
+### 實作邏輯(沿用現役 `/log` 的擁有權驗證模式,不重新發明)
+1. 驗 `X-Line-AccessToken` → `resolveUserId()`(現役 helper,原樣呼叫)取得 `verifiedUserId`。
+2. 解析 payload,只取 `log_id`,其餘丟棄。
+3. `GET https://api.airtable.com/v0/{AT_BASE}/{AT_DIV_LOG}/{log_id}` 讀出該筆記錄。
+4. 查無記錄 → 404。
+5. 擁有權比對:`record.fields.line_user_id_raw !== verifiedUserId` → 403(邏輯與現役 `/log` 路由第 3 步完全一致)。
+6. 冪等檢查:若 `record.fields.golden_seal === true` → 直接回 200 `already_sealed:true`,**不重新寫入**(見 §3-e)。
+7. 未蓋過 → `PATCH https://api.airtable.com/v0/{AT_BASE}/{AT_DIV_LOG}/{log_id}`,body:
+   ```json
+   { "fields": { "golden_seal": true, "golden_seal_time": "<伺服器產生的 ISO 時間>" } }
+   ```
+   (🔴 白名單鐵律:PATCH body 只包含這兩個欄位,程式碼層面硬編碼欄位名,不接受外部輸入拼接欄位名或欄位值。)
+8. Airtable 回應非 2xx → 502。
+9. 成功 → 回 200 `already_sealed:false`。
+
+---
+
+## 3. 🔴 安全紅線(S37 紀律)逐條落實
+
+**a. 前端永不持有真後端 endpoint/key**
+- 前端(LIFF 頁面)只呼叫 Worker relay 網域(現役 `ALLOWED_ORIGIN` 對應的前端網域不變),不新增任何直連 Airtable / 其他後端的呼叫。
+- 沿用現役 CORS 設定(`corsHeaders()`),新路徑同樣掛 CORS。
+
+**b. 寫入必須驗 LIFF ID Token,禁信前端自報 userId**
+- 100% 沿用現役 `resolveUserId(accessToken, LINE_CHANNEL_ID)`:先呼叫 LINE `/oauth2/v2.1/verify` 驗 token 有效性與 `client_id` 是否本 channel,再呼叫 `/v2/profile` 換真實 `userId`。
+- 端點**不接受**、也不解析 payload 中任何 `line_user_id` / `user_id` 欄位(§2 payload schema 僅有 `log_id`)。
+
+**c. TA 只能寫「自己的」卦記(防越權)**
+- §2 步驟 5:讀出目標記錄的 `line_user_id_raw`,與 `resolveUserId()` 驗證後的 `verifiedUserId` 比對,不符 → 403,**不執行任何寫入**。
+- 此比對邏輯與現役 `/log`(GET,讀取越權防護)完全同構,不新創一套判斷方式,降低邏輯分裂風險。
+
+**d. 寫入白名單:端點只准改「金印欄位」一欄**
+- PATCH body 的欄位名/欄位值皆為程式碼硬編碼(`golden_seal: true`, `golden_seal_time: <server-generated>`),**不從 request payload 組裝任何 PATCH 欄位**。
+- 即使前端傳來 `{"log_id":"rec123","golden_seal":false,"note":"hack"}`,Worker 也只解析 `log_id`,其餘忽略,實際寫入值恆為程式碼常數 `true` + 伺服器時間。
+
+**e. 冪等與防連打**
+- 冪等:寫入前先讀記錄現況(§2 步驟 6),`golden_seal` 已為 true → 直接回成功、不重複 PATCH,天然避免重複觸發造成的多次寫入與 Airtable rate limit 消耗。
+- 連打(同一使用者短時間內狂點按鈕):因步驟 6 的 read-before-write,重複請求最終效果一致(冪等),不會產生資料錯誤;但**未做**跨請求鎖(如 KV lock)防止極短時間內的 race condition(同時兩個請求都讀到「未蓋章」而都執行 PATCH)。
+  - 風險評估:golden_seal 是布林值,即使罕見 race 下重複 PATCH 兩次,最終值仍是 `true`,**不會造成資料錯誤**,只是多一次 Airtable API 呼叫。此為可接受風險,不做額外鎖,以維持 Worker 無狀態簡潔性(若 Codex 認為此處仍須 BLOCKER,將於互審記錄回應)。
+  - 基本節流:前端按鈕在送出請求後立即進入 disabled 狀態直到收到回應(見 §4),從 UI 層面降低連打發生率。
+
+---
+
+## 4. 前端互動(LIFF 頁面,對應現役「我的卦記」列表/詳情頁)
+
+- **按鈕狀態**:
+  - 未蓋章:顯示「🖋 蓋金印」可點擊按鈕。
+  - 已蓋章(`record.golden_seal === true`,來自 `/history` 或 `/log` 回傳資料):顯示「🔶 已蓋金印 · <sealed_at 格式化日期>」徽章,不可再點擊。
+- **互動流程**:
+  1. 點擊「蓋金印」→ 按鈕立即轉為 disabled + loading 樣式(防連打,見 §3-e)。
+  2. 呼叫 `POST /log/seal`,帶 `X-Line-AccessToken`。
+  3. 成功(`sealed:true`)→ 按鈕狀態切換為「已蓋金印」徽章,畫面即時更新(樂觀更新僅在收到 200 成功回應後才套用,**不在送出當下就假裝已蓋章**,避免假資料混入真資料)。
+  4. 失敗 → 按鈕恢復可點擊狀態,顯示 toast 錯誤訊息:
+     - 401 → 「登入逾時,請重新開啟」。
+     - 403 → 「無法蓋章:此卦記不屬於您的帳號」。
+     - 404 → 「找不到此筆卦記」。
+     - 其他(502/503)→ 「系統忙碌,請稍後再試」。
+- **資料一致性**:`/history` 列表與 `/log` 詳情的 API 回傳需附帶 `golden_seal` / `golden_seal_time`(現役 `/history` 與 `/log` 的 `fields` 白名單需追加這兩個新欄位,屬於「讀取端顯示新增欄位」,非寫入邏輯變更,列入本計畫範圍內的**唯一**既有路由微調)。
+
+---
+
+## 5. 封閉驗收集(全過才算完成)
+
+- [ ] **功能代表 case**:TA A 對自己名下、未蓋章的卦記呼叫 `/log/seal`,帶有效 token → 回 200 `sealed:true, already_sealed:false`;Airtable 該筆記錄 `golden_seal=true` 且 `golden_seal_time` 有值。
+- [ ] **越權 case**:TA A 持自己的有效 token,對 TA B 名下的卦記 `log_id` 呼叫 `/log/seal` → 回 403,Airtable 該筆記錄**未被寫入**(`golden_seal` 維持原值)。
+- [ ] **無效 token case**:呼叫 `/log/seal` 帶過期/偽造/非本 channel 的 token → 回 401,**不觸發**任何 Airtable 讀寫呼叫。
+- [ ] **重複蓋章 case**:對同一筆已 `golden_seal=true` 的卦記,再次呼叫 `/log/seal`(同一合法 TA、合法 token)→ 回 200 `already_sealed:true`,Airtable 無新的 PATCH 寫入(以 `golden_seal_time` 值不變驗證)。
+- [ ] **缺 log_id case**(邊界):payload 為 `{}` → 回 400,不觸發 Airtable 呼叫。
+- [ ] **payload 夾帶多餘欄位 case**(白名單稽核):payload 為 `{"log_id":"recXXX","golden_seal":false}` → 實際寫入結果仍為 `golden_seal:true`(證明白名單生效,外部無法覆寫為 false)。
+
+### 機讀驗證指令(headless-first)
+```
+# typecheck: Worker 為單檔 JS,無 TS build step;以 wrangler dry-run 取代
+wrangler deploy --dry-run --outdir=./dryrun
+
+# test: 以 curl 打上述 6 個 case(需先備妥測試用 log_id / token,由 Codex 施工時於派工卡回報實測結果)
+curl -s -X POST https://<relay-domain>/log/seal -H "X-Line-AccessToken: <token>" -H "Content-Type: application/json" -d '{"log_id":"<id>"}'
+
+# leakage scan:確認回應內容不外洩 AIRTABLE_API_KEY / MAKE_WEBHOOK_URL 等機密
+curl -s ... | grep -Ei "airtable_api_key|make_.*webhook|key=" && echo "LEAK FOUND" || echo "CLEAN"
+```
+
+---
+
+## 🔴 邊界(每次動工前重讀)
+- 本計畫只涵蓋 `/log/seal` 端點與 `/history`、`/log` 的欄位白名單追加(§4 末段);**不**修改 `POST /`、`/study`、`resolveUserId()`、`corsHeaders()`、`json()`、`airtableFetch()` 的既有邏輯。
+- 不碰 `deliverables/`、不碰任何真 token/金鑰、不動既有 CI。
+- Airtable 新欄位建立為 Perth 手動操作(Airtable 後台),不在本計畫施工範圍內自動化。
+- 卡在遠端閘(Airtable 欄位未建好、Cloudflare 部署權限)→ 停 + 回報,禁自行繞道或造替代方案。
+
+<!-- 待互審:本檔尾將由 codex-review Skill 附加 APPROVED / ESCALATED Marker -->
+codex
+我會用 `workers-best-practices` 來審這份 Cloudflare Worker 計畫，重點放在安全邊界、路由契約、Airtable 寫入一致性與驗收缺口。先讀技能指引，再回到計畫逐條抓 BLOCKER。
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath 'C:\\Users\\ivych\\.codex\\skills\\workers-best-practices\\SKILL.md' -Raw -Encoding UTF8" in D:\20260702 Begining\BB_BU Project\mingge-line
+2026-07-05T05:48:55.009139Z ERROR codex_core::exec: exec error: windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\20260702 Begining\BB_BU Project\mingge-line, log=C:\Users\ivych\.codex\.sandbox\sandbox.2026-07-05.log, error=program not found
+2026-07-05T05:48:55.010281Z ERROR codex_core::tools::router: error=execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\20260702 Begining\\BB_BU Project\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-05.log, error=program not found" })
+ exited -1 in 0ms:
+execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\20260702 Begining\\BB_BU Project\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-05.log, error=program not found" })
+codex
+VERDICT: NOT APPROVED
+
+[BLOCKER] §0 與 §4 自相矛盾。§0 說不修改 `/history`、`/log` 行為或回傳格式，但 §4 又要求兩者追加 `golden_seal` / `golden_seal_time`。前端狀態依賴這兩欄，必須明確列為既有讀取路由的契約變更。
+
+[BLOCKER] 安全紅線 b 寫「驗 LIFF ID Token」，但實作 header 是 `X-Line-AccessToken`，流程也是驗 access token。這是資料契約/安全契約矛盾，需統一為「LIFF access token」或改成真正 ID token 驗證。
+
+[BLOCKER] `log_id` 驗證不足。只說必填 string，未要求 Airtable record id 格式驗證與 `encodeURIComponent`。應先擋掉非 string、空字串、非 `rec...` 格式、含 `/ ? # %` 等 path 注入風險的值，且 invalid case 不應打 Airtable。
+
+[BLOCKER] 防連打不足。計畫承認沒有跨請求鎖，但 `golden_seal_time` 是稽核欄位；兩個並發請求都讀到未蓋章時會重複 PATCH，後者可能覆蓋首次時間，違反冪等與「留痕稽核」。至少要有 per-log 短鎖、Durable Object/KV lock，或明確放棄時間稽核語意。
+
+[BLOCKER] 「只准改金印欄位一欄」與實際 PATCH 兩欄矛盾。若白名單是 `golden_seal` + `golden_seal_time`，文字要改成「金印欄位組」；否則驗收會誤判。
+
+[BLOCKER] Airtable GET 錯誤處理不完整。計畫只定義查無 404，但未定義 Airtable 401/403、429、5xx、JSON parse fail、base/table 錯誤時如何區分。所有非 404 的讀取失敗都不能當「查無卦記」。
+
+[BLOCKER] 已蓋章但 `golden_seal_time` 缺失的資料未處理。Response schema 承諾 `sealed_at` 是原蓋章時間，但 Airtable 可能有 boolean true、time 空值。需定義回 `null`、修復寫入、或 500/502，否則前端格式化會破。
+
+[BLOCKER] `/history`、`/log` 的新增讀取欄位契約不夠明確。需定義回傳 JSON 形狀、false/空值正規化規則，以及未勾選 checkbox 時 Airtable 省略欄位的處理方式。
+
+[BLOCKER] 驗收集無法證明「不觸發 Airtable 讀寫」。curl 只能看外部結果，不能證明 invalid token / missing log_id 沒有打 Airtable，也不能證明 already sealed 沒 PATCH。需加 mock fetch 單元測試、Worker log evidence，或可觀測的請求計數。
+
+[BLOCKER] malformed JSON / wrong Content-Type 未列入錯誤處理。`POST /log/seal` 必須明確回 400，且不得進入 Airtable 流程。
+
+[SUGGEST] payload 夾帶多餘欄位目前採忽略。安全上可接受，但「禁止接受其他欄位」語意更適合回 400，避免前端錯誤長期潛伏。
+
+[SUGGEST] 新路由需明確列 `OPTIONS /log/seal`、`GET/PUT/PATCH /log/seal` 的結果。尤其自訂 `X-Line-AccessToken` 會觸發 CORS preflight，驗收應補 preflight case。
+
+[SUGGEST] 401 不建議回傳 raw `resolveUserId` 錯誤訊息。對前端統一回「Invalid access token」，詳細原因只進 server log，避免外洩 LINE 驗證細節。
+
+[SUGGEST] live 源證明仍偏薄。已列 Worker id/tag 與檔頭，但計畫依賴 `resolveUserId()`、`/log` ownership、現有 route matching、field whitelist；最好補 live code 摘錄或行號證明這些假設。
+tokens used
+32,903
+VERDICT: NOT APPROVED
+
+[BLOCKER] §0 與 §4 自相矛盾。§0 說不修改 `/history`、`/log` 行為或回傳格式，但 §4 又要求兩者追加 `golden_seal` / `golden_seal_time`。前端狀態依賴這兩欄，必須明確列為既有讀取路由的契約變更。
+
+[BLOCKER] 安全紅線 b 寫「驗 LIFF ID Token」，但實作 header 是 `X-Line-AccessToken`，流程也是驗 access token。這是資料契約/安全契約矛盾，需統一為「LIFF access token」或改成真正 ID token 驗證。
+
+[BLOCKER] `log_id` 驗證不足。只說必填 string，未要求 Airtable record id 格式驗證與 `encodeURIComponent`。應先擋掉非 string、空字串、非 `rec...` 格式、含 `/ ? # %` 等 path 注入風險的值，且 invalid case 不應打 Airtable。
+
+[BLOCKER] 防連打不足。計畫承認沒有跨請求鎖，但 `golden_seal_time` 是稽核欄位；兩個並發請求都讀到未蓋章時會重複 PATCH，後者可能覆蓋首次時間，違反冪等與「留痕稽核」。至少要有 per-log 短鎖、Durable Object/KV lock，或明確放棄時間稽核語意。
+
+[BLOCKER] 「只准改金印欄位一欄」與實際 PATCH 兩欄矛盾。若白名單是 `golden_seal` + `golden_seal_time`，文字要改成「金印欄位組」；否則驗收會誤判。
+
+[BLOCKER] Airtable GET 錯誤處理不完整。計畫只定義查無 404，但未定義 Airtable 401/403、429、5xx、JSON parse fail、base/table 錯誤時如何區分。所有非 404 的讀取失敗都不能當「查無卦記」。
+
+[BLOCKER] 已蓋章但 `golden_seal_time` 缺失的資料未處理。Response schema 承諾 `sealed_at` 是原蓋章時間，但 Airtable 可能有 boolean true、time 空值。需定義回 `null`、修復寫入、或 500/502，否則前端格式化會破。
+
+[BLOCKER] `/history`、`/log` 的新增讀取欄位契約不夠明確。需定義回傳 JSON 形狀、false/空值正規化規則，以及未勾選 checkbox 時 Airtable 省略欄位的處理方式。
+
+[BLOCKER] 驗收集無法證明「不觸發 Airtable 讀寫」。curl 只能看外部結果，不能證明 invalid token / missing log_id 沒有打 Airtable，也不能證明 already sealed 沒 PATCH。需加 mock fetch 單元測試、Worker log evidence，或可觀測的請求計數。
+
+[BLOCKER] malformed JSON / wrong Content-Type 未列入錯誤處理。`POST /log/seal` 必須明確回 400，且不得進入 Airtable 流程。
+
+[SUGGEST] payload 夾帶多餘欄位目前採忽略。安全上可接受，但「禁止接受其他欄位」語意更適合回 400，避免前端錯誤長期潛伏。
+
+[SUGGEST] 新路由需明確列 `OPTIONS /log/seal`、`GET/PUT/PATCH /log/seal` 的結果。尤其自訂 `X-Line-AccessToken` 會觸發 CORS preflight，驗收應補 preflight case。
+
+[SUGGEST] 401 不建議回傳 raw `resolveUserId` 錯誤訊息。對前端統一回「Invalid access token」，詳細原因只進 server log，避免外洩 LINE 驗證細節。
+
+[SUGGEST] live 源證明仍偏薄。已列 Worker id/tag 與檔頭，但計畫依賴 `resolveUserId()`、`/log` ownership、現有 route matching、field whitelist；最好補 live code 摘錄或行號證明這些假設。
