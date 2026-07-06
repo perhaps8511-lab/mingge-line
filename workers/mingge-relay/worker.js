@@ -4,6 +4,9 @@
 // S135+: 新增 GET /history (E09 歷史卦例 + 會員狀態)
 //         需要 Secret: AIRTABLE_API_KEY (Perth 貼進 Cloudflare Secrets)
 // S137-R02: 新增 GET /log (E23 卦記詳情) + /history 加 log_id 欄位
+// S140: 新增 POST /trigger/deepdive、/trigger/fupan(E27 深卜/複盤入口導引,薄代理層)
+//         需要 Secret: HOOK_DEEPDIVE、HOOK_FUPAN(Perth 已貼進 Cloudflare Secrets)
+//         沿用現役 resolveUserId() 驗證,webhook URL 不進前端(依 S37 binding)
 // ====================================================
 
 const ALLOWED_ORIGIN = "https://perhaps8511-lab.github.io";
@@ -255,6 +258,174 @@ export default {
       return json({ sealed: true, sealed_at: sealedAt, already_sealed: false });
     }
 
+    // S140(E27):深卜/複盤薄代理層 —— 前端只打這裡,Worker 驗完身分才轉發 Make webhook,
+    // webhook URL 全程留在 Worker 端 Secrets,不進前端原始碼(S37 binding)。
+    if (request.method === "POST" && url.pathname === "/trigger/deepdive") {
+      const contentType = request.headers.get("Content-Type") || "";
+      if (!contentType.toLowerCase().includes("application/json")) {
+        return json({ error: "Bad JSON body" }, 400);
+      }
+
+      let payload;
+      try {
+        payload = await request.json();
+      } catch (e) {
+        return json({ error: "Bad JSON body" }, 400);
+      }
+
+      const accessToken = request.headers.get("X-Line-AccessToken");
+      if (!accessToken) {
+        return json({ error: "Missing access token" }, 401);
+      }
+
+      let verifiedUserId;
+      try {
+        ({ userId: verifiedUserId } = await resolveUserId(accessToken, LINE_CHANNEL_ID));
+      } catch (e) {
+        console.log("Deepdive access token validation failed", e.message || e);
+        return json({ error: "Invalid access token" }, 401);
+      }
+
+      const payloadIsObject = payload && typeof payload === "object" && !Array.isArray(payload);
+      const payloadKeys = payloadIsObject ? Object.keys(payload) : [];
+      if (payloadKeys.some(k => k !== "log_id")) {
+        return json({ error: "Unexpected field in payload" }, 400);
+      }
+
+      const logId = payloadIsObject ? payload.log_id : undefined;
+      if (typeof logId !== "string" || !/^rec[a-zA-Z0-9]{14}$/.test(logId)) {
+        return json({ error: "Invalid log_id" }, 400);
+      }
+
+      if (!env.AIRTABLE_API_KEY) {
+        return json({ error: "AIRTABLE_API_KEY not configured" }, 503);
+      }
+      if (!env.HOOK_DEEPDIVE) {
+        return json({ error: "HOOK_DEEPDIVE not configured" }, 503);
+      }
+
+      let recRes;
+      try {
+        recRes = await fetch(
+          `https://api.airtable.com/v0/${AT_BASE}/${AT_DIV_LOG}/${encodeURIComponent(logId)}`,
+          { headers: { "Authorization": "Bearer " + env.AIRTABLE_API_KEY } }
+        );
+      } catch (e) {
+        console.log("Airtable deepdive read failed", e.message || e);
+        return json({ error: "Airtable read failed" }, 502);
+      }
+
+      if (recRes.status === 404) {
+        return json({ record: null }, 404);
+      }
+      if (!recRes.ok) {
+        console.log("Airtable deepdive read failed", recRes.status);
+        return json({ error: "Airtable read failed" }, 502);
+      }
+
+      let rec;
+      try {
+        rec = await recRes.json();
+      } catch (e) {
+        console.log("Airtable deepdive read JSON parse failed", e.message || e);
+        return json({ error: "Airtable read failed" }, 502);
+      }
+
+      const f = rec.fields || {};
+      if (f.line_user_id_raw !== verifiedUserId) {
+        return json({ error: "Forbidden" }, 403);
+      }
+
+      const hookPayload = {
+        line_user_id:  verifiedUserId,
+        ben_gua:       f.ben_gua       || "",
+        question_text: f.question_text || "",
+        session_id:    f.session_id    || "",
+      };
+
+      try {
+        const hookRes = await fetch(env.HOOK_DEEPDIVE, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(hookPayload),
+        });
+        if (!hookRes.ok) {
+          console.log("Deepdive webhook forward failed", hookRes.status);
+          return json({ error: "Webhook forward failed" }, 502);
+        }
+      } catch (e) {
+        console.log("Deepdive webhook forward failed", e.message || e);
+        return json({ error: "Webhook forward failed" }, 502);
+      }
+
+      return json({ sent: true }, 202);
+    }
+
+    if (request.method === "POST" && url.pathname === "/trigger/fupan") {
+      const contentType = request.headers.get("Content-Type") || "";
+      if (!contentType.toLowerCase().includes("application/json")) {
+        return json({ error: "Bad JSON body" }, 400);
+      }
+
+      let payload;
+      try {
+        payload = await request.json();
+      } catch (e) {
+        return json({ error: "Bad JSON body" }, 400);
+      }
+
+      const accessToken = request.headers.get("X-Line-AccessToken");
+      if (!accessToken) {
+        return json({ error: "Missing access token" }, 401);
+      }
+
+      let verifiedUserId;
+      try {
+        ({ userId: verifiedUserId } = await resolveUserId(accessToken, LINE_CHANNEL_ID));
+      } catch (e) {
+        console.log("Fupan access token validation failed", e.message || e);
+        return json({ error: "Invalid access token" }, 401);
+      }
+
+      const payloadIsObject = payload && typeof payload === "object" && !Array.isArray(payload);
+      const payloadKeys = payloadIsObject ? Object.keys(payload) : [];
+      if (payloadKeys.some(k => k !== "current_question")) {
+        return json({ error: "Unexpected field in payload" }, 400);
+      }
+
+      const rawQuestion = payloadIsObject ? payload.current_question : undefined;
+      const currentQuestion = typeof rawQuestion === "string" ? rawQuestion.trim() : "";
+      if (!currentQuestion || currentQuestion.length > 200) {
+        return json({ error: "Invalid current_question" }, 400);
+      }
+
+      if (!env.HOOK_FUPAN) {
+        return json({ error: "HOOK_FUPAN not configured" }, 503);
+      }
+
+      const hookPayload = {
+        line_user_id:    verifiedUserId,
+        current_question: currentQuestion,
+      };
+
+      try {
+        const hookRes = await fetch(env.HOOK_FUPAN, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(hookPayload),
+        });
+        if (!hookRes.ok) {
+          console.log("Fupan webhook forward failed", hookRes.status);
+          return json({ error: "Webhook forward failed" }, 502);
+        }
+      } catch (e) {
+        console.log("Fupan webhook forward failed", e.message || e);
+        return json({ error: "Webhook forward failed" }, 502);
+      }
+
+      return json({ sent: true }, 202);
+    }
+
     if (request.method !== "POST") {
       return new Response("Method not allowed", { status: 405, headers: corsHeaders() });
     }
@@ -276,6 +447,11 @@ export default {
       payload = await request.json();
     } catch (e) {
       return new Response("Bad JSON body", { status: 400, headers: corsHeaders() });
+    }
+
+    if (payload.event !== "consent_granted") {
+      const quotaGate = await readQuotaGate(env, verifiedUserId);
+      if (!quotaGate.allow) return json({ gate: "zero_quota" }, 402);
     }
 
     payload.line_user_id = verifiedUserId;
@@ -348,6 +524,39 @@ async function airtableFetch(apiKey, base, table, opts) {
     return { records: [] };
   }
   return res.json();
+}
+
+async function readQuotaGate(env, lineUserId) {
+  if (!env.AIRTABLE_API_KEY) {
+    console.log("Quota gate skipped: AIRTABLE_API_KEY not configured");
+    return { allow: true };
+  }
+
+  let subResult;
+  try {
+    subResult = await airtableFetch(env.AIRTABLE_API_KEY, AT_BASE, AT_SUBS, {
+      filterByFormula: `{line_user_id}="${lineUserId}"`,
+      fields: ["subscriber_tier", "trial_quota_remaining", "monthly_quota_remaining"],
+      maxRecords: 1,
+    });
+  } catch (e) {
+    console.log("Quota gate Airtable read failed", e.message || e);
+    return { allow: true };
+  }
+
+  const subRec = (subResult.records || [])[0];
+  if (!subRec) {
+    return { allow: true };
+  }
+
+  const sub = subRec.fields || {};
+  const tier = sub.subscriber_tier || "free";
+  const credits = (Number(sub.trial_quota_remaining) || 0) + (Number(sub.monthly_quota_remaining) || 0);
+  if (tier === "subscriber" || credits > 0) {
+    return { allow: true };
+  }
+
+  return { allow: false };
 }
 
 function json(data, status) {
