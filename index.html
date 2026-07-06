@@ -345,6 +345,23 @@
   .pay-note{
     font-size:11.5px;line-height:2.0;letter-spacing:.04em;
     color:var(--jade);opacity:.65;margin-top:20px;}
+  .quota-gate{
+    max-width:360px;text-align:center;border:1px solid rgba(184,134,11,.28);
+    border-radius:6px;padding:26px 24px;background:rgba(7,11,7,.52);
+    box-shadow:0 24px 70px rgba(0,0,0,.38), inset 0 0 30px rgba(184,134,11,.05);}
+  .quota-gate .gate-text{
+    white-space:pre-line;font-size:15px;line-height:2.05;letter-spacing:.08em;
+    color:var(--rice-deep);}
+  .entry-gift{
+    border:1px solid rgba(184,134,11,.22);border-radius:4px;
+    padding:12px 14px;margin-bottom:12px;color:var(--gold-lit);
+    font-size:13px;line-height:1.8;letter-spacing:.05em;text-align:center;
+    background:rgba(184,134,11,.06);}
+  .single-log-entry{margin-top:18px;text-align:center;min-height:34px;}
+  .single-log-entry a{
+    display:inline-block;color:var(--moss);border:1px solid var(--gold);
+    border-radius:3px;padding:9px 18px;text-decoration:none;font-size:13px;
+    letter-spacing:.08em;background:rgba(184,134,11,.08);}
 </style>
 </head>
 <body>
@@ -380,6 +397,12 @@
       <p>此刻先不必說、不必寫，只要在心中反覆默念。<br>待卦象浮現，自會請你說說所問。</p>
       <p style="color:var(--gold-soft);opacity:.9;">心已澄定，<br>便可開始起卦。</p>
       <button class="next" onclick="go(2)">開　始　起　卦</button>
+    </div>
+  </div>
+
+  <div class="scene" id="sGate">
+    <div class="quota-gate">
+      <div class="gate-text" id="entryGateText"></div>
     </div>
   </div>
 
@@ -426,6 +449,7 @@
         <div class="l"><span>gua_result（送 Make / Dify · 內測檢視）</span><button class="cp" onclick="copyJson()">複製</button></div>
         <pre id="rJson"></pre>
       </div>
+      <div class="single-log-entry" id="singleLogEntry"></div>
     </div>
   </div>
 
@@ -484,6 +508,7 @@
       <div class="lp-sub">您問過的卦，都在這裡記著。</div>
     </div>
     <div class="lp-body">
+      <div class="entry-gift" id="entryGift" hidden></div>
       <div class="log-status" id="logStatus">載入中……</div>
       <div id="fupanBanner"></div>
       <div id="logList"><div class="log-loading" id="logLoading">讀取記錄中……</div></div>
@@ -599,12 +624,11 @@ function lcDate(qiguaTime){
    分流依 /history 已回傳的 sub.tier + records.length,不需額外請求。 */
 function buildFupanBannerHtml(sub, recordsCount){
   var isSubscriber = sub && sub.tier === 'subscriber';
+  var credits = quotaCreditsFromSub(sub);
   var head = '<div class="fp-title">這些卦，連成了什麼路？</div>'
     +'<div class="fp-sub">問道·複盤——讀你這一連串決定走成的軌跡，讀那道「轉」在哪裡。</div>';
   if(!isSubscriber){
-    return '<div class="fupan-banner">'+head
-      +'<button class="fp-btn" id="fupanBtn" type="button" data-mode="upsell">訂閱解鎖複盤</button>'
-      +'</div>';
+    return credits > 0 ? '<div class="fupan-banner">'+head+'</div>' : '';
   }
   var enough = recordsCount >= 2;
   if(!enough){
@@ -680,11 +704,18 @@ async function initLogPage(){
     //   trial_quota_remaining, monthly_quota_remaining, subscription_start}，
     //   不是 subscription:{active,expires_at} / coins；原判斷永遠落到 else 分支。
     var sub=data.subscriber;
+    var giftEl=document.getElementById('entryGift');
     if(sub&&sub.tier==='subscriber'){
       statusEl.textContent='訂閱中，書房為您常開。';
+      if(giftEl){ giftEl.hidden=true; }
     }else{
-      var coins=sub?((sub.trial_quota_remaining||0)+(sub.monthly_quota_remaining||0)):0;
+      var coins=quotaCreditsFromSub(sub);
       statusEl.textContent='尚餘 '+coins+' 枚問卦銅錢。';
+      if(giftEl){
+        var isFirstTouch=(!data.records||data.records.length===0) && coins===3;
+        giftEl.textContent=isFirstTouch?'一輩子相贈 3 枚問卦銅錢 —— 一枚一問。':'';
+        giftEl.hidden=!isFirstTouch;
+      }
     }
     // E27:複盤 CTA —— 分流依剛拿到的 sub + records.length,不需額外請求
     var fupanBannerEl=document.getElementById('fupanBanner');
@@ -1013,6 +1044,106 @@ const SESSION_ID = (function(){
   }catch(_){ return gen(); }   // sessionStorage 不可用 → 退一次性 ID,卦記仍有值
 })();
 
+const ZERO_QUOTA_TEXT = '你問過的卦,已在卦記裡連成了形。仍有事要問,便再來一卦 ——\n問一卦|149。老易為您讀本卦、變卦、動爻,把這一程攤開看清。';
+const ZERO_QUOTA_THREE_TEXT = '三卦既成,下卦已立 —— 要往上建嗎?\n問一卦|149。老易為您讀本卦、變卦、動爻,把這一程攤開看清。';
+const READING_STATUS_TEXT = '卦已收到,老易讀卦中';
+let entryGateState = { ready:false, allow:true, hasSubscriber:false, tier:null, credits:null, recordsCount:0, inFlight:false };
+
+function quotaCreditsFromSub(sub){
+  if(!sub) return 0;
+  return (Number(sub.trial_quota_remaining)||0) + (Number(sub.monthly_quota_remaining)||0);
+}
+
+function setSceneById(id){
+  document.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+  var el=document.getElementById(id);
+  if(el) el.classList.add('active');
+}
+
+function readEntryGateState(data){
+  var records = (data && data.records) || [];
+  var sub = data ? data.subscriber : null;
+  var hasSubscriber = !!sub;
+  var tier = sub && sub.tier ? sub.tier : 'free';
+  var credits = quotaCreditsFromSub(sub);
+  var activeSession = null;
+  try{ activeSession = sessionStorage.getItem('mg_inflight_session_id'); }catch(_){}
+  return {
+    ready:true,
+    allow:true,
+    hasSubscriber:hasSubscriber,
+    tier:tier,
+    credits:credits,
+    recordsCount:records.length,
+    inFlight:activeSession===SESSION_ID && records.some(function(r){ return r && r.session_id===SESSION_ID; })
+  };
+}
+
+async function refreshEntryGateState(token){
+  if(DEV_MODE || !token) return entryGateState = { ready:true, allow:true, hasSubscriber:false, tier:null, credits:null, recordsCount:0, inFlight:false };
+  try{
+    var resp = await fetch(RELAY_URL+'history',{method:'GET',headers:{'X-Line-AccessToken':token}});
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    entryGateState = readEntryGateState(await resp.json());
+  }catch(e){
+    console.warn('[entry gate]', e && e.message ? e.message : e);
+    entryGateState = { ready:true, allow:true, hasSubscriber:false, tier:null, credits:null, recordsCount:0, inFlight:false };
+  }
+  return entryGateState;
+}
+
+async function ensureEntryGateState(){
+  var token = liffAccessToken;
+  try{
+    if(!DEV_MODE && liffReady && liff.isLoggedIn()){
+      token = liff.getAccessToken() || token;
+      if(token) liffAccessToken = token;
+    }
+  }catch(_){}
+  if(!token && !DEV_MODE) return entryGateState;
+  return refreshEntryGateState(token);
+}
+
+function renderZeroQuotaGate(state){
+  var el=document.getElementById('entryGateText');
+  if(el) el.textContent = state && state.recordsCount===3 ? ZERO_QUOTA_THREE_TEXT : ZERO_QUOTA_TEXT;
+  setSceneById('sGate');
+}
+
+function renderReadingGate(){
+  var el=document.getElementById('entryGateText');
+  if(el) el.textContent = READING_STATUS_TEXT;
+  var send=document.querySelector('.handoff .send');
+  if(send){ send.disabled=true; send.textContent=READING_STATUS_TEXT; }
+  setSceneById('sGate');
+}
+
+function blockEntryIfNeeded(state){
+  if(!state || !state.ready) return false;
+  if(state.inFlight){ renderReadingGate(); return true; }
+  if(state.hasSubscriber && state.tier==='free' && state.credits===0){
+    renderZeroQuotaGate(state);
+    return true;
+  }
+  return false;
+}
+
+async function renderSingleLogEntry(token){
+  var el=document.getElementById('singleLogEntry');
+  if(!el || !token) return;
+  try{
+    var resp=await fetch(RELAY_URL+'history',{method:'GET',headers:{'X-Line-AccessToken':token}});
+    if(!resp.ok) return;
+    var data=await resp.json();
+    var rec=((data&&data.records)||[]).find(function(r){ return r && r.session_id===SESSION_ID && r.log_id; });
+    if(rec){
+      el.innerHTML='<a href="./log.html?log_id='+encodeURIComponent(rec.log_id)+'">查看信箋 ›</a>';
+    }
+  }catch(e){
+    console.warn('[single log entry]', e && e.message ? e.message : e);
+  }
+}
+
 let liffReady=false, liffUserId=null, liffAccessToken=null;
 
 /* LIFF 初始化(DEV 模式下略過,不報錯)
@@ -1033,6 +1164,8 @@ async function initLiff(){
     }catch(_){}
     liffAccessToken=liff.getAccessToken();  // ★ 方案3:Access Token(SDK 管理、會自動續期;送出時會再即時重抓一次)
     console.log('[LIFF] init done. accessToken at init:', liffAccessToken ? 'OK' : 'null(送出時會重抓)');
+    var gateState = await refreshEntryGateState(liffAccessToken);
+    if(blockEntryIfNeeded(gateState)) return;
     restorePendingIfAny();                  // ★ v1.2:若是登入跳轉返回,還原送出前暫存的卦(qigua_time 原封,守 T0)
   }catch(e){
     console.error('LIFF init failed:', e);
@@ -1109,6 +1242,8 @@ async function sendSay(){
     }
     return;
   }
+  const gateState = await refreshEntryGateState(liffAccessToken);
+  if(blockEntryIfNeeded(gateState)) return;
   try{
     const btn=document.querySelector('.handoff .send');
     if(btn){btn.disabled=true;btn.textContent='正在送進老易書房…';}
@@ -1120,8 +1255,15 @@ async function sendSay(){
       },
       body:JSON.stringify(payload)
     });
+    if(res.status===402){
+      const zeroState = await refreshEntryGateState(liffAccessToken);
+      renderZeroQuotaGate(zeroState);
+      return;
+    }
     if(!res.ok) throw new Error('relay HTTP '+res.status);
+    try{ sessionStorage.setItem('mg_inflight_session_id', SESSION_ID); }catch(_){}
     if(btn){btn.textContent='已送出 · 老易解卦中';}
+    await renderSingleLogEntry(liffAccessToken);
     // 回覆由 LINE OA 推回(本頁不負責顯示解卦結果)。
     // S79:送出成功 → 顯示「解卦中」引導 → 自動收合 LIFF 回聊天室等信箋。
     showSendingAndClose();
@@ -1234,6 +1376,8 @@ function onConsentToggle(){
 async function enterWithConsent(){
   const chk = document.getElementById('consentChk');
   if(!chk || !chk.checked) return;            // 沒勾不放行(雙保險)
+  const gateState = await ensureEntryGateState();
+  if(blockEntryIfNeeded(gateState)) return;
   // 先進 s1,不讓建檔的網路延遲卡住使用者體驗
   go(1);
   // 背景靜默送出 consent_granted(失敗也不擋,只記 log)

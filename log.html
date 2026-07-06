@@ -240,30 +240,29 @@ function parseReading(raw) {
   return { type: "letter", gz, mirrors, zy, next };
 }
 
-/* ===== E27:深卜 CTA(裁決 3-1 B-lite / 3-3 Worker 薄代理層)=====
-   tier 用途只決定按鈕文案與行為,/history 打不到就降級為「顯示按鈕、點擊照送」(Make 端本身仍會擋非訂閱戶)。*/
+/* ===== E27:深卜 CTA(裁決 3-1 B-lite / 3-3 Worker 薄代理層)===== */
 async function fetchSubscriberTier(token) {
   try {
     const res = await fetch(`${RELAY_URL}history`, {
       method: "GET",
       headers: { "X-Line-AccessToken": token },
     });
-    if (!res.ok) return { ok: false, tier: null };
+    if (!res.ok) return { ok: false, tier: "free" };
     const data = await res.json();
     return { ok: true, tier: data.subscriber ? data.subscriber.tier : "free" };
   } catch (e) {
-    return { ok: false, tier: null };
+    return { ok: false, tier: "free" };
   }
 }
 
 function buildDeepdiveCtaHtml(tierInfo) {
-  const isSubscriber = !tierInfo.ok || tierInfo.tier === "subscriber"; // /history 失敗 → 降級照送,視同可按
-  const btnLabel = isSubscriber ? "深讀這一卦" : "訂閱解鎖四鏡深讀";
+  const isSubscriber = tierInfo.ok && tierInfo.tier === "subscriber";
+  const btnLabel = isSubscriber ? "四鏡深讀(訂閱含)" : "四鏡·深卜 200";
   return `
     <div class="section deepen-section">
       <div class="sec-title">往裡再讀四面？</div>
       <div class="deepen-sub">同一卦，不重卜、不換卦——互、綜、錯、序，四鏡合看。</div>
-      <button class="deepen-btn" id="deepdiveBtn" type="button" data-mode="${isSubscriber ? "trigger" : "upsell"}">${btnLabel}</button>
+      <button class="deepen-btn" id="deepdiveBtn" type="button" data-mode="${isSubscriber ? "trigger" : "ready"}"${isSubscriber ? "" : " disabled"}>${btnLabel}</button>
       <div class="deepen-status" id="deepdiveStatus"></div>
     </div>`;
 }
@@ -273,8 +272,7 @@ async function handleDeepdiveClick(logId, token) {
   const statusEl = document.getElementById("deepdiveStatus");
   if (!btn) return;
 
-  if (btn.dataset.mode === "upsell") {
-    window.location.href = "./index.html?action=pay";
+  if (btn.dataset.mode !== "trigger") {
     return;
   }
 
@@ -410,7 +408,7 @@ function renderDetail(rec, tierInfo, token) {
   wrap.innerHTML = html;
 
   const deepdiveBtn = document.getElementById("deepdiveBtn");
-  if (deepdiveBtn) {
+  if (deepdiveBtn && !deepdiveBtn.disabled) {
     deepdiveBtn.addEventListener("click", () => handleDeepdiveClick(rec.log_id, token));
   }
 }
