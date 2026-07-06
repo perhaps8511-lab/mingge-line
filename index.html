@@ -284,6 +284,30 @@
     letter-spacing:.06em;opacity:.8;}
   .log-card .lc-arrow{margin-left:auto;color:var(--gold-soft);letter-spacing:.02em;flex-shrink:0;}
   /* ====================================================
+     E27 複盤 CTA(格2 hub 頂部橫幅)
+  ==================================================== */
+  .fupan-banner{
+    background:rgba(184,134,11,.06);border:1px solid rgba(184,134,11,.22);
+    border-radius:10px;padding:20px 20px 18px;margin-bottom:22px;
+  }
+  .fupan-banner .fp-title{font-size:15px;letter-spacing:.12em;color:var(--gold-lit);margin-bottom:8px;font-weight:600;}
+  .fupan-banner .fp-sub{font-size:13px;letter-spacing:.05em;line-height:1.9;color:var(--rice-deep);opacity:.85;margin-bottom:16px;}
+  .fupan-banner .fp-input{
+    width:100%;background:rgba(245,241,232,.04);border:1px solid rgba(216,207,188,.25);
+    border-radius:6px;padding:11px 13px;font-size:13.5px;color:var(--rice);
+    font-family:inherit;margin-bottom:12px;resize:none;
+  }
+  .fupan-banner .fp-input::placeholder{color:var(--jade);opacity:.6;}
+  .fupan-banner .fp-input:disabled{opacity:.45;cursor:not-allowed;}
+  .fupan-banner .fp-btn{
+    display:block;width:100%;background:transparent;color:var(--rice);
+    border:1px solid var(--gold);border-radius:4px;padding:12px 20px;
+    font-size:13.5px;letter-spacing:.1em;cursor:pointer;transition:.25s;font-family:inherit;
+  }
+  .fupan-banner .fp-btn:hover:not(:disabled){background:var(--gold);color:#15200f;}
+  .fupan-banner .fp-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .fupan-banner .fp-status{font-size:11.5px;color:var(--jade);margin-top:10px;min-height:1.4em;letter-spacing:.05em;}
+  /* ====================================================
      E13 易經書房
   ==================================================== */
   .study-section{margin-bottom:28px;}
@@ -461,6 +485,7 @@
     </div>
     <div class="lp-body">
       <div class="log-status" id="logStatus">載入中……</div>
+      <div id="fupanBanner"></div>
       <div id="logList"><div class="log-loading" id="logLoading">讀取記錄中……</div></div>
     </div>
   </div>
@@ -570,6 +595,74 @@ function lcDate(qiguaTime){
 }
 
 /* ===== E09 歷史卦例頁 ===== */
+/* ===== E27:複盤 CTA(裁決 3-2 需輸入框 / 3-3 Worker 薄代理層)=====
+   分流依 /history 已回傳的 sub.tier + records.length,不需額外請求。 */
+function buildFupanBannerHtml(sub, recordsCount){
+  var isSubscriber = sub && sub.tier === 'subscriber';
+  var head = '<div class="fp-title">這些卦，連成了什麼路？</div>'
+    +'<div class="fp-sub">問道·複盤——讀你這一連串決定走成的軌跡，讀那道「轉」在哪裡。</div>';
+  if(!isSubscriber){
+    return '<div class="fupan-banner">'+head
+      +'<button class="fp-btn" id="fupanBtn" type="button" data-mode="upsell">訂閱解鎖複盤</button>'
+      +'</div>';
+  }
+  var enough = recordsCount >= 2;
+  if(!enough){
+    return '<div class="fupan-banner">'+head
+      +'<textarea class="fp-input" id="fupanInput" rows="2" placeholder="再卜幾次，複盤就能連成路" disabled></textarea>'
+      +'<button class="fp-btn" id="fupanBtn" type="button" disabled>開始複盤</button>'
+      +'</div>';
+  }
+  return '<div class="fupan-banner">'+head
+    +'<textarea class="fp-input" id="fupanInput" rows="2" maxlength="200" placeholder="你眼前正面對哪個決定？"></textarea>'
+    +'<button class="fp-btn" id="fupanBtn" type="button" data-mode="trigger">開始複盤</button>'
+    +'<div class="fp-status" id="fupanStatus"></div>'
+    +'</div>';
+}
+
+function attachFupanBannerHandlers(token){
+  var btn = document.getElementById('fupanBtn');
+  if(!btn || btn.disabled) return; // 卦例不足的禁用態不綁事件
+
+  if(btn.dataset.mode === 'upsell'){
+    btn.addEventListener('click', function(){ window.location.href = './index.html?action=pay'; });
+    return;
+  }
+
+  btn.addEventListener('click', function(){
+    var input = document.getElementById('fupanInput');
+    var statusEl = document.getElementById('fupanStatus');
+    var q = (input && input.value ? input.value : '').trim();
+    if(!q){ if(statusEl) statusEl.textContent = '請先寫下你眼前的決定'; return; }
+
+    var originalLabel = btn.textContent;
+    btn.disabled = true;
+    if(input) input.disabled = true;
+    btn.textContent = '送出中……';
+    if(statusEl) statusEl.textContent = '';
+
+    fetch(RELAY_URL+'trigger/fupan', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-Line-AccessToken':token},
+      body: JSON.stringify({current_question:q})
+    }).then(function(res){
+      if(res.ok){
+        btn.textContent = '已送出，老易正為你複盤，請回 LINE 對話等信';
+        return; // 保持 disabled,不恢復可點(避免重送)
+      }
+      btn.disabled = false;
+      if(input) input.disabled = false;
+      btn.textContent = originalLabel;
+      if(statusEl) statusEl.textContent = (res.status===401) ? '請重新開啟' : '系統忙碌，請稍後再試';
+    }).catch(function(){
+      btn.disabled = false;
+      if(input) input.disabled = false;
+      btn.textContent = originalLabel;
+      if(statusEl) statusEl.textContent = '系統忙碌，請稍後再試';
+    });
+  });
+}
+
 async function initLogPage(){
   var statusEl=document.getElementById('logStatus');
   var listEl=document.getElementById('logList');
@@ -592,6 +685,12 @@ async function initLogPage(){
     }else{
       var coins=sub?((sub.trial_quota_remaining||0)+(sub.monthly_quota_remaining||0)):0;
       statusEl.textContent='尚餘 '+coins+' 枚問卦銅錢。';
+    }
+    // E27:複盤 CTA —— 分流依剛拿到的 sub + records.length,不需額外請求
+    var fupanBannerEl=document.getElementById('fupanBanner');
+    if(fupanBannerEl){
+      fupanBannerEl.innerHTML=buildFupanBannerHtml(sub, (data.records||[]).length);
+      attachFupanBannerHandlers(token);
     }
     if(loadingEl)loadingEl.remove();
     if(!data.records||data.records.length===0){

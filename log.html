@@ -120,6 +120,19 @@
   .report-body strong{color:var(--ink);font-weight:700;}
   .report-body em{color:var(--ink-soft);}
   .report-body hr{border:none;border-top:1px solid var(--line);margin:16px 0;}
+
+  /* ---- E27 深卜 CTA(比照 index.html .pay-btn 視覺語言:透明底/金框/hover 填金) ---- */
+  .deepen-section{text-align:center;}
+  .deepen-sub{font-size:13px;color:var(--ink-soft);line-height:1.8;margin-bottom:16px;}
+  .deepen-btn{
+    display:block;width:100%;background:transparent;color:var(--ink);
+    border:1px solid var(--gold);border-radius:8px;
+    padding:13px 20px;font-family:var(--serif);font-size:14.5px;letter-spacing:.1em;
+    cursor:pointer;transition:.25s;
+  }
+  .deepen-btn:hover:not(:disabled){background:var(--gold);color:#fff;}
+  .deepen-btn:disabled{opacity:.55;cursor:not-allowed;}
+  .deepen-status{font-size:12px;color:var(--ink-soft);margin-top:10px;min-height:1.4em;}
 </style>
 </head>
 <body>
@@ -227,7 +240,72 @@ function parseReading(raw) {
   return { type: "letter", gz, mirrors, zy, next };
 }
 
-function renderDetail(rec) {
+/* ===== E27:深卜 CTA(裁決 3-1 B-lite / 3-3 Worker 薄代理層)=====
+   tier 用途只決定按鈕文案與行為,/history 打不到就降級為「顯示按鈕、點擊照送」(Make 端本身仍會擋非訂閱戶)。*/
+async function fetchSubscriberTier(token) {
+  try {
+    const res = await fetch(`${RELAY_URL}history`, {
+      method: "GET",
+      headers: { "X-Line-AccessToken": token },
+    });
+    if (!res.ok) return { ok: false, tier: null };
+    const data = await res.json();
+    return { ok: true, tier: data.subscriber ? data.subscriber.tier : "free" };
+  } catch (e) {
+    return { ok: false, tier: null };
+  }
+}
+
+function buildDeepdiveCtaHtml(tierInfo) {
+  const isSubscriber = !tierInfo.ok || tierInfo.tier === "subscriber"; // /history 失敗 → 降級照送,視同可按
+  const btnLabel = isSubscriber ? "深讀這一卦" : "訂閱解鎖四鏡深讀";
+  return `
+    <div class="section deepen-section">
+      <div class="sec-title">往裡再讀四面？</div>
+      <div class="deepen-sub">同一卦，不重卜、不換卦——互、綜、錯、序，四鏡合看。</div>
+      <button class="deepen-btn" id="deepdiveBtn" type="button" data-mode="${isSubscriber ? "trigger" : "upsell"}">${btnLabel}</button>
+      <div class="deepen-status" id="deepdiveStatus"></div>
+    </div>`;
+}
+
+async function handleDeepdiveClick(logId, token) {
+  const btn = document.getElementById("deepdiveBtn");
+  const statusEl = document.getElementById("deepdiveStatus");
+  if (!btn) return;
+
+  if (btn.dataset.mode === "upsell") {
+    window.location.href = "./index.html?action=pay";
+    return;
+  }
+
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = "送出中……";
+  if (statusEl) statusEl.textContent = "";
+
+  try {
+    const res = await fetch(`${RELAY_URL}trigger/deepdive`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Line-AccessToken": token },
+      body: JSON.stringify({ log_id: logId }),
+    });
+    if (res.ok) {
+      btn.textContent = "老易讀著了，請回 LINE 對話等信";
+      return; // 保持 disabled,不恢復可點(避免重送)
+    }
+    if (res.status === 401) {
+      if (statusEl) statusEl.textContent = "請重新開啟";
+    } else {
+      if (statusEl) statusEl.textContent = "系統忙碌，請稍後再試";
+    }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = "系統忙碌，請稍後再試";
+  }
+  btn.disabled = false;
+  btn.textContent = originalLabel;
+}
+
+function renderDetail(rec, tierInfo, token) {
   const wrap = document.getElementById("viewDetail");
 
   const benSym  = guaSymbol(rec.ben_gua  || "");
@@ -326,7 +404,15 @@ function renderDetail(rec) {
     }
   }
 
+  // E27:深卜 CTA —— 走到這裡已保證 entryType === "divination"(其他類型在函式前段已早退)
+  html += buildDeepdiveCtaHtml(tierInfo);
+
   wrap.innerHTML = html;
+
+  const deepdiveBtn = document.getElementById("deepdiveBtn");
+  if (deepdiveBtn) {
+    deepdiveBtn.addEventListener("click", () => handleDeepdiveClick(rec.log_id, token));
+  }
 }
 
 async function init() {
@@ -381,7 +467,8 @@ async function init() {
     return;
   }
 
-  renderDetail(data.record);
+  const tierInfo = await fetchSubscriberTier(token); // E27:失敗不擋主流程,降級處理見 buildDeepdiveCtaHtml
+  renderDetail(data.record, tierInfo, token);
   show("viewDetail");
 }
 
