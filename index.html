@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.3.2</title>
+<title>命格 · 進場儀式 v1.3.0</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -282,7 +282,6 @@
   .log-card .lc-q{font-size:14px;color:var(--rice-deep);letter-spacing:.04em;line-height:1.75;margin-bottom:11px;}
   .log-card .lc-foot{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--jade);
     letter-spacing:.06em;opacity:.8;}
-  .log-card .lc-goldseal{color:var(--gold-lit);font-size:10.5px;letter-spacing:.04em;}
   .log-card .lc-arrow{margin-left:auto;color:var(--gold-soft);letter-spacing:.02em;flex-shrink:0;}
   /* ====================================================
      E27 複盤 CTA(格2 hub 頂部橫幅)
@@ -737,7 +736,6 @@ async function initLogPage(){
           (r.dong_yao?('動爻 '+lcEsc(String(r.dong_yao))):''),
           (r.entry_type&&r.entry_type!=='divination'?lcEsc(r.entry_type):'')
         ].filter(Boolean).join(' · ');
-        var goldsealBadge = r.golden_seal === true ? '<span class="lc-goldseal">🔶</span>' : '';
         var card=''
           +'<div class="lc-head">'
             +'<span class="lc-glyph">'+glyph+'</span>'
@@ -747,7 +745,6 @@ async function initLogPage(){
           +(r.question_text?('<div class="lc-q">'+lcEsc(r.question_text)+'</div>'):'')
           +'<div class="lc-foot">'
             +(footBits?('<span>'+footBits+'</span>'):'')
-            +goldsealBadge
             +'<span class="lc-arrow">查看信箋 ›</span>'
           +'</div>';
         // log_id 由 Worker /history 補上(S137-R02),包成可點連結進卦記詳情頁(E23,現役已驗證,不重寫)
