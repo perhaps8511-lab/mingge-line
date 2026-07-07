@@ -352,6 +352,12 @@
   .quota-gate .gate-text{
     white-space:pre-line;font-size:15px;line-height:2.05;letter-spacing:.08em;
     color:var(--rice-deep);}
+  .gate-door{
+    display:inline-block;margin-top:8px;background:transparent;color:var(--rice);
+    border:1px solid var(--gold);border-radius:2px;padding:14px 44px;
+    font-family:inherit;font-size:14px;letter-spacing:.22em;text-decoration:none;
+    transition:.45s;text-align:center;}
+  .gate-door:hover{background:var(--gold);color:#15200f;box-shadow:0 0 30px rgba(184,134,11,.4);}
   .entry-gift{
     border:1px solid rgba(184,134,11,.22);border-radius:4px;
     padding:12px 14px;margin-bottom:12px;color:var(--gold-lit);
@@ -1044,8 +1050,8 @@ const SESSION_ID = (function(){
   }catch(_){ return gen(); }   // sessionStorage 不可用 → 退一次性 ID,卦記仍有值
 })();
 
-const ZERO_QUOTA_TEXT = '你問過的卦,已在卦記裡連成了形。仍有事要問,便再來一卦 ——\n問一卦|149。老易為您讀本卦、變卦、動爻,把這一程攤開看清。';
-const ZERO_QUOTA_THREE_TEXT = '三卦既成,下卦已立 —— 要往上建嗎?\n問一卦|149。老易為您讀本卦、變卦、動爻,把這一程攤開看清。';
+const ZERO_QUOTA_TEXT = '下卦已立,要往上建嗎?';
+const ZERO_QUOTA_THREE_TEXT = '下卦已立,要往上建嗎?';
 const READING_STATUS_TEXT = '卦已收到,老易讀卦中';
 let entryGateState = { ready:false, allow:true, hasSubscriber:false, tier:null, credits:null, recordsCount:0, inFlight:false };
 
@@ -1106,7 +1112,8 @@ async function ensureEntryGateState(){
 
 function renderZeroQuotaGate(state){
   var el=document.getElementById('entryGateText');
-  if(el) el.textContent = state && state.recordsCount===3 ? ZERO_QUOTA_THREE_TEXT : ZERO_QUOTA_TEXT;
+  if(el) el.innerHTML = '<span style="display:block;margin-bottom:22px;font-size:17px;letter-spacing:.14em;color:var(--gold-lit);">'+ZERO_QUOTA_TEXT+'</span>'
+    +'<a href="./index.html?action=pay" class="gate-door">問一卦 149</a>';
   setSceneById('sGate');
 }
 

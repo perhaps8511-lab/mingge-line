@@ -451,7 +451,7 @@ export default {
 
     if (payload.event !== "consent_granted") {
       const quotaGate = await readQuotaGate(env, verifiedUserId);
-      if (!quotaGate.allow) return json({ gate: "zero_quota" }, 402);
+      if (!quotaGate.allow) return json({ gate: "zero_quota", credits: 0, next: "door_149" }, 402);
     }
 
     payload.line_user_id = verifiedUserId;
