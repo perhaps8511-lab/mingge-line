@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.4.0</title>
+<title>命格 · 進場儀式 v1.4.1</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -398,6 +398,7 @@
   <!-- S1 凝神默念過場 -->
   <div class="scene" id="s1">
     <div class="nianter">
+      <div class="entry-gift" id="entryGiftEntry" hidden></div>
       <div class="mark">起 卦 之 前</div>
       <h2>把心中所問<br>在心裡反覆默念</h2>
       <p>此刻先不必說、不必寫，只要在心中反覆默念。<br>待卦象浮現，自會請你說說所問。</p>
@@ -536,7 +537,7 @@
     </div>
   </div>
 
-      <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.4.0(E35 進場門)</div>
+      <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.4.1(E35 進場門 · E40 贈幣)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -718,8 +719,8 @@ async function initLogPage(){
       var coins=quotaCreditsFromSub(sub);
       statusEl.textContent='尚餘 '+coins+' 枚問卦銅錢。';
       if(giftEl){
-        var isFirstTouch=(!data.records||data.records.length===0) && coins===3;
-        giftEl.textContent=isFirstTouch?'一輩子相贈 3 枚問卦銅錢 —— 一枚一問。':'';
+        var isFirstTouch=giftShouldShow(sub);
+        giftEl.textContent=isFirstTouch?GIFT_TEXT:'';
         giftEl.hidden=!isFirstTouch;
       }
     }
@@ -1060,6 +1061,13 @@ function quotaCreditsFromSub(sub){
   return (Number(sub.trial_quota_remaining)||0) + (Number(sub.monthly_quota_remaining)||0);
 }
 
+const GIFT_TEXT = '一輩子相贈 3 枚問卦銅錢 —— 一枚一問。';   // ★ E40②:唯一定義處,log/entry 兩頁共用,不得另造字串
+
+function giftShouldShow(sub){
+  if(sub && sub.tier==='subscriber') return false;   // 訂閱戶一律不顯示,與 initLogPage 既有分流一致
+  return sub===null || quotaCreditsFromSub(sub)===3;
+}
+
 function setSceneById(id){
   document.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
   var el=document.getElementById(id);
@@ -1153,6 +1161,27 @@ async function renderSingleLogEntry(token){
 
 let liffReady=false, liffUserId=null, liffAccessToken=null;
 
+async function applyEntryGift(token){
+  var giftEl=document.getElementById('entryGiftEntry');
+  if(!giftEl) return;
+  giftEl.hidden=true; giftEl.textContent='';          // 先重置,避免殘留舊狀態(重入/BFCache 防呆)
+  if(DEV_MODE || !token) return;                      // LIFF 未登入/DEV → 保持 hidden
+  var ctrl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+  var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, 8000) : null;  // 逾時 8s 視同失敗
+  try{
+    var resp=await fetch(RELAY_URL+'history',{method:'GET',headers:{'X-Line-AccessToken':token},cache:'no-store',signal:ctrl?ctrl.signal:undefined});
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    var data=await resp.json();
+    var show=giftShouldShow(data?data.subscriber:null);
+    giftEl.textContent=show?GIFT_TEXT:'';
+    giftEl.hidden=!show;
+  }catch(e){
+    console.warn('[entry gift]', e && e.message ? e.message : e);   // 失敗/逾時 → 保持 hidden(已於前置重置)
+  }finally{
+    if(timer) clearTimeout(timer);
+  }
+}
+
 /* LIFF 初始化(DEV 模式下略過,不報錯)
    方案3:改用 Access Token(SDK 自動續期,解決 ID Token 不續期會過期的問題);前端零固定祕密。 */
 async function initLiff(){
@@ -1173,6 +1202,7 @@ async function initLiff(){
     console.log('[LIFF] init done. accessToken at init:', liffAccessToken ? 'OK' : 'null(送出時會重抓)');
     var gateState = await refreshEntryGateState(liffAccessToken);
     if(blockEntryIfNeeded(gateState)) return;
+    void applyEntryGift(liffAccessToken);   // ★ E40②:非阻塞 fire-and-forget(void 明示不等待),失敗/逾時不擋起卦主流程
     restorePendingIfAny();                  // ★ v1.2:若是登入跳轉返回,還原送出前暫存的卦(qigua_time 原封,守 T0)
   }catch(e){
     console.error('LIFF init failed:', e);
