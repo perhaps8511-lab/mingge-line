@@ -121,18 +121,20 @@
   .report-body em{color:var(--ink-soft);}
   .report-body hr{border:none;border-top:1px solid var(--line);margin:16px 0;}
 
-  /* ---- E27 深卜 CTA(比照 index.html .pay-btn 視覺語言:透明底/金框/hover 填金) ---- */
-  .deepen-section{text-align:center;}
-  .deepen-sub{font-size:13px;color:var(--ink-soft);line-height:1.8;margin-bottom:16px;}
-  .deepen-btn{
-    display:block;width:100%;background:transparent;color:var(--ink);
-    border:1px solid var(--gold);border-radius:8px;
-    padding:13px 20px;font-family:var(--serif);font-size:14.5px;letter-spacing:.1em;
-    cursor:pointer;transition:.25s;
+  /* ---- E27→lettertail_taskB 深卜 CTA(升級為信箋卡同視覺重量區塊,沿用既有深色 token --ink/--gold) ---- */
+  .deepen-section{
+    text-align:center;background:var(--ink);color:var(--paper);
+    border-radius:10px;padding:20px 18px;border-bottom:none;
   }
-  .deepen-btn:hover:not(:disabled){background:var(--gold);color:#fff;}
-  .deepen-btn:disabled{opacity:.55;cursor:not-allowed;}
-  .deepen-status{font-size:12px;color:var(--ink-soft);margin-top:10px;min-height:1.4em;}
+  .deepen-sub{font-size:13px;color:var(--paper);opacity:.75;line-height:1.8;margin-bottom:16px;}
+  .deepen-btn{
+    display:block;width:100%;background:var(--gold);color:#fff;
+    border:none;border-radius:8px;
+    padding:14px 20px;font-family:var(--serif);font-size:15px;letter-spacing:.1em;
+    cursor:pointer;transition:.25s;font-weight:600;
+  }
+  .deepen-btn:hover{opacity:.85;}
+  .deepen-status{font-size:12px;color:var(--paper);opacity:.7;margin-top:10px;min-height:1.4em;}
 </style>
 </head>
 <body>
@@ -257,12 +259,12 @@ async function fetchSubscriberTier(token) {
 
 function buildDeepdiveCtaHtml(tierInfo) {
   const isSubscriber = tierInfo.ok && tierInfo.tier === "subscriber";
-  const btnLabel = isSubscriber ? "四鏡深讀(訂閱含)" : "四鏡·深卜 200";
+  const btnLabel = "四鏡·深卜 200";
   return `
     <div class="section deepen-section">
       <div class="sec-title">往裡再讀四面？</div>
       <div class="deepen-sub">同一卦，不重卜、不換卦——互、綜、錯、序，四鏡合看。</div>
-      <button class="deepen-btn" id="deepdiveBtn" type="button" data-mode="${isSubscriber ? "trigger" : "ready"}"${isSubscriber ? "" : " disabled"}>${btnLabel}</button>
+      <button class="deepen-btn" id="deepdiveBtn" type="button" data-mode="${isSubscriber ? "trigger" : "purchase"}">${btnLabel}</button>
       <div class="deepen-status" id="deepdiveStatus"></div>
     </div>`;
 }
@@ -271,6 +273,13 @@ async function handleDeepdiveClick(logId, token) {
   const btn = document.getElementById("deepdiveBtn");
   const statusEl = document.getElementById("deepdiveStatus");
   if (!btn) return;
+
+  if (btn.dataset.mode === "purchase") {
+    if (statusEl) statusEl.textContent = "深讀之門設在書房，這就帶你過去。";
+    btn.disabled = true;
+    setTimeout(() => { window.location.href = "./index.html?action=pay"; }, 1200);
+    return;
+  }
 
   if (btn.dataset.mode !== "trigger") {
     return;

@@ -634,7 +634,7 @@ function buildFupanBannerHtml(sub, recordsCount){
   var head = '<div class="fp-title">這些卦，連成了什麼路？</div>'
     +'<div class="fp-sub">問道·複盤——讀你這一連串決定走成的軌跡，讀那道「轉」在哪裡。</div>';
   if(!isSubscriber){
-    return credits > 0 ? '<div class="fupan-banner">'+head+'</div>' : '';
+    return ''; // gated-ii revert(lettertail_cta 卡邊界條款):複盤 banner 對非 subscriber 完全隱藏,不分 credits
   }
   var enough = recordsCount >= 2;
   if(!enough){
