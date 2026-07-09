@@ -1,0 +1,13 @@
+[BLOCKER] 無。
+
+[SUGGEST] `index.html:+337` 新增 raw color `#15200f`，雖非禁用金色且未動 `--gold:#B8860B`，但建議改成既有 token `var(--moss)`，讓「禁動色」機讀更完整。
+
+[SUGGEST] `history.replaceState({v:'cover'},'')` 會覆寫目前 history state；若 `initStudyPage()` 可能在非書房頁預載，建議只在進入 `#page-study` 時執行。
+
+範圍守門：PASS。diff 僅落在書房 CSS、`#page-study` HTML、study JS 呈現/導覽邏輯，未動格1/2/3/5/6。
+
+驗收 8 項：① PASS ② PASS ③ PASS ④ PASS ⑤ PASS ⑥ PASS ⑦ PASS ⑧ PASS。
+
+紅線掃：PASS。未見 token/key、未新增硬編碼 endpoint、未直連 Airtable/Dify、未新增 `innerHTML` 注入；`RELAY_URL+'study'` 是既有路徑延續；article body 以 `textContent/createTextNode` 保字元，不改字。
+
+VERDICT: APPROVED

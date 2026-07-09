@@ -1,0 +1,324 @@
+--- live_index.html	2026-07-09 11:51:40.729057100 +0800
++++ work/index.html	2026-07-09 13:46:16.787610100 +0800
+@@ -325,17 +325,53 @@
+   .fupan-banner .fp-btn:disabled{opacity:.4;cursor:not-allowed;}
+   .fupan-banner .fp-status{font-size:11.5px;color:var(--jade);margin-top:10px;min-height:1.4em;letter-spacing:.05em;}
+   /* ====================================================
+-     E13 易經書房
++     E42 易經書房 · 呈現層(三層:門面/列表/閱讀)· 卡B
++     視覺沿用既有 tokens,禁動色(金=--gold #B8860B;品牌金另案歸 E45 換皮卡)
+   ==================================================== */
+-  .study-section{margin-bottom:28px;}
+-  .study-section h3{font-size:15px;letter-spacing:.18em;color:var(--gold-lit);margin-bottom:10px;}
+-  .study-section p{font-size:13.5px;line-height:2.1;letter-spacing:.06em;color:var(--rice-deep);opacity:.82;}
+-  .study-divider{border:none;border-top:1px solid rgba(216,207,188,.1);margin:24px 0;}
+-  .study-coming{font-size:12px;color:var(--jade);opacity:.55;letter-spacing:.12em;}
+-.study-article{padding:10px 0;border-bottom:1px solid rgba(216,207,188,.07);}
+-.study-article:last-child{border-bottom:none;}
+-.sa-title{font-size:14px;color:var(--rice);letter-spacing:.1em;margin-bottom:6px;line-height:1.7;}
+-.sa-body{font-size:17px;line-height:2.0;letter-spacing:.05em;color:var(--rice-deep);opacity:.78;}/* T5:書房內文≥17px */
++  .study-view{animation:studyFade .28s ease;}
++  @keyframes studyFade{from{opacity:0;}to{opacity:1;}}
++  /* 層1 門面 */
++  .study-intro{font-size:13.5px;line-height:2.05;letter-spacing:.05em;color:var(--rice-deep);opacity:.82;text-align:center;margin:2px 0 0;}
++  .study-intro .si-2{display:block;color:var(--gold-soft);opacity:.95;margin-top:9px;}
++  .study-tags{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:28px 0 8px;}
++  .study-tag{background:transparent;color:var(--rice);border:1px solid var(--gold);border-radius:20px;
++    padding:8px 18px;font-size:13px;letter-spacing:.12em;cursor:pointer;font-family:inherit;transition:.2s;}
++  .study-tag:hover,.study-tag:active{background:var(--gold);color:var(--moss);}
++  .study-tag .st-n{opacity:.55;font-size:11px;margin-left:5px;letter-spacing:0;}
++  .study-featured{margin:32px 0 6px;}
++  .study-featured .sf-head{font-size:13px;letter-spacing:.16em;color:var(--gold-lit);text-align:center;margin-bottom:16px;opacity:.9;}
++  .study-feat{display:block;width:100%;text-align:left;background:var(--paper);color:var(--moss);
++    border:none;border-radius:4px;padding:15px 18px;margin-bottom:12px;cursor:pointer;font-family:inherit;box-shadow:0 1px 12px rgba(21,32,15,.18);}
++  .study-feat .ff-t{font-size:15px;line-height:1.7;letter-spacing:.03em;margin-bottom:6px;font-weight:600;}
++  .study-feat .ff-y{font-size:12.5px;line-height:1.6;color:var(--moss-soft);opacity:.85;
++    display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
++  /* 層2 書卷列表 */
++  .study-back{display:inline-flex;align-items:center;gap:5px;background:transparent;color:var(--gold-soft);
++    border:none;font-size:13px;letter-spacing:.08em;cursor:pointer;font-family:inherit;padding:2px 0;margin-bottom:16px;}
++  .study-listhead{font-size:17px;letter-spacing:.18em;color:var(--rice);margin-bottom:5px;}
++  .study-listsub{font-size:12px;letter-spacing:.1em;color:var(--jade);opacity:.7;margin-bottom:20px;}
++  .study-card{display:block;width:100%;text-align:left;background:transparent;color:var(--rice);
++    border:none;border-bottom:1px solid rgba(216,207,188,.1);padding:16px 2px;cursor:pointer;font-family:inherit;}
++  .study-card:last-child{border-bottom:none;}
++  .study-card .sc-t{font-size:15px;line-height:1.7;letter-spacing:.05em;color:var(--rice);margin-bottom:7px;}
++  .study-card .sc-y{font-size:13px;line-height:1.65;letter-spacing:.03em;color:var(--rice-deep);opacity:.88;
++    display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
++  /* 層3 閱讀頁(米白紙感;同 .log-empty-card 既有明面手法) */
++  .study-read .sr-paper{background:var(--paper);border-radius:6px;padding:30px 22px 24px;box-shadow:0 2px 20px rgba(21,32,15,.22);}
++  .study-read .sr-title{font-size:21px;line-height:1.6;letter-spacing:.05em;color:var(--moss);font-weight:700;margin-bottom:22px;font-family:"Noto Serif TC",serif;}
++  .study-read .sr-body{font-size:17px;line-height:1.95;letter-spacing:.02em;color:var(--moss);}/* ≥17px/行高≥1.9 */
++  .study-read .sr-body p{font-size:17px;line-height:1.95;letter-spacing:.02em;color:var(--moss);margin:0 0 17px;}
++  .study-read .sr-body p:last-child{margin-bottom:0;}
++  .study-quote{background:var(--rice-deep);border-left:2px solid var(--gold);padding:2px 8px;border-radius:2px;color:var(--moss);font-family:"Noto Serif TC",serif;}
++  .study-read .sr-seal{text-align:center;margin-top:20px;color:var(--gold-soft);opacity:.5;font-size:15px;letter-spacing:.5em;}
++  .study-read .study-signpost{text-align:center;margin-top:22px;padding-top:22px;border-top:1px solid rgba(184,134,11,.25);}
++  .study-read .study-signpost p{font-size:14.5px;line-height:2.0;letter-spacing:.03em;color:var(--moss-soft);margin-bottom:18px;}
++  .study-signpost .sp-btn{display:inline-block;background:transparent;color:var(--moss);border:1px solid var(--gold);
++    border-radius:4px;padding:11px 26px;font-size:14px;letter-spacing:.14em;cursor:pointer;font-family:inherit;transition:.25s;}
++  .study-signpost .sp-btn:hover{background:var(--gold);color:var(--paper);box-shadow:0 0 26px rgba(184,134,11,.3);}
++  /* 骨架佔位(防亂碼閃 ⑥) */
++  .sk-line{border-radius:3px;background:linear-gradient(90deg,rgba(216,207,188,.07),rgba(216,207,188,.15),rgba(216,207,188,.07));background-size:200% 100%;animation:skShimmer 1.3s ease-in-out infinite;height:13px;margin:14px 0;}
++  @keyframes skShimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+   /* ====================================================
+      E12 訂閱方案
+   ==================================================== */
+@@ -523,15 +559,54 @@
+     </div>
+   </div>
+ 
+-  <!-- P-STUDY 格4 易經書房 (E13 · 靜態 · action=study) -->
++  <!-- P-STUDY 格4 易經書房 (E42 呈現層 · 三層 · action=study) -->
+   <div class="liff-page" id="page-study">
+-    <div class="lp-header">
+-      <div class="lp-icon">📚</div>
+-      <h1>易經書房</h1>
+-      <div class="lp-sub">主人讀易的地方，也擱著些可看的東西。</div>
+-    </div>
+-        <div class="lp-body" id="studyBody">
+-      <div class="log-loading" id="studyLoading">æ¸æ¿ééä¸­â¦â¦</div>
++    <div class="lp-body" id="studyBody">
++      <!-- 骨架佔位:先 render,decode 完才換入(防亂碼閃 ⑥) -->
++      <div id="studySkeleton" aria-hidden="true" style="padding:44px 8px 0;">
++        <div class="sk-line" style="width:55%;height:22px;margin:0 auto 26px;"></div>
++        <div class="sk-line" style="width:78%;margin:0 auto 10px;"></div>
++        <div class="sk-line" style="width:64%;margin:0 auto 30px;"></div>
++        <div class="sk-line" style="width:30%;height:30px;border-radius:20px;display:inline-block;margin:0 5px;"></div>
++        <div class="sk-line" style="width:30%;height:30px;border-radius:20px;display:inline-block;margin:0 5px;"></div>
++        <div class="sk-line" style="width:100%;height:64px;margin-top:34px;"></div>
++        <div class="sk-line" style="width:100%;height:64px;"></div>
++      </div>
++      <!-- 層1 書房門面 -->
++      <div class="study-view study-cover" id="studyCover" hidden>
++        <div class="lp-header" style="padding-top:44px;">
++          <div class="lp-icon">📚</div>
++          <h1>易經書房</h1>
++        </div>
++        <p class="study-intro">主人讀易的地方，也擱著些可看的東西。<span class="si-2">不必問卦也能進來坐 —— 挑一卷，慢慢看。</span></p>
++        <div class="study-tags" id="studyTags"></div>
++        <div class="study-featured" id="studyFeatured" hidden>
++          <div class="sf-head">本週擱在案上的</div>
++          <div id="studyFeatList"></div>
++        </div>
++      </div>
++      <!-- 層2 書卷列表 -->
++      <div class="study-view study-list" id="studyList" hidden>
++        <button type="button" class="study-back" onclick="history.back()">← 回書房</button>
++        <div class="study-listhead" id="studyListHead"></div>
++        <div class="study-listsub" id="studyListSub"></div>
++        <div id="studyListItems"></div>
++      </div>
++      <!-- 層3 閱讀頁 -->
++      <div class="study-view study-read" id="studyRead" hidden>
++        <button type="button" class="study-back" id="studyReadBack" onclick="history.back()">← 回列表</button>
++        <div class="sr-paper">
++          <div class="sr-title" id="studyReadTitle"></div>
++          <div class="sr-body" id="studyReadBody"></div>
++          <div class="sr-seal" aria-hidden="true">☰ ☷</div>
++          <div class="study-signpost">
++            <p>讀著讀著，心裡若浮出一件自己的事 —— 書房這頭，隨時可向天問一卦。</p>
++            <button type="button" class="sp-btn" onclick="location.href='./index.html'">🎴 向天問卦</button>
++          </div>
++        </div>
++      </div>
++      <!-- 錯誤/空態(schema guard;沿用既有語彙) -->
++      <div class="log-empty" id="studyError" hidden></div>
+     </div>
+   </div>
+ 
+@@ -575,49 +650,162 @@
+ <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
+ <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+ <script>
+-/* ===== E13 易經書房頁 ===== */
++/* ===== E42 易經書房呈現層(三層:門面→列表→閱讀)· 卡B ===== */
++var STUDY_CATS=['節氣信','人際小文','時節問候']; /* 分類籤 closed-set 白名單+序(空籤零出 ②) */
++var STUDY_MARK='(?:大象傳|大象說|大象|彖傳|彖曰|象傳|象曰|卦辭|爻辭|卦說|初九|九二|九三|九四|九五|上九|初六|六二|六三|六四|六五|上六|用九|用六)';
++var STUDY_QUOTE_RE=new RegExp(STUDY_MARK+'[^「『」』]{0,6}?(「[^」]+」|『[^』]+』)');
++var studyState={loaded:false,articles:[],byCat:{},featured:[]};
++
++/* 一句引:精確匹配樣板才剝→取次句→≤20+「…」(Perth §10-A;禁 AI;主體逐字取自 body) */
++function studyYiju(body){
++  var b=(body||'').replace(/^\s+/,'');
++  var m=b.match(/^老易在書房[，,](?:談|寫於)[^。]*。/);
++  var rest=m?b.slice(m[0].length).replace(/^\s+/,''):b;
++  var sm=rest.match(/^[^。！？\n]*[。！？]/);
++  var s=(sm?sm[0]:(rest.split('\n')[0]||'')).replace(/\s+$/,'');
++  return s.length>20 ? s.slice(0,20)+'…' : s;
++}
++
++/* 閱讀頁逐段 DOM:僅古文 span 包引文卡,其餘 createTextNode;零改字零 innerHTML(R1-#10) */
++function studyParagraph(line){
++  var p=document.createElement('p');
++  var idx=0,guard=0;
++  while(idx<line.length && guard++<300){
++    var seg=line.slice(idx);
++    var m=seg.match(STUDY_QUOTE_RE);
++    if(!m){ p.appendChild(document.createTextNode(line.slice(idx))); return p; }
++    var q=m[1];
++    var qStart=idx+m.index+m[0].length-q.length;
++    if(qStart>idx){ p.appendChild(document.createTextNode(line.slice(idx,qStart))); }
++    var span=document.createElement('span'); span.className='study-quote';
++    span.appendChild(document.createTextNode(q));
++    p.appendChild(span);
++    idx=qStart+q.length;
++  }
++  if(idx<line.length){ p.appendChild(document.createTextNode(line.slice(idx))); }
++  return p;
++}
++
++function studyShow(id){
++  ['studySkeleton','studyCover','studyList','studyRead','studyError'].forEach(function(v){
++    var el=document.getElementById(v); if(el){ el.hidden=(v!==id); }
++  });
++  try{ window.scrollTo(0,0); }catch(e){}
++}
++function studyFail(msg){ var el=document.getElementById('studyError'); if(el){ el.textContent=msg; } studyShow('studyError'); }
++
++function studyRenderCover(){
++  var tagsEl=document.getElementById('studyTags');
++  if(tagsEl){
++    tagsEl.textContent='';
++    STUDY_CATS.forEach(function(cat){
++      var arr=studyState.byCat[cat]; if(!arr||!arr.length){ return; } /* 空籤零出 ② */
++      var b=document.createElement('button'); b.type='button'; b.className='study-tag';
++      b.appendChild(document.createTextNode(cat));
++      var n=document.createElement('span'); n.className='st-n';
++      n.appendChild(document.createTextNode('· '+arr.length)); b.appendChild(n);
++      b.addEventListener('click',function(){ studyGo({v:'list',cat:cat},true); });
++      tagsEl.appendChild(b);
++    });
++  }
++  var wrap=document.getElementById('studyFeatured');
++  var list=document.getElementById('studyFeatList');
++  if(list){ list.textContent=''; }
++  if(studyState.featured.length && list){
++    studyState.featured.slice(0,3).forEach(function(a){
++      var b=document.createElement('button'); b.type='button'; b.className='study-feat';
++      var t=document.createElement('div'); t.className='ff-t'; t.appendChild(document.createTextNode(a.title||''));
++      var y=document.createElement('div'); y.className='ff-y'; y.appendChild(document.createTextNode(studyYiju(a.body)));
++      b.appendChild(t); b.appendChild(y);
++      b.addEventListener('click',function(){ studyGo({v:'read',gidx:a._gidx,from:'cover'},true); });
++      list.appendChild(b);
++    });
++    if(wrap){ wrap.hidden=false; }
++  } else if(wrap){ wrap.hidden=true; } /* featured 無勾整區不顯示 ⑤ */
++}
++
++function studyRenderList(cat){
++  var arr=studyState.byCat[cat]||[];
++  var head=document.getElementById('studyListHead'); if(head){ head.textContent=cat; }
++  var sub=document.getElementById('studyListSub'); if(sub){ sub.textContent='共 '+arr.length+' 卷'; }
++  var box=document.getElementById('studyListItems'); if(!box){ return; }
++  box.textContent='';
++  arr.forEach(function(a){
++    var b=document.createElement('button'); b.type='button'; b.className='study-card';
++    var t=document.createElement('div'); t.className='sc-t'; t.appendChild(document.createTextNode(a.title||''));
++    var y=document.createElement('div'); y.className='sc-y'; y.appendChild(document.createTextNode(studyYiju(a.body)));
++    b.appendChild(t); b.appendChild(y);
++    b.addEventListener('click',function(){ studyGo({v:'read',gidx:a._gidx,from:'list'},true); });
++    box.appendChild(b);
++  });
++}
++
++function studyRenderRead(gidx,from){
++  var a=studyState.articles[gidx]; if(!a){ return; }
++  var back=document.getElementById('studyReadBack'); if(back){ back.textContent=(from==='cover')?'← 回書房':'← 回列表'; }
++  var t=document.getElementById('studyReadTitle'); if(t){ t.textContent=a.title||''; }
++  var body=document.getElementById('studyReadBody'); if(!body){ return; }
++  body.textContent='';
++  (a.body||'').split('\n').forEach(function(line){
++    if(line===''){ return; } /* 空行=段落界,由 p 間距承;內文字元零改 */
++    body.appendChild(studyParagraph(line));
++  });
++}
++
++/* 導覽狀態機:單次 fetch 快取,層間不重抓;pushState/popstate + 邊界 guard(R1-#5) */
++function studyGo(state,push){
++  if(push){ try{ history.pushState(state,''); }catch(e){} }
++  studyApply(state);
++}
++function studyApply(state){
++  if(state && state.v==='read' && typeof state.gidx==='number' && studyState.articles[state.gidx]){
++    studyRenderRead(state.gidx,state.from); studyShow('studyRead');
++  } else if(state && state.v==='list' && state.cat && studyState.byCat[state.cat] && studyState.byCat[state.cat].length){
++    studyRenderList(state.cat); studyShow('studyList');
++  } else {
++    studyShow('studyCover'); /* 層1;層1 再返回=不 trap,走 LIFF 預設 */
++  }
++}
++
+ async function initStudyPage(){
+-  var bodyEl=document.getElementById('studyBody');
+-  var loadEl=document.getElementById('studyLoading');
+-  var CATS=['節氣信','人際小文','時節問候'];
++  studyShow('studySkeleton'); /* 骨架先 render(防亂碼閃 ⑥) */
++  try{ history.replaceState({v:'cover'},''); }catch(e){}
+   try{
+     var resp=await fetch(RELAY_URL+'study',{method:'GET'});
+-    if(!resp.ok){throw new Error('HTTP '+resp.status);}
++    if(!resp.ok){ throw new Error('HTTP '+resp.status); }
+     var data=await resp.json();
+-    if(loadEl)loadEl.remove();
+-    var articles=data.articles||[];
+-    if(articles.length===0){
+-      bodyEl.innerHTML='<div class="log-empty">書房整理中，稍候。</div>';
+-      return;
+-    }
+-    var grouped={};
+-    CATS.forEach(function(c){grouped[c]=[];});
+-    articles.forEach(function(a){
+-      var ct=a.content_type||'其他';
+-      if(!grouped[ct])grouped[ct]=[];
+-      grouped[ct].push(a);
++    var raw=(data && Array.isArray(data.articles))?data.articles:null;
++    if(!raw){ throw new Error('bad payload'); }
++    var clean=[]; /* schema guard:壞篇跳過,不 blank 全頁(R1-#14) */
++    raw.forEach(function(a){
++      if(a && typeof a.title==='string' && typeof a.body==='string' && typeof a.content_type==='string'){ clean.push(a); }
++      else { console.warn('[study] 跳過壞篇', a); }
+     });
+-    var html='';
+-    Object.keys(grouped).forEach(function(cat,i){
+-      if(grouped[cat].length===0)return;
+-      if(i>0)html+='<hr class="study-divider">';
+-      html+='<div class="study-section"><h3>'+cat+'</h3>';
+-      grouped[cat].forEach(function(a){
+-        html+='<div class="study-article">'
+-          +'<div class="sa-title">'+a.title+'</div>'
+-          +(a.body?('<div class="sa-body">'+a.body+'</div>'):'')
+-          +'</div>';
+-      });
+-      html+='</div>';
++    studyState.articles=clean; studyState.byCat={}; studyState.featured=[];
++    STUDY_CATS.forEach(function(c){ studyState.byCat[c]=[]; });
++    clean.forEach(function(a,i){
++      a._gidx=i;
++      if(STUDY_CATS.indexOf(a.content_type)>=0){ studyState.byCat[a.content_type].push(a); }
++      else { console.warn('[study] 未知分類不掛籤:', a.content_type); }
++      if(a.featured===true){ studyState.featured.push(a); }
+     });
+-    bodyEl.innerHTML=html;
++    studyState.loaded=true;
++    if(clean.length===0){ studyFail('書房整理中，稍候。'); return; }
++    studyRenderCover();
++    studyApply(history.state||{v:'cover'});
+   }catch(e){
+-    if(loadEl)loadEl.remove();
+-    bodyEl.innerHTML='<div class="log-empty">書房暫時無法開門，請稍後再試。</div>';
++    studyState.loaded=true;
++    studyFail('書房暫時無法開門，請稍後再試。');
+     console.warn('[study page]',e);
+   }
+ }
+ 
++window.addEventListener('popstate',function(e){
++  if(!studyState.loaded){ return; }
++  var pg=document.getElementById('page-study');
++  if(pg && pg.classList.contains('active')){ studyApply(e.state||{v:'cover'}); }
++});
++
+ /* ===== E12 訂閱方案頁 ===== */
+ async function initPayPage(){
+   var subActiveEl=document.getElementById('paySubActive');

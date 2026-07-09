@@ -1,0 +1,23 @@
+# E42 卡B ⑤ — mingge-relay Worker `/study` featured passthrough(獨立 artifact/commit)
+# Worker: mingge-relay (tag a325768bf5f64151bd8bccebe2818ad6);來源=Cloudflare 部署版
+# 最小必要 diff = /study handler 的 fields 陣列加欄名 "featured" 一項(以欄名取值,同既有 title/body/content_type;featured 欄名無 BOM)
+# 不改結構/不新端點/不動 filterByFormula/不動驗身。🔴 禁前端直連 Airtable、禁持 key。
+# 部署:apply 到 Worker 源 → wrangler deploy(需 Worker 源 repo + Perth 授權);與 index.html 不同 commit。
+
+  if (request.method === "GET" && url.pathname === "/study") {
+    if (!env.AIRTABLE_API_KEY) {
+      return json({ error: "AIRTABLE_API_KEY not configured" }, 503);
+    }
+    const result = await airtableFetch(env.AIRTABLE_API_KEY, AT_BASE, AT_SHUFANG, {
+      filterByFormula: `{qc_passed}=1`,
+-     fields: ["title", "content_type", "body", "persona", "ta_type", "jieqi_node"],
++     fields: ["title", "content_type", "body", "persona", "ta_type", "jieqi_node", "featured"],
+      maxRecords: 100
+    });
+    const articles = (result.records || []).map((r) => r.fields);
+    return json({ articles });
+  }
+
+# 行為:Airtable checkbox 勾選 → r.fields.featured===true(隨 payload 回);未勾 → 該鍵省略/undefined。
+# 前端 a.featured===true 兩態皆正確;全表無 true → 精選區整區 hidden(⑤ 隱藏態)。
+# ⑤ 完整驗收 gate(需三件齊):(a) 本 diff deploy;(b) Perth 勾一篇 featured=true → 精選區顯示該篇;(c) 全不勾 → 整區不顯示。

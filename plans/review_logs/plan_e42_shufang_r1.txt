@@ -1,0 +1,183 @@
+OpenAI Codex v0.142.3
+--------
+workdir: C:\Users\ivych\AppData\Local\Temp\claude\D--CBD-Lab-OS\7a3fa063-de6d-43b8-a23c-d26dd7633c53\scratchpad\mingge-line
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019f452e-0c79-7031-a71c-2de8870b768d
+--------
+user
+你是資深前端/後端架構審稿人,審查一份 LINE LIFF 單頁前端「呈現層」實作計畫(繁中專案「命格·易經書房」格4)。目標:嚴格找出遺漏的 corner case、邊界條件、錯誤處理缺口、資料契約矛盾、與驗收標準不符、計畫內部前後矛盾。逐條列,每條標 [BLOCKER](不改不能過)/[SUGGEST](建議)/[ESCALATE](TA面文案取捨,屬 chat/Perth 裁決,非你裁)。末行:無 BLOCKER 回 `VERDICT: APPROVED`,否則 `VERDICT: CHANGES_REQUESTED`。
+
+【背景·資料契約】前端只能吃 relay。`GET /study` 回 `{articles:[{title,persona,ta_type,body,content_type,jieqi_node?}]}`,**無 id/content_id**。28 篇全 qc_passed;三分類 content_type=節氣信12/人際小文8/時節問候8。featured 欄在 Airtable(checkbox fldTo9eEVE9RRje8J)但 relay 現 payload 不含。body 皆以「老易在書房,談/寫於X。」樣板開場(28/28);古典原文以「」夾注在 body 散文內(時節問候 8 篇無任何卦引)。
+【紅線】body 逐字禁改零破句;禁動色(金=live #B8860B,禁引入 #C9A84C);前端禁持 key/禁直連 Airtable/禁新 API;卡C(Dify prompt)不同 commit;格名/六格結構/起卦模型禁碰。
+【驗收封閉集8項】①三層導覽(門面→列表→閱讀頁)真機可走 ②分類籤=實際三分類空籤零出 ③閱讀頁內文≥17px/行高≥1.9+古文引文卡+每篇古典原文≥1 ④篇尾路標定稿句僅一處+按鈕 ⑤featured=true 無勾整區不顯示 ⑥進頁亂碼閃0/10 ⑦一句引取自內容/metadata禁AI ⑧門面兩句逐字。
+
+以下為計畫全文:
+# plan_e42_shufang_v0_1 — E42 卡B 格4 易經書房呈現層
+規格源:`001_spec_journey_6grid_script_S156_v1_0` §4-A~F + §8 卡B。閘1=Journey_Edges `recpgmvs4BDg9ZK4l`(8項)。Perth 2026-07-09 裁決(Change_Log `recE8ZAIlHc9z9thr`)。
+狀態:待 Codex 互審(模式A)。**APPROVED 前不施工。**
+
+## 0. 範圍與紅線
+- **改的檔**:(1) live `index.html` 之 `#page-study` 呈現層(HTML/CSS/JS);(2) relay Worker `/study` 加 `featured` passthrough(⑤最小必要 diff,獨立 artifact/commit)。
+- **禁碰**:Dify prompt/六格結構/格名/earned/起卦互動模型;卡C(E44 信箋)不同 commit;格1/2/3/5/6 一字不動;article body 內容**零改字零破句**。
+- **禁動色(Perth 裁③)**:金色沿用 live 既有 token `--gold:#B8860B`;`#C9A84C` 品牌色統一歸 **E45 換皮卡**;本卡任何改色=範圍外變動,Codex 應攔。
+- **基礎檔鐵律**:base=自抓 GitHub raw/API live main(現 v1.4.3);禁本機 `00D_spec/index.html` 化石;回交完整檔逐行 diff,範圍外變動攔下。
+- **資料紀律(S37)**:前端→Cloudflare Worker relay(E13 既模式);前端禁持 key、禁直連 Airtable、禁新 API。
+
+## 1. Pre-flight(已核實)
+- ShufangContent(`apptFfyVBYE4ygW3E`/`tblbzhwwmBDfAKQAs`)=28 篇全 `qc_passed`;三分類 `content_type`=節氣信12/人際小文8/時節問候8。relay `/study` 回同 28 篇。
+- `featured` 欄已建=`fldTo9eEVE9RRje8J`(checkbox);relay 現 payload **不含**此 key(需加 passthrough)。
+- relay payload/篇=`{title, persona, ta_type, body, content_type, jieqi_node?}`,**無 content_id/無 id**(→ 見 §2 篇識別)。
+- 主鍵一律用 field id;`content_id` 欄名帶 BOM,禁以欄名存取。
+
+## 2. 三層資訊架構(§4-A)——單頁內 view 切換,路由不動
+`action=study` 維持單一入口;`#page-study` 內三 sub-view(`.study-cover`/`.study-list`/`.study-read`),JS 切 `hidden`。返回:`history.pushState({layer,cat,idx})` + `popstate` 還原(層3→層2→層1);硬體返回鍵不跳出 LIFF。閘① 三層真機可走。
+- **篇識別**:relay 無 id → 以 `/study` payload **陣列 index** 為篇 key(單次載入穩定;層2 卡與層3 閱讀頁共用 index);不依賴 content_id。
+
+### 層1 書房門面(進格第一屏)
+- 自我介紹句一行(路標)。
+- **門面兩句(§4-B,閘⑧逐字凍結)**:
+  1. `主人讀易的地方,也擱著些可看的東西。`(live 531 已在)
+  2. `不必問卦也能進來坐 —— 挑一卷,慢慢看。`(**新增**)
+- 分類籤(橫向):由 payload 實際出現的 `content_type` distinct 值動態生成 → 節氣信/人際小文/時節問候;**空籤零出現**(某分類 0 篇則不掛籤);v0.6 第④類「老易讀卦隨筆」phase2 不顯示。閘②。
+- 精選區「本週擱在案上的」:`featured===true` 篇 1-3;**payload 無任一 true → 整區不 render(`hidden`)**。閘⑤。
+
+### 層2 書卷列表(點分類籤進入)
+- 紙卡直列:篇名 + 一句引(≤20 字)。
+- **一句引規則(§4-E.4,禁 AI,零改字,確定性)**:
+  - 實測:**28/28 body 均以樣板開場「老易在書房,談/寫於 X。」**(regex `^老易在書房[，,][^。]*。`)→ 直取「首句」= 每卡皆「老易在書房,談X」= 退化無辨識度。
+  - **提案(待 Perth 微裁,見 §10-A)**:剝除樣板開場句 → 取其後第一句(至 。！？),>20 字截斷+`…`。皆逐字取自 body、無 AI。範例:交棒篇=「老樹擋了陽光,新苗就長不起來。」;識人篇=「看人,最怕看一時的熱絡。」
+  - 防呆:若某篇不符樣板開場,退回字面首句。
+
+### 層3 閱讀頁(點紙卡進入)
+- 篇名(墨綠 `--moss` serif 大字)→ 內文(≥17px/行高≥1.9/`--rice`/`--paper` 底/窄欄 max-width/手機留 24px 邊距)。閘③字級;§4-E.1。
+- **古文引文卡 + 白話緊隨其後(縱向,非並排;inline-block,Perth 裁②定案)**:
+  - 樣式:古文 span 就地套 inline-block「`--rice-deep` 底 + `--gold`(#B8860B)細左邊線 + serif」;白話同段緊隨(段落零破)。「左金線」塊卡元素 inline 態以細左邊線承接其意。
+  - **偵測規則(§3 專節)**:見下。
+- 篇尾:落款小卦符印(純 CSS 線稿,§6.5)+ **尾部路標(§4-C,閘④)僅一處**:
+  - `讀著讀著,心裡若浮出一件自己的事 —— 書房這頭,隨時可向天問一卦。`
+  - 按鈕 `🎴 向天問卦` → `location.href='./index.html'`。
+  - **每篇僅此一處,不插中段、不彈窗、不計數逼迫。**
+
+## 3. 古文引文卡偵測規則(閘③核心 · 零 AI · 確定性 · 寧漏勿誤)
+把 body 中 `「…」/『…』` span 套 inline 引文卡 **當且僅當**其前 ≤6 非引號字內出現下列**封閉白名單**標記:
+- 傳文:`大象`/`大象說`/`大象傳`/`彖曰`/`彖傳`/`象曰`/`象傳`/`卦辭`/`爻辭`/`卦說`
+- 爻位:`初九`/`九二`/`九三`/`九四`/`九五`/`上九`/`初六`/`六二`/`六三`/`六四`/`六五`/`上六`/`用九`/`用六`
+- 正則(確定性):`(白名單)[^「『」』]{0,6}?[「『]([^」』]+)[」』]`
+- **28 篇實測證據**:命中=人際小文 8/8、節氣信 12/12(含爻位補 乾九三/乾上九 2 篇)→ **非問候 20/20 每篇 ≥1 古典原文**(閘③達標)。**誤命中=0**(白話強調引號 贏/成事/止/夠了/同心/同路… 皆無前置標記,不套)。
+- **時節問候 8 篇 body 零卦引**(立秋/立夏/秋分/春分/夏至/立春/冬至/立冬)→ 不套卡=純文字(合法,寧漏勿誤)。Perth 裁②:不擋卡;**列 content-軌 backlog 回報,前端禁生成補洞**。
+
+## 4. 亂碼閃修(§4-E.2,閘⑥)
+- 進頁先 render **骨架佔位**(門面/列表/閱讀頁各一套固定高度 `.sk-*` skeleton);`fetch` → `res.json()` 完、內文組好才一次性換入;用 `textContent`/受控 DOM 組裝(不半解碼逐字塞)。
+- error/空態:relay 非 2xx 或 `articles=[]` → 既有「書房整理中/暫時無法開門」態(沿用,不新文案)。
+- 機讀證:進頁初始 DOM 即含 `.sk-*` 佔位、`articles` render 後移除;10 進頁截圖無亂碼幀。
+
+## 5. featured relay passthrough(⑤最小必要 diff · 獨立 artifact)
+- relay `/study` article 映射現含 `content_type`、缺 `featured`。加 `featured: (rec.fields['fldTo9eEVE9RRje8J']===true)`(field id 存取,防 BOM);**只加一欄、不改結構、不新端點、不動驗身**。
+- 🔴 禁新 API/禁前端直連 Airtable/禁持 key。此後端小改與 index.html **不同 commit**,各自 Codex 審 + deploy。Worker 源施工時經 Cloudflare MCP 或其 repo 取。
+- **解耦**:前端精選區由 `a.featured===true` 驅動;featured 未上線=無 true=整區隱藏=⑤隱藏態已達標 → index.html 卡B 可先獨立交付,relay passthrough 併入/緊隨,不互阻。
+
+## 6. CSS(沿用既有 tokens,不等 Design,禁動色)
+1. 全用 live 既有 `--moss #2C3E2D`/`--rice #F5F1E8`/`--rice-deep #ece5d6`/`--paper`/`--gold #B8860B`/`--jade`/`--line`/Noto Serif TC。
+2. 新 class 一律 `study-*` 命名,不覆寫既有選擇器。
+3. 引文卡=`--rice-deep` 底 + `--gold` 細左邊線。
+4. 頁尾統一 foot(§4-E.6,與格1同源),不遮內容。
+5. 落款小卦符印/空態=純排版線稿(§6 圖像清單:不新產圖)。
+6. **禁引入 #C9A84C 或任何新色值**(Perth 裁③;改色=E45)。
+
+## 7. 驗收對映(8項聯集;①③⑥出機讀證,真機關 Perth)
+①三層真機可走(機讀:三 sub-view DOM + pushState/popstate)②三分類零空籤(機讀:籤=payload distinct content_type,0 篇不掛)③內文≥17px/行高≥1.9 + inline 引文卡 + 每篇古典原文≥1(機讀:computed style + 偵測覆蓋 20/20、誤命中 0)④篇尾路標僅一處 + 鈕(機讀:單一 `.study-signpost`)⑤featured 無勾整區不顯示(機讀:featured 空 → 區 `hidden`)⑥亂碼閃 0/10(機讀:骨架先於內文)⑦一句引取內容非 AI(機讀:切片邏輯純字串)⑧門面兩句逐字。
+
+## 8. 明文不做(本波)
+時節問候補卦(內容軌)/心情卡+集點(phase2)/隨筆第四籤/換皮·改色(E45)/格1235 6/信箋(卡C)/圖鑑蓋印(W-DJ)。
+
+## 9. 交付流程(既裝互審)
+自抓 live main → 改 `#page-study`(+worker featured 獨立)→ 完整檔逐行 diff → **Codex 互審(本檔=模式A plan 審;施工後=模式B code 三查)** → (Perth session 內 GitHub 授權後)Claude Code push main → Pages deploy → 機讀證回報 → Perth 真機掃 → 收官 bump(指紋/Live_Artifacts/E42翻🟢/Change_Log 三同步,待收官指令,依卡A同型)。
+
+## 10. 待 Perth 微裁(TA 文案類,依 codex-review Skill RED LINE 交回 chat,非 Codex 裁)
+- **A|一句引取句**:直取「body 首句」因 28/28 樣板開場而退化(見 §2 層2)。**提案=剝樣板開場句取其後第一句**(逐字、無 AI、確定性)。請 Perth 確認「剝開場取次句」或「維持字面首句」。
+
+warning: Skill descriptions were shortened to fit the 2% skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+codex
+我會先把這當「計畫審稿」處理，只檢查你給的契約與計畫內部一致性；TA 文案取捨會標 ESCALATE，不代 Perth 裁。
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-ChildItem -Force' in C:\Users\ivych\AppData\Local\Temp\claude\D--CBD-Lab-OS\7a3fa063-de6d-43b8-a23c-d26dd7633c53\scratchpad\mingge-line
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"Mingge|命格|LIFF|study|書房|Build_Nodes|AGENTS|continuity|SanMus|Airtable\" C:\\Users\\ivych\\.codex\\memories\\MEMORY.md" in C:\Users\ivych\AppData\Local\Temp\claude\D--CBD-Lab-OS\7a3fa063-de6d-43b8-a23c-d26dd7633c53\scratchpad\mingge-line
+2026-07-09T04:41:29.806786Z ERROR codex_core::exec: exec error: windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=C:\Users\ivych\AppData\Local\Temp\claude\D--CBD-Lab-OS\7a3fa063-de6d-43b8-a23c-d26dd7633c53\scratchpad\mingge-line, log=C:\Users\ivych\.codex\.sandbox\sandbox.2026-07-09.log, error=program not found
+2026-07-09T04:41:29.806766Z ERROR codex_core::exec: exec error: windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=C:\Users\ivych\AppData\Local\Temp\claude\D--CBD-Lab-OS\7a3fa063-de6d-43b8-a23c-d26dd7633c53\scratchpad\mingge-line, log=C:\Users\ivych\.codex\.sandbox\sandbox.2026-07-09.log, error=program not found
+2026-07-09T04:41:29.807287Z ERROR codex_core::tools::router: error=execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=C:\\Users\\ivych\\AppData\\Local\\Temp\\claude\\D--CBD-Lab-OS\\7a3fa063-de6d-43b8-a23c-d26dd7633c53\\scratchpad\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-09.log, error=program not found" })
+2026-07-09T04:41:29.807297Z ERROR codex_core::tools::router: error=execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=C:\\Users\\ivych\\AppData\\Local\\Temp\\claude\\D--CBD-Lab-OS\\7a3fa063-de6d-43b8-a23c-d26dd7633c53\\scratchpad\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-09.log, error=program not found" })
+ exited -1 in 0ms:
+execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=C:\\Users\\ivych\\AppData\\Local\\Temp\\claude\\D--CBD-Lab-OS\\7a3fa063-de6d-43b8-a23c-d26dd7633c53\\scratchpad\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-09.log, error=program not found" })
+ exited -1 in 0ms:
+execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=C:\\Users\\ivych\\AppData\\Local\\Temp\\claude\\D--CBD-Lab-OS\\7a3fa063-de6d-43b8-a23c-d26dd7633c53\\scratchpad\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-09.log, error=program not found" })
+codex
+審查結果：有 BLOCKER，不能 APPROVE。
+
+1. [BLOCKER] 驗收③「每篇古典原文≥1」與資料事實衝突。背景明講時節問候 8 篇無任何卦引；計畫 §3 改口成「非問候 20/20 達標」等於改驗收封閉集。需 Perth/卡A 明確修驗收文字，或內容軌補卦引；前端不能生成補洞。
+
+2. [BLOCKER] `featured` passthrough 用 field id 讀值未確認 Worker 是否啟用 Airtable `returnFieldsByFieldId=true`。若現有 Worker 是用欄名取 `title/body/content_type`，直接讀 `rec.fields['fldTo9eEVE9RRje8J']` 會永遠 false；若切成 field id 又可能打爆既有欄名映射。需先定 Worker 欄位取值模式。
+
+3. [BLOCKER] §5 說 `index.html` 可先獨立交付、featured 未上線也算 ⑤ 達標，但 §0 把 Worker passthrough 列入範圍。若未驗 `featured=true` 顯示路徑，只驗「無 true 隱藏」，featured 區功能未完整驗收。需把 Worker deploy/test 納入最終 gate，或把本卡明確降為「hidden-only」。
+
+4. [BLOCKER] 分類籤用 payload distinct 動態生成，沒有 closed-set guard。若 relay 回 typo、空字串、BOM、phase2 第四類，前端會掛出非三分類籤，違反「實際三分類／空籤零出」。需 whitelist：節氣信、人際小文、時節問候；未知類型不顯示並進錯誤證據。
+
+5. [BLOCKER] `history.pushState({layer,cat,idx})` 缺初始 `replaceState`、idx 越界、cat 與 idx 不一致、payload 重排後還原錯篇的處理。硬體返回鍵「不跳出 LIFF」也未定義 layer1 再返回怎麼辦。需補 state machine 與 fallback。
+
+6. [BLOCKER] 亂碼閃修只處理資料 render，未驗 HTML 本體 charset/response header。若 `index.html` meta charset 位置或 Cloudflare Pages header 有問題，skeleton 也擋不住第一屏中文亂碼。⑥ 需要把 `<meta charset="UTF-8">` 與 response encoding 納入 pre-flight。
+
+7. [BLOCKER] 一句引「>20 字截斷 + `…`」與「取自內容/metadata 禁 AI」有契約灰區；截斷符不是內容原文。若機讀要證明逐字取自 body，應保留 raw excerpt，視覺用 CSS line-clamp；或明確裁決「截斷符不算改寫」。
+
+8. [ESCALATE] 「首句」還是「剝樣板開場取次句」屬 TA 面呈現裁決。Codex 不該裁，但計畫需在 APPROVED 前等 Perth 定稿，否則 §10-A 仍是開放決策。
+
+9. [BLOCKER] 古文偵測規則無 matching quote pair。正則允許 `『...」` 這類異配對被包卡；資料目前可能乾淨，但計畫聲稱確定性與誤命中 0，應補 paired tokenizer 或明確只處理合法配對。
+
+10. [BLOCKER] 閱讀頁 body 重建未明講保留原始換行、段落、空白與所有標點。`body 零改字零破句` 下，tokenize 包 span 可以，但 normalize whitespace、重切段、用 innerHTML 都不行。需補 DOM Text node/tokenizer 規格。
+
+11. [SUGGEST] `location.href='./index.html'` 作為「向天問卦」目的地太硬。若 LIFF 帶 query/liff.state 或既有 SPA 有內部入口，reload 可能掉狀態。建議接既有起卦入口 handler，或至少驗證 Pages 子路徑與 LIFF 參數。
+
+12. [SUGGEST] featured 1-3 篇沒有排序規則。若 >3 true，現在看起來是 payload 前 3，但 relay/Airtable 排序未寫死。建議明定排序依現有 relay order，或補 sort field；否則每週精選可能飄。
+
+13. [SUGGEST] 基礎檔說抓 live main v1.4.3，但未鎖 SHA。施工與互審期間 main 若變動，完整 diff 會失真。建議施工前記錄 commit SHA/etag，diff 對固定基底。
+
+14. [SUGGEST] error/empty 只列非 2xx 與 `articles=[]`，缺 malformed JSON、`articles` 非 array、單篇缺 `title/body/content_type` 的降級策略。建議 schema guard，壞篇跳過並進證據，不讓整頁 blank。
+
+VERDICT: CHANGES_REQUESTED
+tokens used
+41,053
+審查結果：有 BLOCKER，不能 APPROVE。
+
+1. [BLOCKER] 驗收③「每篇古典原文≥1」與資料事實衝突。背景明講時節問候 8 篇無任何卦引；計畫 §3 改口成「非問候 20/20 達標」等於改驗收封閉集。需 Perth/卡A 明確修驗收文字，或內容軌補卦引；前端不能生成補洞。
+
+2. [BLOCKER] `featured` passthrough 用 field id 讀值未確認 Worker 是否啟用 Airtable `returnFieldsByFieldId=true`。若現有 Worker 是用欄名取 `title/body/content_type`，直接讀 `rec.fields['fldTo9eEVE9RRje8J']` 會永遠 false；若切成 field id 又可能打爆既有欄名映射。需先定 Worker 欄位取值模式。
+
+3. [BLOCKER] §5 說 `index.html` 可先獨立交付、featured 未上線也算 ⑤ 達標，但 §0 把 Worker passthrough 列入範圍。若未驗 `featured=true` 顯示路徑，只驗「無 true 隱藏」，featured 區功能未完整驗收。需把 Worker deploy/test 納入最終 gate，或把本卡明確降為「hidden-only」。
+
+4. [BLOCKER] 分類籤用 payload distinct 動態生成，沒有 closed-set guard。若 relay 回 typo、空字串、BOM、phase2 第四類，前端會掛出非三分類籤，違反「實際三分類／空籤零出」。需 whitelist：節氣信、人際小文、時節問候；未知類型不顯示並進錯誤證據。
+
+5. [BLOCKER] `history.pushState({layer,cat,idx})` 缺初始 `replaceState`、idx 越界、cat 與 idx 不一致、payload 重排後還原錯篇的處理。硬體返回鍵「不跳出 LIFF」也未定義 layer1 再返回怎麼辦。需補 state machine 與 fallback。
+
+6. [BLOCKER] 亂碼閃修只處理資料 render，未驗 HTML 本體 charset/response header。若 `index.html` meta charset 位置或 Cloudflare Pages header 有問題，skeleton 也擋不住第一屏中文亂碼。⑥ 需要把 `<meta charset="UTF-8">` 與 response encoding 納入 pre-flight。
+
+7. [BLOCKER] 一句引「>20 字截斷 + `…`」與「取自內容/metadata 禁 AI」有契約灰區；截斷符不是內容原文。若機讀要證明逐字取自 body，應保留 raw excerpt，視覺用 CSS line-clamp；或明確裁決「截斷符不算改寫」。
+
+8. [ESCALATE] 「首句」還是「剝樣板開場取次句」屬 TA 面呈現裁決。Codex 不該裁，但計畫需在 APPROVED 前等 Perth 定稿，否則 §10-A 仍是開放決策。
+
+9. [BLOCKER] 古文偵測規則無 matching quote pair。正則允許 `『...」` 這類異配對被包卡；資料目前可能乾淨，但計畫聲稱確定性與誤命中 0，應補 paired tokenizer 或明確只處理合法配對。
+
+10. [BLOCKER] 閱讀頁 body 重建未明講保留原始換行、段落、空白與所有標點。`body 零改字零破句` 下，tokenize 包 span 可以，但 normalize whitespace、重切段、用 innerHTML 都不行。需補 DOM Text node/tokenizer 規格。
+
+11. [SUGGEST] `location.href='./index.html'` 作為「向天問卦」目的地太硬。若 LIFF 帶 query/liff.state 或既有 SPA 有內部入口，reload 可能掉狀態。建議接既有起卦入口 handler，或至少驗證 Pages 子路徑與 LIFF 參數。
+
+12. [SUGGEST] featured 1-3 篇沒有排序規則。若 >3 true，現在看起來是 payload 前 3，但 relay/Airtable 排序未寫死。建議明定排序依現有 relay order，或補 sort field；否則每週精選可能飄。
+
+13. [SUGGEST] 基礎檔說抓 live main v1.4.3，但未鎖 SHA。施工與互審期間 main 若變動，完整 diff 會失真。建議施工前記錄 commit SHA/etag，diff 對固定基底。
+
+14. [SUGGEST] error/empty 只列非 2xx 與 `articles=[]`，缺 malformed JSON、`articles` 非 array、單篇缺 `title/body/content_type` 的降級策略。建議 schema guard，壞篇跳過並進證據，不讓整頁 blank。
+
+VERDICT: CHANGES_REQUESTED

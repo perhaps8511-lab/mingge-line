@@ -1,0 +1,22 @@
+TL;DR：原 10 條 BLOCKER 我都撤回；計畫已把阻擋點補到可施工規格。唯一未決的是 #8，但它仍是 ESCALATE/Perth 文案裁決，不是我維持的技術 BLOCKER。
+
+逐條判定：
+
+- #1：撤回。③ 已明確限縮為「有卦引 20 篇 20/20」，時節問候 8 篇走 content backlog，前端禁補洞，邏輯一致。
+- #2：撤回。Worker 實源以欄名取值，`fields` 加 `"featured"` 是正確最小 diff。
+- #3：撤回。⑤ 已改成 Worker deploy + featured=true 顯示 + 全不勾 hidden 三件齊，夠完整。
+- #4：撤回。分類白名單、固定序、野類不掛籤，解掉空籤/亂籤風險。
+- #5：撤回。`replaceState`、單次快取、idx/cat guard、layer1 不 trap 都補上。
+- #6：撤回。charset pre-flight + 骨架後一次換入 + 機讀亂碼證據，足夠。
+- #7：撤回。excerpt 為 body 子字串，省略號只由 CSS 呈現，解掉改字風險。
+- #8：維持 ESCALATE，不標 BLOCKER。Perth 仍需裁「首句」或「剝樣板取次句」；這會影響文案效果，但不再是技術規格缺口。
+- #9：撤回。同型引號配對正則已補。
+- #10：撤回。`createTextNode`、禁 `innerHTML`、禁 normalize、只包古文 span，解掉破句/XSS/轉寫風險。
+- #11：撤回。沿用 live about 既有 `./index.html`，深 LIFF 路由列範圍外，可接受。
+- #12：撤回。cap 3 依 payload 序 + Perth 手動策展 ≤3，作為本輪規格足夠。
+- #13：撤回。施工前鎖 main SHA、main 動就重抓重 diff，解掉化石基底風險。
+- #14：撤回。schema guard 已補，壞 payload 不會 blank 全頁。
+
+殘留提醒：#8 仍需 Perth 拍板後才能「整體收 APPROVED」是你計畫自己的 gate；但就我上一輪的 BLOCKER 來看，沒有未解 BLOCKER。
+
+VERDICT: APPROVED

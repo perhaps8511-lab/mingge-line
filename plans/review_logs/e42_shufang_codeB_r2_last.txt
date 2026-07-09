@@ -1,0 +1,10 @@
+TL;DR: 這 3 個 CSS 值變更 OK，沒有看到範圍外修改或紅線問題。
+
+判斷：
+- ① `.sc-y opacity .7 → .88`：OK，只提高列表引句可讀性，仍限 `.study-card .sc-y`。
+- ② `.sr-body p` 補 `font-size/line-height/color`：OK，原因成立。`.lp-body p` 直接命中 `<p>`，確實會壓過容器繼承；用 `.study-read .sr-body p` 覆蓋是正確層級。
+- ③ 內文達標：達標。computed `font-size=17px`、`line-height=33.15px`，等於 `1.95`，符合 `≥17px / ≥1.9`。`study-quote` 在段落內繼承字級/行高，也不破壞內文標準。
+
+`study-signpost p` 是 CTA/導引文，不是閱讀內文；它維持 14.5px 不構成 ③ 未達標。
+
+VERDICT: APPROVED
