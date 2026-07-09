@@ -46,7 +46,7 @@
 
   /* ====== 場景容器 ====== */
   .scene{position:absolute;inset:0;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;padding:40px 24px;
+    align-items:center;justify-content:center;padding:40px 24px 60px;/* T1:三屏同源底部安全帶,置中內容讓開固定頁尾,入內/開始起卦等鈕零遮擋(#s3 已自帶 padding-bottom:60px) */
     opacity:0;pointer-events:none;transition:opacity 1s ease;z-index:10;}
   .scene.active{opacity:1;pointer-events:auto;}
 
@@ -102,6 +102,7 @@
   .qi .guide{font-size:16px;letter-spacing:.1em;color:var(--gold-lit);text-align:center;
     line-height:1.85;margin-bottom:16px;min-height:48px;transition:.4s;font-weight:600;
     text-shadow:0 0 14px rgba(216,188,94,.25);}
+  .qi .guide-permit{font-size:12px;letter-spacing:.16em;color:var(--gold-soft);opacity:.72;text-align:center;margin:-4px 0 18px;line-height:1.75;/* T3:凝神屏第三行許可句 */}
   .oracle{position:relative;width:340px;height:340px;max-width:88vw;max-height:88vw;
     display:flex;align-items:center;justify-content:center;}
 
@@ -143,9 +144,10 @@
     background:radial-gradient(circle, rgba(216,188,94,.22), transparent 68%);
     animation:breathe 4s ease-in-out infinite;}
   @keyframes breathe{0%,100%{transform:scale(1);opacity:.55}50%{transform:scale(1.14);opacity:.95}}
-  .core.pressing{transform:scale(.96);
+  .core.pressing{transform:scale(.96);transition:transform .25s ease, box-shadow 3s ease-out;/* T3視覺B:光點約3秒轉亮 */
     box-shadow:0 0 90px rgba(216,188,94,.6), inset 0 0 36px rgba(0,0,0,.4);}
-  .core.pressing::before{animation:breathe 1.3s ease-in-out infinite;}
+  .core.pressing::before{animation:coreGlowUp 3s ease-out forwards;}/* T3視覺B:轉亮後恆定,不閃(原脈動改一次性漸亮) */
+  @keyframes coreGlowUp{from{opacity:.45;transform:scale(1)}to{opacity:1;transform:scale(1.12)}}
   .core .label{position:relative;z-index:2;font-size:14.5px;letter-spacing:.16em;text-indent:.16em;
     color:var(--rice);opacity:.95;text-align:center;line-height:1.85;transition:.3s;font-weight:600;}
 
@@ -196,7 +198,7 @@
     border-radius:2px;padding:11px;font-family:inherit;font-size:12.5px;letter-spacing:.14em;cursor:pointer;transition:.3s;}
   .ractions .ghost:hover{background:var(--rice-deep);}
 
-  .devjson{margin-top:16px;background:var(--rice-deep);border-radius:5px;padding:9px 12px;}
+  .devjson{margin-top:16px;background:var(--rice-deep);border-radius:5px;padding:9px 12px;display:none;/* T2:預設隱藏,僅內測戶/DEV 顯示,見 isDebugViewer() */}
   .devjson .l{font-size:9px;color:var(--gold);letter-spacing:.1em;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;}
   .devjson pre{font-family:Consolas,monospace;font-size:9.5px;line-height:1.5;color:var(--moss-soft);white-space:pre-wrap;word-break:break-all;}
   .devjson .cp{background:var(--gold);border:none;color:#15200f;border-radius:3px;padding:2px 8px;font-size:9.5px;cursor:pointer;font-family:inherit;}
@@ -264,6 +266,13 @@
     border-radius:4px;padding:14px 18px;font-size:13px;
     letter-spacing:.08em;color:var(--gold-soft);margin-bottom:24px;line-height:1.8;}
   .log-empty{text-align:center;padding:48px 0;color:var(--jade);font-size:13px;letter-spacing:.15em;opacity:.7;}
+  /* T4:格2 卦記空態卡(僅零卦戶) */
+  .log-empty-card{max-width:340px;margin:36px auto 0;text-align:center;background:var(--paper);
+    border:1px solid var(--line);border-radius:8px;padding:30px 26px 28px;box-shadow:0 18px 50px rgba(0,0,0,.32);}
+  .log-empty-card p{font-size:15px;line-height:2.1;letter-spacing:.04em;color:var(--moss);margin-bottom:22px;}
+  .log-empty-card .lec-btn{display:inline-block;background:transparent;color:var(--moss);border:1px solid var(--gold);
+    border-radius:2px;padding:12px 30px;font-family:inherit;font-size:14.5px;letter-spacing:.14em;cursor:pointer;transition:.45s;}
+  .log-empty-card .lec-btn:hover{background:var(--gold);color:var(--paper);box-shadow:0 0 26px rgba(184,134,11,.35);}
   .log-loading{text-align:center;padding:40px 0;color:var(--jade);font-size:13px;letter-spacing:.18em;opacity:.65;}
   /* ★ S138 格2卡片版(E09視覺升級①②;③蓋金印留痕另排E25,本輪不動) */
   .log-card{
@@ -417,6 +426,7 @@
   <div class="scene" id="s2">
     <div class="qi">
       <div class="guide" id="guide">按住光點，心中默念你想問的事<br>念畢放開，卦自成</div>
+      <div class="guide-permit" id="guidePermit">不必久按,念畢即放</div>
       <div class="oracle">
         <div class="glyphring" id="glyphring"></div>
         <div class="ring64" id="ring64"></div>
@@ -732,7 +742,10 @@ async function initLogPage(){
     }
     if(loadingEl)loadingEl.remove();
     if(!data.records||data.records.length===0){
-      listEl.innerHTML='<div class="log-empty">尚無卦記。</div>';
+      listEl.innerHTML='<div class="log-empty-card">'
+        +'<p>這裡還空著 —— 您的第一卦,會是第一頁。<br>心裡若有件事在轉,到〔向天問卦〕把它放上心頭。</p>'
+        +'<button type="button" class="lec-btn" onclick="location.href=\'./index.html\'">🎴 向天問卦</button>'
+        +'</div>';
     }else{
       listEl.innerHTML=data.records.map(function(r){
         // ★ S138 格2卡片版①②:大卦符(真實King Wen對照)+本卦→變卦+日期 / 事由 / 動爻+型態+查看信箋箭頭
@@ -1017,7 +1030,8 @@ function showResult(g,now){
     mian_xiang:null, master_preference:"auto", question_text:""
   };
   lastGuaResult=json;
-  document.getElementById('rJson').textContent=JSON.stringify(json,null,2);
+  document.getElementById('rJson').textContent = isDebugViewer() ? JSON.stringify(json,null,2) : '';   // T2:僅內測戶填 debug 檢視
+  applyDebugVisibility();
 }
 /* ====================================================
    LIFF + 送出設定(S37 填入真值前,維持 DEV 模式)
@@ -1028,6 +1042,11 @@ function showResult(g,now){
 ==================================================== */
 const DEV_MODE = false;                      // ★ 正式上線:走真實 LIFF + ID Token
 const LIFF_ID  = "2010192384-9AwjI8qH";       // S37 已建:命格進場儀式 LIFF App
+/* ===== T2:debug 檢視區(gua_result 內測檢視)可見性閘門 ===== */
+/*  非內測 LINE 戶進頁 → .devjson 零渲染;僅白名單 ID 或 DEV_MODE 見。 */
+const INTERNAL_TESTERS = ["Uf7d0922f21d68bc94f2bc17295e43d4e"];   // 內測帳號(S138 既定測試 ID)
+function isDebugViewer(){ return DEV_MODE || (liffUserId && INTERNAL_TESTERS.indexOf(liffUserId) !== -1); }
+function applyDebugVisibility(){ var d=document.querySelector('.devjson'); if(d) d.style.display = isDebugViewer() ? 'block' : 'none'; }
 
 /* 送出目標 = Cloudflare Worker 轉發層(方案2)
    ──────────────────────────────────────────────
@@ -1197,6 +1216,7 @@ async function initLiff(){
     try{
       const prof=await liff.getProfile();
       liffUserId=prof.userId;             // 僅供前端參考;後端以驗證過的身分為準
+      applyDebugVisibility();   // T2:profile 回填後即套 debug 可見性(內測戶 race hardening)
     }catch(_){}
     liffAccessToken=liff.getAccessToken();  // ★ 方案3:Access Token(SDK 管理、會自動續期;送出時會再即時重抓一次)
     console.log('[LIFF] init done. accessToken at init:', liffAccessToken ? 'OK' : 'null(送出時會重抓)');
@@ -1369,7 +1389,8 @@ function restorePendingIfAny(){
   const si=document.getElementById('sayInput');
   if(si && p.say){ si.value=p.say; if(typeof sayText!=='undefined') sayText=p.say; }
   const rj=document.getElementById('rJson');
-  if(rj) rj.textContent=JSON.stringify(lastGuaResult,null,2);
+  if(rj) rj.textContent = isDebugViewer() ? JSON.stringify(lastGuaResult,null,2) : '';   // T2:僅內測戶填
+  applyDebugVisibility();
   go(3);
   console.log('[LIFF] 登入返航:已還原暫存卦,qigua_time =', lastGuaResult.qigua_time);
 }
