@@ -1,0 +1,24 @@
+VERDICT: CHANGES-REQUESTED
+
+FINDINGS:
+
+1. [BLOCKER] §7/V5 與 spec §二自相矛盾：plan 把「限時」列為格3禁字，且 V5 要求禁字掃描 0 命中；但 canonical spec §二收尾句含「不催您、不限時、不打折」。若照 spec 逐字貼，V5 必 FAIL。
+建議：施工前先裁決「不限時」是否為 canonical 例外；若是，V5 改成「禁促銷語掃描，允許 exact phrase `不催您、不限時、不打折`」。
+
+2. [SUGGEST] §3 白名單大致合理：H1/H3/H5 明確；H2 CSS 與 H4 `initPayPage()` 雖不在 `#page-pay` DOM 內，但都只服務格3，可接受。  
+建議：V7 加一句硬檢「不得改 `#page-study`、router/pageMap、起卦、Dify、儀式五屏相關 hunk」。
+
+3. [SUGGEST] §4 `pc-status` 沿用沒有新承諾語，也無禁字；1490 用「銅錢尚在」不是最佳語義，但在「不新寫承諾語」約束下可暫收。  
+建議：若要語義更精準，不能施工時現寫，應回 spec/施工卡補 canonical status。
+
+4. [SUGGEST] §5 `?src` 設計是零後端，且放在 `initPayPage()` 頂部，理論上只影響 `action=pay`。  
+建議：V4 除 zero/deepdive/fupan/無參數外，加 unknown `src` 斷言 hidden，因 §5 已承諾未知值 hidden。
+
+5. [SUGGEST] §8 付款句「上方→下方」列 ESCALATED 是合理的；我未見其他既有凍結段有漏標的實質改字，主要是標點寬度、括號/破折號/版面格式差異。  
+建議：把此點設為施工前確認或 commit message 明列，不要等真機後才第一次決策。
+
+6. [SUGGEST] §9 V1 機讀驗收還不夠完整：目前寫抽 `pl-copy/lp-sub/pay-note`，但 spec §二的「書房的來法」標題也應納入 byte-diff。  
+建議：V1 明寫抽 `h1 + lp-sub + pl-copy + pay-note`，還原 strong/br 後整段對 spec §二。
+
+紅線結論：目前唯一 BLOCKER 是「限時」禁字與 canonical「不限時」的不可同時滿足。修掉這個規則衝突後，本計畫可進施工審。記憶檔只做 Mingge quick pass；實質判斷依本輪讀到的 plan/spec/index。
+

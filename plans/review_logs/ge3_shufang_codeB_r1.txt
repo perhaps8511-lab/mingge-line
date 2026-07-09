@@ -1,0 +1,9 @@
+VERDICT: APPROVED
+
+FINDINGS:
+無 BLOCKER。可提交。
+
+三查確認：
+1. 逐字對照：`#page-pay` 五卡、開場、付款、退費、收尾與 `?src` 三語境均照 `spec_ta_canonical.md`，含「點下方連結」。
+2. 紅線/凍結區：退費舊句 `14 天內全退` 0 殘留；格3禁字僅出現允許例外「不催您、不限時、不打折」；diff 未動 `#page-study`、`pageMap`、`GUA_RING`、Dify、儀式五屏。
+3. 版本與 `?src`：`v1.5.0` 0 殘留；title/footer 已是 `v1.5.1`；`URLSearchParams` 在 `liff.init` 前，未新增後端呼叫，未知/無參數維持 hidden。

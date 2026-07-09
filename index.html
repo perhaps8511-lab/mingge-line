@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.5.0</title>
+<title>命格 · 進場儀式 v1.5.1</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -406,6 +406,7 @@
   .pc-status{margin-top:16px;padding-top:13px;border-top:1px solid rgba(184,134,11,.15);
     font-size:12.5px;line-height:1.85;letter-spacing:.04em;color:var(--jade);opacity:.9;}
   .pc-status.pc-ok{color:var(--gold-soft);}
+  .pay-ctx{margin:12px auto 0;max-width:30em;font-size:12.5px;line-height:1.9;letter-spacing:.04em;color:var(--jade);text-align:center;}
   .quota-gate{
     max-width:360px;text-align:center;border:1px solid rgba(184,134,11,.28);
     border-radius:6px;padding:26px 24px;background:rgba(7,11,7,.52);
@@ -530,35 +531,41 @@
     <div class="st3" id="sendHint">可關閉此頁，回到 LINE 對話等候信箋</div>
   </div>
 
-  <!-- P-PAY 格3 訂閱方案殼 (E12 · action=pay) -->
+  <!-- P-PAY 格3 書房的來法五卡 (E30/E46 · action=pay · S159) -->
   <div class="liff-page" id="page-pay">
     <div class="lp-header">
       <div class="lp-icon">🪙</div>
       <h1>書房的來法</h1>
-      <div class="lp-sub">書房不關門，來的方式您可自己挑。</div>
+      <div class="lp-sub">書房不關門,來的方式您可自己挑。</div>
+      <div class="pay-ctx" id="payCtx" hidden></div>
     </div>
     <div class="lp-body">
       <div class="pay-sub-active" id="paySubActive" style="display:none"></div>
-      <!-- T7:三張卡直列;文案凍結原文零改,只換版面+卡底狀態行;假活灰鈕(spec §4.2)移除 -->
+      <!-- 五卡直列(S159):文案逐字取 spec §二;pc-status 沿現行 live 不新寫承諾語 -->
       <div class="pay-plan">
-        <h3>初訪（免費）</h3>
-        <p>一輩子相贈 <strong>3 枚問卦銅錢</strong>。一枚一問；卦象、解讀都是真的，先進來問問看。</p>
+        <p class="pl-copy"><strong>初訪(免費)</strong> — 一輩子相贈 <strong>3 枚問卦銅錢</strong>。一枚一問;卦象、解讀都是真的,先進來問問看。</p>
         <div class="pc-status pc-ok">您的 3 枚銅錢已在囊中 —— 到〔向天問卦〕便可用。</div>
       </div>
       <div class="pay-plan">
-        <h3>問一卦｜149</h3>
-        <p>銅錢用盡，仍有事要問，便來一卦。老易為您讀本卦、變卦、動爻，把這一程攤開看清。</p>
+        <p class="pl-copy"><strong>問一卦|149</strong> — 銅錢用盡,仍有事要問,便來一卦。老易為您讀本卦、變卦、動爻,把這一程攤開看清。</p>
         <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
       </div>
       <div class="pay-plan">
-        <h3>四鏡·深卜 200</h3>
-        <p>讀完若想再往深處走，同一卦，可再請老易多開幾面——<strong>四鏡·深卜 200</strong>，看互卦、序卦、變與不變裡的「轉」。不換卦、不重卜，只把這一卦讀到透。</p>
+        <p class="pl-copy"><strong>囊中銅錢|399</strong> — 三枚一包,收在囊中,不催著用。要緊的事不挑日子來;哪天心裡又起了一問,囊中有錢,隨時進門。一枚一問,枚枚都是完整的一卦。</p>
+        <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
+      </div>
+      <div class="pay-plan">
+        <p class="pl-copy">〔讀完若想再往深處走〕同一卦,可再請老易多開幾面 —— <strong>四鏡·深卜 200</strong>,看互卦、序卦、變與不變裡的「轉」。不換卦、不重卜,只把這一卦讀到透。</p>
+        <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
+      </div>
+      <div class="pay-plan">
+        <p class="pl-copy"><strong>問道·複盤|1490(月)</strong> — 問卦,是決策的前半段;拿了主意、做下去,後半段才開始。訂閱書房,老易陪您把做過的決定回頭複盤——這一程走到了哪,卦象當時所示的「轉」應在何處。複盤不限次,四鏡深卜一併在內;卦記隨時回看,可補記後續、蓋印留痕;逢節氣,老易捎一封信來。決策是一條路,不是一次問答。</p>
         <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
       </div>
       <p class="pay-note">
-        付款在書房外頭辦（點上方連結），書房裡不收錢——這是規矩。<br>
-        退費：還沒起過任何一卦，14 天內全退；起過了，便算書房已為您開講，這次就不退了（取消後不再續扣，服務用到當期末）。<br>
-        ——不催您、不限時、不打折。書房的價錢，就是書房的價錢。
+        付款在書房外頭辦(點下方連結),書房裡不收錢 —— 這是規矩。<br>
+        退費:單卦與囊中銅錢,<strong>七天之內、一枚未用</strong>,全數退還;起過卦了,便算書房已為您開講,依規不退。訂閱<strong>十四天之內、未起過卦</strong>,全退;之後取消,不再續扣,服務用到當期末。<br>
+        —— 不催您、不限時、不打折。書房的價錢,就是書房的價錢。
       </p>
     </div>
   </div>
@@ -649,7 +656,7 @@
     </div>
   </div>
 
-      <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.5.0(E42 易經書房)</div>
+      <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.5.1(E30/E46 書房的來法五卡)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -813,6 +820,10 @@ window.addEventListener('popstate',function(e){
 /* ===== E12 訂閱方案頁 ===== */
 async function initPayPage(){
   var subActiveEl=document.getElementById('paySubActive');
+  var _src=new URLSearchParams(location.search).get('src');
+  var _payCtxMap={zero:'囊中銅錢用盡了。要緊的事還在,來的路都在這裡。',deepdive:'方才那一卦,若想再往深處讀——深卜的來法在這裡。',fupan:'想把走過的決定回頭看——問道·複盤的來法在這裡。'};
+  var _payCtxEl=document.getElementById('payCtx');
+  if(_payCtxEl&&_payCtxMap[_src]){_payCtxEl.textContent=_payCtxMap[_src];_payCtxEl.hidden=false;}
   try{
     await liff.init({liffId:LIFF_ID});
     if(!liff.isLoggedIn()){return;}

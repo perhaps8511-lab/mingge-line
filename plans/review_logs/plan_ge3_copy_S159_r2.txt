@@ -1,0 +1,13 @@
+VERDICT: APPROVED
+
+可進施工。原 BLOCKER 已處理：§7/V5 明確把 canonical 收尾句「不催您、不限時、不打折」列為唯一例外，流程是先剝掉 byte-verified 收尾句再掃禁字，並另行單獨驗收尾句逐位元等於 spec。我也核對 canonical：`限時` 只出現 1 次，且只在該收尾句內；剝除後禁字掃描為 0。
+
+5 個 SUGGEST 也都已納入：
+
+- V7 硬檢凍結區：§7 列凍結區，V7 明列 diff hard check。
+- V4 unknown `src` → hidden：§5 與 V4 都有。
+- V1 納入 `h1`：V1 已抽 `h1 + lp-sub + pl-copy + pay-note`。
+- §8 上→下進 commit message：§8 已要求寫入 commit message + 回報。
+- 1490 狀態註記：§8 已明列「語義非最佳但受紅線約束，回報註記」。
+
+BLOCKER: 無。
