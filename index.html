@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.4.2</title>
+<title>命格 · 進場儀式 v1.4.3</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -198,7 +198,7 @@
     border-radius:2px;padding:11px;font-family:inherit;font-size:12.5px;letter-spacing:.14em;cursor:pointer;transition:.3s;}
   .ractions .ghost:hover{background:var(--rice-deep);}
 
-  .devjson{margin-top:16px;background:var(--rice-deep);border-radius:5px;padding:9px 12px;display:none;/* T2:預設隱藏,僅內測戶/DEV 顯示,見 isDebugViewer() */}
+  .devjson{margin-top:16px;background:var(--rice-deep);border-radius:5px;padding:9px 12px;display:none;/* T2/T2b:預設隱藏,僅 ?dev=1 / DEV_MODE 顯示,見 isDebugViewer() */}
   .devjson .l{font-size:9px;color:var(--gold);letter-spacing:.1em;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;}
   .devjson pre{font-family:Consolas,monospace;font-size:9.5px;line-height:1.5;color:var(--moss-soft);white-space:pre-wrap;word-break:break-all;}
   .devjson .cp{background:var(--gold);border:none;color:#15200f;border-radius:3px;padding:2px 8px;font-size:9.5px;cursor:pointer;font-family:inherit;}
@@ -570,7 +570,7 @@
     </div>
   </div>
 
-      <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.4.2(E35 進場門 · E40 贈幣)</div>
+      <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.4.3(E35 進場門 · E40 贈幣)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1053,7 +1053,7 @@ function showResult(g,now){
     mian_xiang:null, master_preference:"auto", question_text:""
   };
   lastGuaResult=json;
-  document.getElementById('rJson').textContent = isDebugViewer() ? JSON.stringify(json,null,2) : '';   // T2:僅內測戶填 debug 檢視
+  document.getElementById('rJson').textContent = isDebugViewer() ? JSON.stringify(json,null,2) : '';   // T2/T2b:僅 dev 檢視者填 debug
   applyDebugVisibility();
 }
 /* ====================================================
@@ -1065,10 +1065,9 @@ function showResult(g,now){
 ==================================================== */
 const DEV_MODE = false;                      // ★ 正式上線:走真實 LIFF + ID Token
 const LIFF_ID  = "2010192384-9AwjI8qH";       // S37 已建:命格進場儀式 LIFF App
-/* ===== T2:debug 檢視區(gua_result 內測檢視)可見性閘門 ===== */
-/*  非內測 LINE 戶進頁 → .devjson 零渲染;僅白名單 ID 或 DEV_MODE 見。 */
-const INTERNAL_TESTERS = ["Uf7d0922f21d68bc94f2bc17295e43d4e"];   // 內測帳號(S138 既定測試 ID)
-function isDebugViewer(){ return DEV_MODE || (liffUserId && INTERNAL_TESTERS.indexOf(liffUserId) !== -1); }
+/* ===== T2/T2b:debug 檢視區(gua_result 內測檢視)可見性閘門 ===== */
+/*  非 dev 進頁 → .devjson 零渲染;僅網址帶 ?dev=1 或 DEV_MODE 見(不明碼任何 userId)。 */
+function isDebugViewer(){ return DEV_MODE || new URLSearchParams(location.search).get('dev')==='1'; }
 function applyDebugVisibility(){ var d=document.querySelector('.devjson'); if(d) d.style.display = isDebugViewer() ? 'block' : 'none'; }
 
 /* 送出目標 = Cloudflare Worker 轉發層(方案2)
@@ -1239,7 +1238,6 @@ async function initLiff(){
     try{
       const prof=await liff.getProfile();
       liffUserId=prof.userId;             // 僅供前端參考;後端以驗證過的身分為準
-      applyDebugVisibility();   // T2:profile 回填後即套 debug 可見性(內測戶 race hardening)
     }catch(_){}
     liffAccessToken=liff.getAccessToken();  // ★ 方案3:Access Token(SDK 管理、會自動續期;送出時會再即時重抓一次)
     console.log('[LIFF] init done. accessToken at init:', liffAccessToken ? 'OK' : 'null(送出時會重抓)');
@@ -1412,7 +1410,7 @@ function restorePendingIfAny(){
   const si=document.getElementById('sayInput');
   if(si && p.say){ si.value=p.say; if(typeof sayText!=='undefined') sayText=p.say; }
   const rj=document.getElementById('rJson');
-  if(rj) rj.textContent = isDebugViewer() ? JSON.stringify(lastGuaResult,null,2) : '';   // T2:僅內測戶填
+  if(rj) rj.textContent = isDebugViewer() ? JSON.stringify(lastGuaResult,null,2) : '';   // T2/T2b:僅 dev 檢視者填
   applyDebugVisibility();
   go(3);
   console.log('[LIFF] 登入返航:已還原暫存卦,qigua_time =', lastGuaResult.qigua_time);
