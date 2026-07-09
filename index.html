@@ -258,6 +258,14 @@
   .lp-quote{
     border-left:2px solid var(--gold-soft);padding-left:16px;margin:20px 0;
     font-size:14px;line-height:2.2;letter-spacing:.06em;color:var(--rice-deep);}
+  /* T6:格5 老易頁 頁首 image-slot + 尾部路標 */
+  .about-portrait{max-width:300px;height:190px;margin:2px auto 26px;border-radius:10px;background:var(--paper);
+    border:1px solid var(--line);box-shadow:0 14px 40px rgba(0,0,0,.3);}
+  .about-signpost{text-align:center;margin-top:32px;padding-top:22px;border-top:1px solid rgba(184,134,11,.18);}
+  .about-signpost p{font-size:15px;line-height:2.05;letter-spacing:.05em;color:var(--gold-soft);margin-bottom:18px;}
+  .about-signpost .sp-btn{display:inline-block;background:transparent;color:var(--rice);border:1px solid var(--gold);
+    border-radius:2px;padding:12px 30px;font-family:inherit;font-size:14.5px;letter-spacing:.16em;cursor:pointer;transition:.45s;}
+  .about-signpost .sp-btn:hover{background:var(--gold);color:#15200f;box-shadow:0 0 26px rgba(184,134,11,.35);}
   /* ====================================================
      E09 歷史卦例
   ==================================================== */
@@ -327,7 +335,7 @@
 .study-article{padding:10px 0;border-bottom:1px solid rgba(216,207,188,.07);}
 .study-article:last-child{border-bottom:none;}
 .sa-title{font-size:14px;color:var(--rice);letter-spacing:.1em;margin-bottom:6px;line-height:1.7;}
-.sa-body{font-size:13px;line-height:2.0;letter-spacing:.05em;color:var(--rice-deep);opacity:.78;}
+.sa-body{font-size:17px;line-height:2.0;letter-spacing:.05em;color:var(--rice-deep);opacity:.78;}/* T5:書房內文≥17px */
   /* ====================================================
      E12 訂閱方案
   ==================================================== */
@@ -354,6 +362,10 @@
   .pay-note{
     font-size:11.5px;line-height:2.0;letter-spacing:.04em;
     color:var(--jade);opacity:.65;margin-top:20px;}
+  /* T7:卡底誠實整備態狀態行 */
+  .pc-status{margin-top:16px;padding-top:13px;border-top:1px solid rgba(184,134,11,.15);
+    font-size:12.5px;line-height:1.85;letter-spacing:.04em;color:var(--jade);opacity:.9;}
+  .pc-status.pc-ok{color:var(--gold-soft);}
   .quota-gate{
     max-width:360px;text-align:center;border:1px solid rgba(184,134,11,.28);
     border-radius:6px;padding:26px 24px;background:rgba(7,11,7,.52);
@@ -487,15 +499,21 @@
     </div>
     <div class="lp-body">
       <div class="pay-sub-active" id="paySubActive" style="display:none"></div>
+      <!-- T7:三張卡直列;文案凍結原文零改,只換版面+卡底狀態行;假活灰鈕(spec §4.2)移除 -->
       <div class="pay-plan">
         <h3>初訪（免費）</h3>
         <p>一輩子相贈 <strong>3 枚問卦銅錢</strong>。一枚一問；卦象、解讀都是真的，先進來問問看。</p>
+        <div class="pc-status pc-ok">您的 3 枚銅錢已在囊中 —— 到〔向天問卦〕便可用。</div>
       </div>
       <div class="pay-plan">
         <h3>問一卦｜149</h3>
         <p>銅錢用盡，仍有事要問，便來一卦。老易為您讀本卦、變卦、動爻，把這一程攤開看清。</p>
+        <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
+      </div>
+      <div class="pay-plan">
+        <h3>四鏡·深卜 200</h3>
         <p>讀完若想再往深處走，同一卦，可再請老易多開幾面——<strong>四鏡·深卜 200</strong>，看互卦、序卦、變與不變裡的「轉」。不換卦、不重卜，只把這一卦讀到透。</p>
-        <button class="pay-btn" data-placeholder>前往付款（即將開放）</button>
+        <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
       </div>
       <p class="pay-note">
         付款在書房外頭辦（點上方連結），書房裡不收錢——這是規矩。<br>
@@ -539,11 +557,16 @@
       <h1>老易</h1>
     </div>
     <div class="lp-body">
+      <div class="about-portrait" aria-hidden="true"></div><!-- T6:頁首老易形象 image-slot 留白框(米白紙感·無人像);raster 待 Design 另輪換皮補 -->
       <p>老易，六十出頭，讀了大半輩子的《易經》。</p>
       <p>他不是算命的，也不替您決定什麼——他是替您把卦讀清楚的人。</p>
       <p>您向天問了一卦，卦象天成；老易做的，是把這一卦的本卦、變卦、動爻，一樣樣為您讀出來，看清這件事此刻的形勢、往哪裡轉。</p>
       <div class="lp-quote">「善為易者不占。」<br>真正懂易的人，不求一個算定的答案，是看懂當下形勢、自己拿主意。</div>
       <p>老易在這裡，陪您把要緊的決定，看得更清楚一點。</p>
+      <div class="about-signpost"><!-- T6:尾部路標 -->
+        <p>老易在書房這頭。要緊的事,向天問一卦,他為您讀。</p>
+        <button type="button" class="sp-btn" onclick="location.href='./index.html'">🎴 向天問卦</button>
+      </div>
     </div>
   </div>
 
