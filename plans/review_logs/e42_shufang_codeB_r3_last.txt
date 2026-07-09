@@ -1,0 +1,17 @@
+**三查結果：無阻斷項。**
+
+1. **範圍守門：PASS**  
+   完整 diff 是 3 hunk：study CSS、`page-study` HTML、study JS。邊界仍在 `study*` / `page-study` / `initStudyPage` / `popstate` 的 study guard 內，未碰 E12、LIFF、pay、core touch、overlay。小註：若嚴格說「完整 diff 僅 CSS+JS」不精確，因為有 study HTML hunk；但範圍沒有外溢。
+
+2. **驗收：PASS**  
+   `.study-card` 是列表呈現層補強：button 紙卡、chevron、active、tap highlight，未換皮、未改品牌色。  
+   `show-first` 對 ①三層是正向修補：有效 read/list state 先切視圖，再同步 render；invalid state 仍回 cover。  
+   ④篇尾未被破壞，`study-signpost` 還在閱讀頁紙面內。  
+   ⑥骨架未被破壞，`initStudyPage()` 仍先 `studyShow('studySkeleton')`，fetch/decode 後才 render/apply。
+
+3. **紅線：PASS**  
+   無凍結邏輯、卦義演算法、金流、token、全域 touch、overlay 層級變更。新增色值是既有 token RGB 的透明用法，沒有新增 `#C9A84C` / `#15200f` 這類換皮硬色。資料渲染仍走 `textContent/createTextNode`，沒有回退到 `innerHTML` 注入風險。
+
+剩餘風險只剩真機手感驗證：這份 diff 本身已對「tap 目標弱」給出合理修正，不構成再改要求。
+
+VERDICT: APPROVED

@@ -1,3 +1,24 @@
+OpenAI Codex v0.142.3
+--------
+workdir: C:\Users\ivych\AppData\Local\Temp\claude\D--CBD-Lab-OS\7a3fa063-de6d-43b8-a23c-d26dd7633c53\scratchpad\mingge-line
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019f458d-792a-7ef2-87ff-dad4ef8ffde1
+--------
+user
+書房 diff 的第二輪修正,做「模式B 三查」再確認(範圍守門/驗收/紅線)。末行 VERDICT: APPROVED 或 CHANGES_REQUESTED。
+
+背景:真機回報 BLOCKER——層3 閱讀頁進不去(列表點篇名無反應)。我已排除 JS 錯誤(28 篇 studyRenderRead 零 throw、studyApply 28/28 進讀頁)、排除全域 touch 攔截(凝神 touch handler 僅掛在 core)、排除 overlay(.cosmos z-index:0 在 study z-index:20 之後)。根因研判=列表項原渲染成近透明純文字列(§4-A 規格要「紙卡」,我漏做卡片可點感),真機 tap 目標弱。
+
+本輪 2 變更(僅 study CSS+JS):
+1. `.study-card` 重做為可點紙卡:半透明奶油底 rgba(245,241,232,.045)、金框 rgba(184,134,11,.24)、圓角 6px、右側 `::after` `›` chevron、`:active` 按壓態、-webkit-tap-highlight;移除原 border-bottom 純文字列樣式。tap 目標 ~111px 高。用色皆既有 token 之 rgb(禁動色:+行零 #C9A84C/#15200f)。
+2. `studyApply`:read/list 分支改「show-first 再 render」(studyShow 先切視圖再 studyRenderRead/List),確保 tap 必切視圖、render 任何狀況都不擋切換。
+
+請確認:(a) 範圍仍限 study(3 hunk);(b) 紙卡是本卡呈現層範圍內(非換皮/非改色);(c) show-first 不破壞既有驗收(①三層/④篇尾/⑥骨架);(d) 無紅線。以下完整 diff:
 --- live_index.html	2026-07-09 11:51:40.729057100 +0800
 +++ work/index.html	2026-07-09 14:21:45.285344700 +0800
 @@ -325,17 +325,57 @@
@@ -326,3 +347,50 @@
  /* ===== E12 訂閱方案頁 ===== */
  async function initPayPage(){
    var subActiveEl=document.getElementById('paySubActive');
+
+warning: Skill descriptions were shortened to fit the 2% skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+codex
+我會按 review 模式看這份完整 diff，而不是只驗你口頭列的 2 點；重點會放在 scope 有沒有外溢、互動狀態機有沒有回歸、以及是否碰到命格/書房紅線。
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git status --short; git diff --stat; git diff -- live_index.html work/index.html index.html | Select-Object -First 200' in C:\Users\ivych\AppData\Local\Temp\claude\D--CBD-Lab-OS\7a3fa063-de6d-43b8-a23c-d26dd7633c53\scratchpad\mingge-line
+2026-07-09T06:25:44.541784Z ERROR codex_core::exec: exec error: windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=C:\Users\ivych\AppData\Local\Temp\claude\D--CBD-Lab-OS\7a3fa063-de6d-43b8-a23c-d26dd7633c53\scratchpad\mingge-line, log=C:\Users\ivych\.codex\.sandbox\sandbox.2026-07-09.log, error=program not found
+2026-07-09T06:25:44.542140Z ERROR codex_core::tools::router: error=execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=C:\\Users\\ivych\\AppData\\Local\\Temp\\claude\\D--CBD-Lab-OS\\7a3fa063-de6d-43b8-a23c-d26dd7633c53\\scratchpad\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-09.log, error=program not found" })
+ exited -1 in 0ms:
+execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=C:\\Users\\ivych\\AppData\\Local\\Temp\\claude\\D--CBD-Lab-OS\\7a3fa063-de6d-43b8-a23c-d26dd7633c53\\scratchpad\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-09.log, error=program not found" })
+codex
+**三查結果：無阻斷項。**
+
+1. **範圍守門：PASS**  
+   完整 diff 是 3 hunk：study CSS、`page-study` HTML、study JS。邊界仍在 `study*` / `page-study` / `initStudyPage` / `popstate` 的 study guard 內，未碰 E12、LIFF、pay、core touch、overlay。小註：若嚴格說「完整 diff 僅 CSS+JS」不精確，因為有 study HTML hunk；但範圍沒有外溢。
+
+2. **驗收：PASS**  
+   `.study-card` 是列表呈現層補強：button 紙卡、chevron、active、tap highlight，未換皮、未改品牌色。  
+   `show-first` 對 ①三層是正向修補：有效 read/list state 先切視圖，再同步 render；invalid state 仍回 cover。  
+   ④篇尾未被破壞，`study-signpost` 還在閱讀頁紙面內。  
+   ⑥骨架未被破壞，`initStudyPage()` 仍先 `studyShow('studySkeleton')`，fetch/decode 後才 render/apply。
+
+3. **紅線：PASS**  
+   無凍結邏輯、卦義演算法、金流、token、全域 touch、overlay 層級變更。新增色值是既有 token RGB 的透明用法，沒有新增 `#C9A84C` / `#15200f` 這類換皮硬色。資料渲染仍走 `textContent/createTextNode`，沒有回退到 `innerHTML` 注入風險。
+
+剩餘風險只剩真機手感驗證：這份 diff 本身已對「tap 目標弱」給出合理修正，不構成再改要求。
+
+VERDICT: APPROVED
+tokens used
+42,310
+**三查結果：無阻斷項。**
+
+1. **範圍守門：PASS**  
+   完整 diff 是 3 hunk：study CSS、`page-study` HTML、study JS。邊界仍在 `study*` / `page-study` / `initStudyPage` / `popstate` 的 study guard 內，未碰 E12、LIFF、pay、core touch、overlay。小註：若嚴格說「完整 diff 僅 CSS+JS」不精確，因為有 study HTML hunk；但範圍沒有外溢。
+
+2. **驗收：PASS**  
+   `.study-card` 是列表呈現層補強：button 紙卡、chevron、active、tap highlight，未換皮、未改品牌色。  
+   `show-first` 對 ①三層是正向修補：有效 read/list state 先切視圖，再同步 render；invalid state 仍回 cover。  
+   ④篇尾未被破壞，`study-signpost` 還在閱讀頁紙面內。  
+   ⑥骨架未被破壞，`initStudyPage()` 仍先 `studyShow('studySkeleton')`，fetch/decode 後才 render/apply。
+
+3. **紅線：PASS**  
+   無凍結邏輯、卦義演算法、金流、token、全域 touch、overlay 層級變更。新增色值是既有 token RGB 的透明用法，沒有新增 `#C9A84C` / `#15200f` 這類換皮硬色。資料渲染仍走 `textContent/createTextNode`，沒有回退到 `innerHTML` 注入風險。
+
+剩餘風險只剩真機手感驗證：這份 diff 本身已對「tap 目標弱」給出合理修正，不構成再改要求。
+
+VERDICT: APPROVED

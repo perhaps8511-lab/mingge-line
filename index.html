@@ -350,9 +350,13 @@
     border:none;font-size:13px;letter-spacing:.08em;cursor:pointer;font-family:inherit;padding:2px 0;margin-bottom:16px;}
   .study-listhead{font-size:17px;letter-spacing:.18em;color:var(--rice);margin-bottom:5px;}
   .study-listsub{font-size:12px;letter-spacing:.1em;color:var(--jade);opacity:.7;margin-bottom:20px;}
-  .study-card{display:block;width:100%;text-align:left;background:transparent;color:var(--rice);
-    border:none;border-bottom:1px solid rgba(216,207,188,.1);padding:16px 2px;cursor:pointer;font-family:inherit;}
-  .study-card:last-child{border-bottom:none;}
+  .study-card{position:relative;display:block;width:100%;text-align:left;color:var(--rice);
+    background:rgba(245,241,232,.045);border:1px solid rgba(184,134,11,.24);border-radius:6px;
+    padding:15px 36px 15px 16px;margin-bottom:11px;cursor:pointer;font-family:inherit;
+    -webkit-tap-highlight-color:rgba(184,134,11,.18);transition:background .15s,border-color .15s;}
+  .study-card:active{background:rgba(184,134,11,.16);border-color:var(--gold);}
+  .study-card::after{content:'›';position:absolute;right:15px;top:50%;transform:translateY(-50%);
+    color:var(--gold-soft);font-size:22px;line-height:1;opacity:.65;}
   .study-card .sc-t{font-size:15px;line-height:1.7;letter-spacing:.05em;color:var(--rice);margin-bottom:7px;}
   .study-card .sc-y{font-size:13px;line-height:1.65;letter-spacing:.03em;color:var(--rice-deep);opacity:.88;
     display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
@@ -759,9 +763,9 @@ function studyGo(state,push){
 }
 function studyApply(state){
   if(state && state.v==='read' && typeof state.gidx==='number' && studyState.articles[state.gidx]){
-    studyRenderRead(state.gidx,state.from); studyShow('studyRead');
+    studyShow('studyRead'); studyRenderRead(state.gidx,state.from); /* show-first:tap 必切視圖,render 錯不擋切換 */
   } else if(state && state.v==='list' && state.cat && studyState.byCat[state.cat] && studyState.byCat[state.cat].length){
-    studyRenderList(state.cat); studyShow('studyList');
+    studyShow('studyList'); studyRenderList(state.cat);
   } else {
     studyShow('studyCover'); /* 層1;層1 再返回=不 trap,走 LIFF 預設 */
   }
