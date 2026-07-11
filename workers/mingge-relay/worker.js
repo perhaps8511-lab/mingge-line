@@ -7,6 +7,8 @@
 // S140: 新增 POST /trigger/deepdive、/trigger/fupan(E27 深卜/複盤入口導引,薄代理層)
 //         需要 Secret: HOOK_DEEPDIVE、HOOK_FUPAN(Perth 已貼進 Cloudflare Secrets)
 //         沿用現役 resolveUserId() 驗證,webhook URL 不進前端(依 S37 binding)
+// S163: 新增 POST /trace(E25② 卦記蓋印·補後續)—— TA 事後補寫「後來怎麼走」,
+//         寫入 Divination_Log.trace_text + trace_at;/history、/log 白名單追加回傳兩欄。
 // ====================================================
 
 const ALLOWED_ORIGIN = "https://perhaps8511-lab.github.io";
@@ -16,6 +18,7 @@ const AT_BASE        = "apptFfyVBYE4ygW3E";
 const AT_DIV_LOG     = "tblVyf8WfTQxvtpEg";
 const AT_SUBS        = "tbljXninuBm76D9nf";
 const AT_SHUFANG     = "tblbzhwwmBDfAKQAs";
+const TRACE_MAX_BODY_BYTES = 4096;
 
 export default {
   async fetch(request, env) {
@@ -46,7 +49,7 @@ export default {
         airtableFetch(env.AIRTABLE_API_KEY, AT_BASE, AT_DIV_LOG, {
           filterByFormula: `AND({line_user_id_raw}="${verifiedUserId}",{entry_type}="divination")`,
           sort: [{ field: "qigua_time", direction: "desc" }],
-          fields: ["question_text", "ben_gua", "bian_gua", "dong_yao", "qigua_time", "session_id", "entry_type", "golden_seal", "golden_seal_time"],
+          fields: ["question_text", "ben_gua", "bian_gua", "dong_yao", "qigua_time", "session_id", "entry_type", "golden_seal", "golden_seal_time", "trace_text", "trace_at"],
           maxRecords: 50,
         }),
         airtableFetch(env.AIRTABLE_API_KEY, AT_BASE, AT_SUBS, {
@@ -63,6 +66,8 @@ export default {
           ...f,
           golden_seal: !!f.golden_seal,
           golden_seal_time: f.golden_seal_time || null,
+          trace_text: f.trace_text || null,
+          trace_at: f.trace_at || null,
         };
       });
       const subRec  = (subResult.records || [])[0];
@@ -128,6 +133,8 @@ export default {
           output_json:    f.output_json    || null,
           golden_seal:    !!f.golden_seal,
           golden_seal_time: f.golden_seal_time || null,
+          trace_text:     f.trace_text     || null,
+          trace_at:       f.trace_at       || null,
         },
       });
     }
@@ -138,7 +145,7 @@ export default {
       }
       const result = await airtableFetch(env.AIRTABLE_API_KEY, AT_BASE, AT_SHUFANG, {
         filterByFormula: `{qc_passed}=1`,
-        fields: ["title", "content_type", "body", "persona", "ta_type", "jieqi_node"],
+        fields: ["title", "content_type", "body", "persona", "ta_type", "jieqi_node", "featured"],
         maxRecords: 100,
       });
       const articles = (result.records || []).map(r => r.fields);
@@ -256,6 +263,137 @@ export default {
       }
 
       return json({ sealed: true, sealed_at: sealedAt, already_sealed: false });
+    }
+
+    // S163(E25②):卦記蓋印·補後續 —— TA 事後補寫「後來怎麼走」,
+    // 沿用 /log/seal 既有驗身+擁有權模式(S37 binding),不動 /log/seal 本身。
+    if (request.method === "POST" && url.pathname === "/trace") {
+      const contentType = request.headers.get("Content-Type") || "";
+      if (!/^application\/json(?:;.*)?$/i.test(contentType.trim())) {
+        return json({ error: "Bad JSON body" }, 400);
+      }
+
+      const declaredLength = Number(request.headers.get("Content-Length") || "0");
+      if (declaredLength > TRACE_MAX_BODY_BYTES) {
+        return json({ error: "Payload too large" }, 413);
+      }
+
+      let rawBody;
+      try {
+        rawBody = await readBodyWithLimit(request, TRACE_MAX_BODY_BYTES);
+      } catch (e) {
+        if (e && e.tooLarge) {
+          return json({ error: "Payload too large" }, 413);
+        }
+        return json({ error: "Bad JSON body" }, 400);
+      }
+
+      let payload;
+      try {
+        payload = JSON.parse(rawBody);
+      } catch (e) {
+        return json({ error: "Bad JSON body" }, 400);
+      }
+
+      const accessToken = request.headers.get("X-Line-AccessToken");
+      if (!accessToken) {
+        return json({ error: "Missing access token" }, 401);
+      }
+
+      let verifiedUserId;
+      try {
+        ({ userId: verifiedUserId } = await resolveUserId(accessToken, LINE_CHANNEL_ID));
+      } catch (e) {
+        console.log("Trace access token validation failed", e.message || e);
+        return json({ error: e.message || "Invalid access token" }, e.status || 401);
+      }
+
+      const payloadIsObject = payload && typeof payload === "object" && !Array.isArray(payload);
+      const payloadKeys = payloadIsObject ? Object.keys(payload) : [];
+      if (payloadKeys.some(k => k !== "log_id" && k !== "trace_text")) {
+        return json({ error: "Unexpected field in payload" }, 400);
+      }
+
+      const logId = payloadIsObject ? payload.log_id : undefined;
+      if (typeof logId !== "string" || !/^rec[a-zA-Z0-9]{14}$/.test(logId)) {
+        return json({ error: "Invalid log_id" }, 400);
+      }
+
+      const rawTraceText = payloadIsObject ? payload.trace_text : undefined;
+      const traceText = typeof rawTraceText === "string" ? rawTraceText.trim() : "";
+      if (!traceText || traceText.length > 500) {
+        return json({ error: "Invalid trace_text" }, 400);
+      }
+
+      if (!env.AIRTABLE_API_KEY) {
+        return json({ error: "AIRTABLE_API_KEY not configured" }, 503);
+      }
+
+      let recRes;
+      try {
+        recRes = await fetch(
+          `https://api.airtable.com/v0/${AT_BASE}/${AT_DIV_LOG}/${encodeURIComponent(logId)}`,
+          { headers: { "Authorization": "Bearer " + env.AIRTABLE_API_KEY } }
+        );
+      } catch (e) {
+        console.log("Airtable trace read failed", e.message || e);
+        return json({ error: "Airtable read failed" }, 502);
+      }
+
+      if (recRes.status === 404) {
+        return json({ record: null }, 404);
+      }
+      if (!recRes.ok) {
+        console.log("Airtable trace read failed", recRes.status);
+        return json({ error: "Airtable read failed" }, 502);
+      }
+
+      let rec;
+      try {
+        rec = await recRes.json();
+      } catch (e) {
+        console.log("Airtable trace read JSON parse failed", e.message || e);
+        return json({ error: "Airtable read failed" }, 502);
+      }
+
+      const f = rec.fields || {};
+      if (f.line_user_id_raw !== verifiedUserId) {
+        return json({ error: "Forbidden" }, 403);
+      }
+      if ((f.entry_type || "divination") !== "divination") {
+        return json({ record: null }, 404);
+      }
+
+      const tracedAt = new Date().toISOString();
+      let patchRes;
+      try {
+        patchRes = await fetch(
+          `https://api.airtable.com/v0/${AT_BASE}/${AT_DIV_LOG}/${encodeURIComponent(logId)}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Authorization": "Bearer " + env.AIRTABLE_API_KEY,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              fields: {
+                trace_text: traceText,
+                trace_at: tracedAt,
+              },
+            }),
+          }
+        );
+      } catch (e) {
+        console.log("Airtable trace write failed", e.message || e);
+        return json({ error: "Airtable write failed" }, 502);
+      }
+
+      if (!patchRes.ok) {
+        console.log("Airtable trace write failed", patchRes.status);
+        return json({ error: "Airtable write failed" }, 502);
+      }
+
+      return json({ traced: true, trace_text: traceText, trace_at: tracedAt });
     }
 
     // S140(E27):深卜/複盤薄代理層 —— 前端只打這裡,Worker 驗完身分才轉發 Make webhook,
@@ -479,6 +617,37 @@ export default {
     }
   },
 };
+
+// S163(E25②):邊讀邊擋的 body 位元組上限 —— 用 stream reader 累計位元組數,
+// 一旦超過 limit 立即 cancel 底層串流並丟出 tooLarge,不等整包 body 進記憶體才檢查
+// (無 Content-Length/chunked body 場景仍受此上限保護)。
+async function readBodyWithLimit(request, limit) {
+  if (!request.body) {
+    return "";
+  }
+  const reader = request.body.getReader();
+  const chunks = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limit) {
+      await reader.cancel();
+      const err = new Error("Payload too large");
+      err.tooLarge = true;
+      throw err;
+    }
+    chunks.push(value);
+  }
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder("utf-8").decode(merged);
+}
 
 async function resolveUserId(accessToken, channelId) {
   const verifyRes = await fetch(

@@ -135,6 +135,50 @@
   }
   .deepen-btn:hover{opacity:.85;}
   .deepen-status{font-size:12px;color:var(--paper);opacity:.7;margin-top:10px;min-height:1.4em;}
+
+  /* ---- E25:卦記蓋印(補後續)---- */
+  .stamp-btn{
+    display:block;width:100%;background:none;color:var(--gold);
+    border:1.5px solid var(--gold);border-radius:8px;
+    padding:12px 20px;font-family:var(--serif);font-size:14px;letter-spacing:.08em;
+    cursor:pointer;transition:.25s;
+  }
+  .stamp-btn:hover{background:rgba(201,168,76,.08);}
+  .stamp-badge{
+    display:flex;align-items:center;gap:8px;
+    font-family:var(--serif);font-size:13px;color:var(--gold);letter-spacing:.06em;
+    margin-bottom:10px;
+  }
+  .stamp-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);flex-shrink:0;}
+  .stamp-trace-text{font-size:15px;line-height:1.8;color:var(--ink);}
+  .stamp-overlay{
+    position:fixed;inset:0;background:rgba(44,62,45,.55);
+    display:none;align-items:center;justify-content:center;z-index:50;padding:24px;
+  }
+  .stamp-overlay.open{display:flex;}
+  .stamp-sheet{
+    background:var(--paper-card);border-radius:14px;padding:22px 20px;
+    width:100%;max-width:340px;box-shadow:0 10px 40px rgba(0,0,0,.25);
+  }
+  .stamp-sheet .stamp-close{
+    float:right;background:none;border:none;color:var(--ink-soft);
+    font-size:18px;line-height:1;cursor:pointer;padding:0 0 8px 8px;
+  }
+  .stamp-sheet textarea{
+    width:100%;min-height:88px;margin-top:6px;
+    border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+    font-family:var(--sans);font-size:15px;line-height:1.7;color:var(--ink);
+    background:#fff;resize:vertical;
+  }
+  .stamp-sheet .stamp-confirm{
+    display:block;width:100%;margin-top:14px;background:var(--gold);color:#fff;
+    border:none;border-radius:8px;padding:12px 20px;
+    font-family:var(--serif);font-size:15px;letter-spacing:.1em;
+    cursor:pointer;transition:.25s;font-weight:600;
+  }
+  .stamp-sheet .stamp-confirm:hover{opacity:.85;}
+  .stamp-sheet .stamp-confirm:disabled{opacity:.5;cursor:default;}
+  .stamp-toast{font-size:13px;color:var(--gold);margin-top:10px;text-align:center;}
 </style>
 </head>
 <body>
@@ -158,6 +202,15 @@
 
 <!-- 詳情 -->
 <div class="detail-wrap" id="viewDetail"></div>
+
+<!-- E25:蓋印彈窗 -->
+<div class="stamp-overlay" id="stampOverlay">
+  <div class="stamp-sheet">
+    <button class="stamp-close" id="stampClose" type="button" aria-label="close">×</button>
+    <textarea id="stampTextarea" placeholder="當時所問的事,後來往哪邊走了 —— 一兩句即可。" maxlength="500" required></textarea>
+    <button class="stamp-confirm" id="stampConfirmBtn" type="button">蓋下金印</button>
+  </div>
+</div>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
@@ -312,6 +365,96 @@ async function handleDeepdiveClick(logId, token) {
   btn.textContent = originalLabel;
 }
 
+/* ===== E25:卦記蓋印(補後續)===== */
+let stampState = { logId: null, token: null };
+
+function buildStampBadgeHtml(traceText) {
+  return `
+    <div class="stamp-badge"><span class="dot"></span>金印 · 已補後續</div>
+    <div class="stamp-trace-text">${textToHtml(traceText)}</div>`;
+}
+
+function buildStampSectionHtml(rec) {
+  if (rec.trace_text) {
+    return `<div class="section">${buildStampBadgeHtml(rec.trace_text)}</div>`;
+  }
+  return `
+    <div class="section">
+      <button class="stamp-btn" id="stampOpenBtn" type="button">補後續 · 蓋金印</button>
+    </div>`;
+}
+
+function openStampModal(logId, token) {
+  stampState = { logId, token };
+  const overlay = document.getElementById("stampOverlay");
+  const textarea = document.getElementById("stampTextarea");
+  const confirmBtn = document.getElementById("stampConfirmBtn");
+  textarea.value = "";
+  confirmBtn.disabled = false;
+  overlay.classList.add("open");
+  textarea.focus();
+}
+
+function closeStampModal() {
+  document.getElementById("stampOverlay").classList.remove("open");
+}
+
+async function submitStamp() {
+  const textarea = document.getElementById("stampTextarea");
+  const confirmBtn = document.getElementById("stampConfirmBtn");
+  const traceText = textarea.value.trim();
+
+  /* 無新增文案:空白/無 logId 靜默不送出(交由 textarea required 屬性攔),
+     失敗分支僅 console.warn、保留入口按鈕,不彈出未定稿文案(見 plan §3 失敗分支) */
+  if (!traceText || !stampState.logId) {
+    return;
+  }
+
+  confirmBtn.disabled = true;
+
+  try {
+    const res = await fetch(`${RELAY_URL}trace`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Line-AccessToken": stampState.token },
+      body: JSON.stringify({ log_id: stampState.logId, trace_text: traceText }),
+    });
+    if (!res.ok) {
+      console.warn("stamp submit failed", res.status);
+      confirmBtn.disabled = false;
+      return;
+    }
+    const data = await res.json();
+    if (!data || typeof data.trace_text !== "string") {
+      console.warn("stamp submit bad payload", data);
+      confirmBtn.disabled = false;
+      return;
+    }
+    closeStampModal();
+    renderStampResult(data.trace_text);
+  } catch (e) {
+    console.warn("stamp submit error", e.message || e);
+    confirmBtn.disabled = false;
+  }
+}
+
+function renderStampResult(traceText) {
+  const openBtn = document.getElementById("stampOpenBtn");
+  if (!openBtn) return;
+  const section = openBtn.closest(".section");
+  section.innerHTML = `
+    <div class="stamp-toast">已蓋印。這一卦,有了後續。</div>
+    ${buildStampBadgeHtml(traceText)}`;
+}
+
+function wireStampHandlers(logId, token) {
+  const openBtn = document.getElementById("stampOpenBtn");
+  if (openBtn) {
+    openBtn.addEventListener("click", () => openStampModal(logId, token));
+  }
+  document.getElementById("stampClose").addEventListener("click", closeStampModal);
+  document.getElementById("stampConfirmBtn").addEventListener("click", submitStamp);
+}
+
 function renderDetail(rec, tierInfo, token) {
   const wrap = document.getElementById("viewDetail");
 
@@ -411,6 +554,9 @@ function renderDetail(rec, tierInfo, token) {
     }
   }
 
+  // E25:蓋印(補後續)—— 同樣只在 divination 類型呈現
+  html += buildStampSectionHtml(rec);
+
   // E27:深卜 CTA —— 走到這裡已保證 entryType === "divination"(其他類型在函式前段已早退)
   html += buildDeepdiveCtaHtml(tierInfo);
 
@@ -420,6 +566,7 @@ function renderDetail(rec, tierInfo, token) {
   if (deepdiveBtn && !deepdiveBtn.disabled) {
     deepdiveBtn.addEventListener("click", () => handleDeepdiveClick(rec.log_id, token));
   }
+  wireStampHandlers(rec.log_id, token);
 }
 
 async function init() {

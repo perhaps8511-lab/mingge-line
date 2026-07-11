@@ -1,0 +1,75 @@
+=== V1: Worker /trace headless 全契約矩陣(Node ESM import 真檔) ===
+Trace access token validation failed Invalid or expired access token
+Trace access token validation failed network down
+Airtable trace read failed network down
+Airtable trace read failed 500
+Airtable trace read JSON parse failed bad json
+Airtable trace write failed network down
+Airtable trace write failed 500
+PASS - case1 200
+PASS - case1 traced=true
+PASS - case1 PATCH has trace_text
+PASS - case1 PATCH has trace_at ISO
+PASS - case2 403 (他人 log_id)
+PASS - case3 401 (缺 token)
+PASS - case4 400 (>500 chars)
+PASS - case4b 200 (==500 chars boundary)
+PASS - case5 400 (extra field)
+PASS - case6 204
+PASS - case6 CORS allow-origin
+PASS - case6 CORS allow-methods
+PASS - case6 CORS allow-headers
+PASS - case7 400 (bad log_id)
+PASS - case8 400 (blank trace_text)
+PASS - case9 400 (bad content-type)
+PASS - case10 400 (malformed json)
+PASS - case11 413 (oversized chunked body)
+PASS - case11 stopped reading before all 12 chunks consumed
+PASS - case12 400 (missing log_id)
+PASS - case13 503 (no api key)
+PASS - case14 401 (invalid token)
+PASS - case15 4xx/5xx (LINE upstream down, not 2xx)
+PASS - case16 404 (record missing)
+PASS - case17 502 (airtable GET network down)
+PASS - case18 502 (airtable GET 500)
+PASS - case19 502 (airtable GET bad json)
+PASS - case20 502 (airtable PATCH network down)
+PASS - case21 502 (airtable PATCH 500)
+PASS - case22 404 (non-divination entry_type)
+PASS - case22b /study query includes featured field
+PASS - case22b /study response passthrough featured
+PASS - case23 /log passthrough trace_text
+PASS - case23 /log passthrough trace_at
+PASS - case24 /history passthrough trace_text
+PASS - case24 /history passthrough trace_at
+
+=== V2: log.html 文案逐字唯一定義(每條字面全檔恰好一次) ===
+PASS - copy exactly once: 補後續 · 蓋金印
+PASS - copy exactly once: 蓋下金印
+PASS - copy exactly once: 已蓋印。這一卦,有了後續。
+PASS - copy exactly once: 金印 · 已補後續
+PASS - copy exactly once: 當時所問的事,後來往哪邊走了 —— 一兩句即可。
+
+=== V3: log.html stamp 函式真執行(vm,非純 regex)+ XSS escaping 斷言 ===
+stamp submit error network down
+stamp submit failed 502
+stamp submit bad payload { traced: true }
+PASS - no trace_text => shows entry button
+PASS - no trace_text => no badge
+PASS - has trace_text => shows badge
+PASS - has trace_text => no entry button
+PASS - has trace_text => renders content
+PASS - submitStamp success => badge rendered
+PASS - submitStamp success => toast rendered
+PASS - submitStamp success => modal closed
+PASS - submitStamp network error => no badge written
+PASS - submitStamp network error => confirm button re-enabled
+PASS - submitStamp non-200 => no badge written
+PASS - submitStamp non-200 => confirm button re-enabled
+PASS - submitStamp bad contract => no badge written
+PASS - submitStamp bad contract => confirm button re-enabled
+PASS - XSS payload not raw <script> tag
+PASS - XSS payload img tag escaped (no raw <img)
+PASS - XSS payload escaped to &lt;script&gt;
+
+=== 總結: PASS=58 FAIL=0 ===
