@@ -42,8 +42,8 @@ function mockFetch(scenario) {
     }
     if (u.includes('api.airtable.com') && (!opts.method || opts.method === 'GET')) {
       if (scenario.airtableGetNetworkDown) throw new Error('network down');
-      if (scenario.recordMissing) return { ok: false, status: 404 };
-      if (scenario.airtableGetNonOk) return { ok: false, status: 500 };
+      if (scenario.recordMissing) return { ok: false, status: 404, text: async () => 'not found' };
+      if (scenario.airtableGetNonOk) return { ok: false, status: 500, text: async () => 'server error' };
       if (scenario.airtableGetBadJson) return { ok: true, json: async () => { throw new Error('bad json'); } };
       return {
         ok: true,
@@ -52,7 +52,7 @@ function mockFetch(scenario) {
     }
     if (u.includes('api.airtable.com') && opts.method === 'PATCH') {
       if (scenario.airtablePatchNetworkDown) throw new Error('network down');
-      if (scenario.airtablePatchNonOk) return { ok: false, status: 500 };
+      if (scenario.airtablePatchNonOk) return { ok: false, status: 500, text: async () => 'server error' };
       scenario.patchBody = JSON.parse(opts.body);
       return { ok: true, json: async () => ({}) };
     }

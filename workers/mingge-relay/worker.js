@@ -344,7 +344,8 @@ export default {
         return json({ record: null }, 404);
       }
       if (!recRes.ok) {
-        console.log("Airtable trace read failed", recRes.status);
+        const errBody = await recRes.text().catch(() => "");
+        console.log("Airtable trace read failed", recRes.status, errBody);
         return json({ error: "Airtable read failed" }, 502);
       }
 
@@ -389,7 +390,8 @@ export default {
       }
 
       if (!patchRes.ok) {
-        console.log("Airtable trace write failed", patchRes.status);
+        const errBody = await patchRes.text().catch(() => "");
+        console.log("Airtable trace write failed", patchRes.status, errBody);
         return json({ error: "Airtable write failed" }, 502);
       }
 
