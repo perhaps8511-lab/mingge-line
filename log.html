@@ -144,13 +144,26 @@
     cursor:pointer;transition:.25s;
   }
   .stamp-btn:hover{background:rgba(201,168,76,.08);}
+  .stamp-success-card{
+    background:var(--paper-card);border:1px solid var(--gold);border-radius:12px;
+    padding:22px 20px;margin:8px 0 12px;
+    box-shadow:0 8px 24px rgba(44,62,45,.08);
+  }
   .stamp-badge{
     display:flex;align-items:center;gap:8px;
-    font-family:var(--serif);font-size:13px;color:var(--gold);letter-spacing:.06em;
-    margin-bottom:10px;
+    font-family:var(--serif);font-size:20px;color:var(--ink);letter-spacing:.06em;
+    margin-bottom:10px;font-weight:700;
   }
-  .stamp-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);flex-shrink:0;}
-  .stamp-trace-text{font-size:15px;line-height:1.8;color:var(--ink);}
+  .stamp-badge .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);flex-shrink:0;}
+  .stamp-toast{
+    font-family:var(--serif);font-size:17px;line-height:1.7;color:var(--ink-soft);
+    margin-bottom:16px;
+  }
+  .stamp-trace-text{font-family:var(--serif);font-size:20px;line-height:1.8;color:var(--ink);}
+  .stamp-trace-time{
+    border-top:1px solid var(--line);margin-top:18px;padding-top:12px;
+    font-size:17px;line-height:1.6;color:var(--ink-soft);letter-spacing:.03em;
+  }
   .stamp-overlay{
     position:fixed;inset:0;background:rgba(44,62,45,.55);
     display:none;align-items:center;justify-content:center;z-index:50;padding:24px;
@@ -178,7 +191,6 @@
   }
   .stamp-sheet .stamp-confirm:hover{opacity:.85;}
   .stamp-sheet .stamp-confirm:disabled{opacity:.5;cursor:default;}
-  .stamp-toast{font-size:13px;color:var(--gold);margin-top:10px;text-align:center;}
 </style>
 </head>
 <body>
@@ -368,15 +380,37 @@ async function handleDeepdiveClick(logId, token) {
 /* ===== E25:卦記蓋印(補後續)===== */
 let stampState = { logId: null, token: null };
 
-function buildStampBadgeHtml(traceText) {
+function formatTraceAt(traceAt) {
+  if (!traceAt) return "";
+  const date = new Date(traceAt);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  if (!values.year || !values.month || !values.day || !values.hour || !values.minute) return "";
+  return `${values.year}/${values.month}/${values.day} ${values.hour}:${values.minute}`;
+}
+
+function buildStampBadgeHtml(traceText, traceAt) {
+  const savedAt = formatTraceAt(traceAt);
+  const timeHtml = savedAt
+    ? `<div class="stamp-trace-time">保存時間｜${esc(savedAt)}</div>`
+    : "";
   return `
-    <div class="stamp-badge"><span class="dot"></span>金印 · 已補後續</div>
-    <div class="stamp-trace-text">${textToHtml(traceText)}</div>`;
+    <div class="stamp-success-card">
+      <div class="stamp-badge"><span class="dot"></span>金印 · 已補後續</div>
+      <div class="stamp-toast">已蓋印。這一卦,有了後續。</div>
+      <div class="stamp-trace-text">${textToHtml(traceText)}</div>
+      ${timeHtml}
+    </div>`;
 }
 
 function buildStampSectionHtml(rec) {
   if (rec.trace_text) {
-    return `<div class="section">${buildStampBadgeHtml(rec.trace_text)}</div>`;
+    return `<div class="section">${buildStampBadgeHtml(rec.trace_text, rec.trace_at)}</div>`;
   }
   return `
     <div class="section">
@@ -430,20 +464,18 @@ async function submitStamp() {
       return;
     }
     closeStampModal();
-    renderStampResult(data.trace_text);
+    renderStampResult(data.trace_text, data.trace_at);
   } catch (e) {
     console.warn("stamp submit error", e.message || e);
     confirmBtn.disabled = false;
   }
 }
 
-function renderStampResult(traceText) {
+function renderStampResult(traceText, traceAt) {
   const openBtn = document.getElementById("stampOpenBtn");
   if (!openBtn) return;
   const section = openBtn.closest(".section");
-  section.innerHTML = `
-    <div class="stamp-toast">已蓋印。這一卦,有了後續。</div>
-    ${buildStampBadgeHtml(traceText)}`;
+  section.innerHTML = buildStampBadgeHtml(traceText, traceAt);
 }
 
 function wireStampHandlers(logId, token) {
