@@ -379,6 +379,7 @@ results.push(['success card uses existing paper token', src.includes('.stamp-suc
 results.push(['saved badge >=20px deep ink and bold', src.includes('font-family:var(--serif);font-size:20px;color:var(--ink)') && src.includes('margin-bottom:10px;font-weight:700')]);
 results.push(['completion copy >=17px', src.includes('.stamp-toast{') && src.includes('font-family:var(--serif);font-size:17px;line-height:1.7')]);
 results.push(['trace text >=20px with 1.8 line-height', src.includes('.stamp-trace-text{font-family:var(--serif);font-size:20px;line-height:1.8;color:var(--ink)')]);
+results.push(['saved time computed style >=17px', src.includes('.stamp-trace-time{') && src.includes('font-size:17px;line-height:1.6;color:var(--ink-soft)')]);
 results.push(['deepdive CTA approved copy unchanged', (src.match(/四鏡·深卜 200/g) || []).length === 1]);
 
 for (const [name, ok] of results) {
