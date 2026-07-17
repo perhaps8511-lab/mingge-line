@@ -375,6 +375,12 @@ for (const line of copyLines) {
   results.push(['copy exactly once: ' + line, count === 1]);
 }
 
+results.push(['success card uses existing paper token', src.includes('.stamp-success-card{') && src.includes('background:var(--paper-card)')]);
+results.push(['saved badge >=20px deep ink and bold', src.includes('font-family:var(--serif);font-size:20px;color:var(--ink)') && src.includes('margin-bottom:10px;font-weight:700')]);
+results.push(['completion copy >=17px', src.includes('.stamp-toast{') && src.includes('font-family:var(--serif);font-size:17px;line-height:1.7')]);
+results.push(['trace text >=20px with 1.8 line-height', src.includes('.stamp-trace-text{font-family:var(--serif);font-size:20px;line-height:1.8;color:var(--ink)')]);
+results.push(['deepdive CTA approved copy unchanged', (src.match(/四鏡·深卜 200/g) || []).length === 1]);
+
 for (const [name, ok] of results) {
   console.log((ok ? 'PASS' : 'FAIL') + ' - ' + name);
 }
@@ -412,9 +418,12 @@ function extractLet(name) {
 const code = [
   extractLet('stampState'),
   extractFn('esc'), extractFn('textToHtml'),
+  extractFn('formatTraceAt'),
   extractFn('buildStampBadgeHtml'), extractFn('buildStampSectionHtml'),
   extractFn('openStampModal'), extractFn('closeStampModal'),
   extractFn('submitStamp'), extractFn('renderStampResult'),
+  'globalThis.__formatTraceAt = formatTraceAt;',
+  'globalThis.__buildStampBadgeHtml = buildStampBadgeHtml;',
   'globalThis.__buildStampSectionHtml = buildStampSectionHtml;',
   'globalThis.__openStampModal = openStampModal;',
   'globalThis.__submitStamp = submitStamp;',
@@ -464,20 +473,34 @@ function buildCtx(fetchImpl) {
 // 已蓋印 → 常駐標示,無入口按鈕(互斥)
 {
   const { ctx } = buildCtx(async () => ({ ok: true, json: async () => ({}) }));
-  const withTrace = ctx.__buildStampSectionHtml({ trace_text: '後來順利談成了。' });
+  const withTrace = ctx.__buildStampSectionHtml({ trace_text: '後來順利談成了。', trace_at: '2026-07-11T09:00:00.000Z' });
   results.push(['has trace_text => shows badge', withTrace.includes('stamp-badge') && withTrace.includes('金印 · 已補後續')]);
   results.push(['has trace_text => no entry button', !withTrace.includes('stampOpenBtn')]);
   results.push(['has trace_text => renders content', withTrace.includes('後來順利談成了。')]);
+  results.push(['reload trace_at => Asia/Taipei YYYY/MM/DD HH:mm', withTrace.includes('保存時間｜2026/07/11 17:00')]);
+}
+
+// trace_at 缺漏或無效 → 安全降級,不得顯示 Invalid Date
+{
+  const { ctx } = buildCtx(async () => ({ ok: true, json: async () => ({}) }));
+  const missingAt = ctx.__buildStampSectionHtml({ trace_text: '後來順利談成了。' });
+  const invalidAt = ctx.__buildStampSectionHtml({ trace_text: '後來順利談成了。', trace_at: 'not-a-date' });
+  results.push(['missing trace_at => no time row', !missingAt.includes('stamp-trace-time') && !missingAt.includes('Invalid Date')]);
+  results.push(['invalid trace_at => no invalid date', !invalidAt.includes('stamp-trace-time') && !invalidAt.includes('Invalid Date')]);
 }
 
 // submitStamp 成功轉態:renderStampResult 真執行,section innerHTML 換成常駐態
 {
-  const { ctx, els, openBtnSection } = buildCtx(async () => ({ ok: true, json: async () => ({ trace_text: '後來去談了,結果不錯。' }) }));
+  const traceText = '後來去談了,結果不錯。';
+  const traceAt = '2026-07-11T09:00:00.000Z';
+  const { ctx, els, openBtnSection } = buildCtx(async () => ({ ok: true, json: async () => ({ trace_text: traceText, trace_at: traceAt }) }));
   ctx.__setStampState({ logId: 'recAAAAAAAAAAAAAA', token: 'tok' });
-  els.stampTextarea.value = '後來去談了,結果不錯。';
+  els.stampTextarea.value = traceText;
   await ctx.__submitStamp();
   results.push(['submitStamp success => badge rendered', openBtnSection.innerHTML.includes('金印 · 已補後續')]);
   results.push(['submitStamp success => toast rendered', openBtnSection.innerHTML.includes('已蓋印。這一卦,有了後續。')]);
+  results.push(['submitStamp success => Taipei time rendered', openBtnSection.innerHTML.includes('保存時間｜2026/07/11 17:00')]);
+  results.push(['submitStamp and reload share identical success card', openBtnSection.innerHTML === ctx.__buildStampBadgeHtml(traceText, traceAt)]);
   results.push(['submitStamp success => modal closed', !els.stampOverlay._classes.has('open')]);
 }
 
