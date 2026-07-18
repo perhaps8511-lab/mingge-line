@@ -26,6 +26,19 @@
 | 書房既有 live 內容 | Airtable `ShufangContent` 中 `qc_passed=1` | `LIVE-VERIFY` | Worker `GET /study` 只回傳 `{qc_passed}=1` | Showcase 只讀此集合；不把本地候選視為已上線 |
 | 老易說易現役 KB／app | 文件稱現役 29→30 篇、既有 21-case PASS | `LIVE-VERIFY` | `001_report_kb_census_S164_v1_0.md` | 掛 `kb2-31` 前讀回 dataset 名稱、現役版本與文件清單 |
 
+### 2.1 Claude Content QA 回件裁定（2026-07-18）
+
+| 回件資產 | 狀態 | Accountable 處置 |
+|---|---|---|
+| `sample_B_shufang_rumen_revised_v1_0.md` | `CANDIDATE-QA-ACCEPTED` | 代表樣本內容與 Owner taste gate 均通過；尚未上架 |
+| `sample_C_dg20_pi_revised_v1_0.md` | `CANDIDATE-QA-ACCEPTED` | 代表樣本內容與 Owner taste gate 均通過；尚未上架 |
+| `sample_A_kb2_31_reception_revised_v1_0.md` | `CANDIDATE-QA-DELTA` | Q6／Q12 三項 bounded delta；v1.1 通過前不得 ingestion |
+| `claude_batch_revision_rules_v1_0.md` | `SUPPORTING-SPEC-DELTA` | R1–R10 主方向接受；待 v1.1 同步邊界與可重現 evidence |
+| `qa_report_mingge_showcase_005_samples_v1_0.md` | `SUPPORTING-EVIDENCE-DELTA` | 核心診斷接受；待 v1.1 封口 Sample A verdict |
+
+正式驗收與 exact hashes：`plans/review_logs/mingge_showcase_005_claude_content_qa_return_v1_0.md`。
+最小差分卡：`plans/dispatch/mingge_showcase_005_claude_content_qa_delta_v1_0.md`。
+
 ## 3. 明確新舊關係
 
 | 舊檔 | 狀態 | 取代／用途 |
