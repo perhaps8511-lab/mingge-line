@@ -252,7 +252,7 @@
   }
 
   /* ====================================================
-     LIFF 子頁面通用（action=about/log/study/pay）
+     LIFF 子頁面通用（action=ask/about/log/study/pay）
   ==================================================== */
   .liff-page{
     position:absolute;inset:0;z-index:20;overflow-y:auto;
@@ -268,7 +268,7 @@
   .lp-quote{
     border-left:2px solid var(--gold-soft);padding-left:16px;margin:20px 0;
     font-size:14px;line-height:2.2;letter-spacing:.06em;color:var(--rice-deep);}
-  /* T6:格5 老易頁 頁首 image-slot + 尾部路標 */
+  /* T6/005A:格5 問老易頁 頁首 image-slot + 免費對話路標 */
   .about-portrait{max-width:300px;height:190px;margin:2px auto 26px;border-radius:10px;background:var(--paper);
     border:1px solid var(--line);box-shadow:0 14px 40px rgba(0,0,0,.3);}
   .about-signpost{text-align:center;margin-top:32px;padding-top:22px;border-top:1px solid rgba(184,134,11,.18);}
@@ -276,6 +276,26 @@
   .about-signpost .sp-btn{display:inline-block;background:transparent;color:var(--rice);border:1px solid var(--gold);
     border-radius:2px;padding:12px 30px;font-family:inherit;font-size:14.5px;letter-spacing:.16em;cursor:pointer;transition:.45s;}
   .about-signpost .sp-btn:hover{background:var(--gold);color:#15200f;box-shadow:0 0 26px rgba(184,134,11,.35);}
+  .ask-prompts{display:grid;gap:10px;margin:24px 0 8px;}
+  .ask-prompt{width:100%;text-align:left;background:rgba(245,241,232,.04);color:var(--rice-deep);
+    border:1px solid rgba(184,134,11,.28);border-radius:5px;padding:13px 15px;
+    font-family:inherit;font-size:14px;line-height:1.75;letter-spacing:.04em;cursor:pointer;}
+  .ask-prompt:active,.ask-prompt:hover{background:rgba(184,134,11,.13);border-color:var(--gold);}
+  .ask-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;}
+  .ask-primary{background:var(--gold)!important;color:#15200f!important;font-weight:600;}
+  .ask-secondary{display:inline-block;color:var(--moss-soft);border:none;background:transparent;
+    padding:11px 12px;font-family:inherit;font-size:13.5px;letter-spacing:.1em;cursor:pointer;text-decoration:underline;
+    text-underline-offset:4px;}
+  .about-signpost .ask-secondary{color:var(--rice-deep);}
+  .ask-status{min-height:1.8em;margin:14px 0 0!important;font-size:12.5px!important;line-height:1.8!important;
+    letter-spacing:.04em!important;color:var(--jade)!important;}
+  .ask-fallback{margin-top:10px;padding:12px;border:1px solid rgba(184,134,11,.25);border-radius:5px;
+    background:rgba(245,241,232,.04);text-align:left;}
+  .ask-fallback label{display:block;font-size:12px;line-height:1.7;color:var(--rice-deep);margin-bottom:7px;}
+  .study-signpost .ask-fallback label{color:var(--moss-soft);}
+  .ask-fallback textarea{width:100%;min-height:72px;resize:vertical;border:1px solid rgba(184,134,11,.3);
+    border-radius:4px;padding:9px;background:rgba(7,11,7,.7);color:var(--rice);font-family:inherit;
+    font-size:13px;line-height:1.7;}
   /* ====================================================
      E09 歷史卦例
   ==================================================== */
@@ -647,8 +667,16 @@
           <div class="sr-body" id="studyReadBody"></div>
           <div class="sr-seal" aria-hidden="true">☰ ☷</div>
           <div class="study-signpost">
-            <p>讀著讀著，心裡若浮出一件自己的事 —— 書房這頭，隨時可向天問一卦。</p>
-            <button type="button" class="sp-btn" onclick="location.href='./index.html'">🎴 向天問卦</button>
+            <p>讀到一處想再問深一點，可以先拿這篇去問老易；若心裡已有一件要緊的事，再向天問卦。</p>
+            <div class="ask-actions">
+              <button type="button" class="sp-btn ask-primary" id="studyAskLaoyi">拿這篇問老易</button>
+              <button type="button" class="ask-secondary" onclick="location.href='./index.html'">向天問卦</button>
+            </div>
+            <p class="ask-status" id="studyAskStatus" role="status" aria-live="polite"></p>
+            <div class="ask-fallback" id="studyAskFallback" hidden>
+              <label for="studyAskFallbackText">若目前不在 LINE 內，請複製這句，回到命格易經的對話貼上：</label>
+              <textarea id="studyAskFallbackText" readonly></textarea>
+            </div>
           </div>
         </div>
       </div>
@@ -672,11 +700,12 @@
     </div>
   </div>
 
-  <!-- P-ABOUT 格5 老易介紹 (E14 · 靜態 · action=about) -->
+  <!-- P-ASK 格5 問老易 (005A · action=ask；保留 action=about 相容入口) -->
   <div class="liff-page" id="page-about">
     <div class="lp-header">
       <div class="lp-icon">👤</div>
-      <h1>老易</h1>
+      <h1>問老易</h1>
+      <div class="lp-sub">不必問卦，也能來聊《易經》的學問。</div>
     </div>
     <div class="lp-body">
       <div class="about-portrait" aria-hidden="true"></div><!-- T6:頁首老易形象 image-slot 留白框(米白紙感·無人像);raster 待 Design 另輪換皮補 -->
@@ -684,10 +713,25 @@
       <p>他不是算命的，也不替您決定什麼——他是替您把卦讀清楚的人。</p>
       <p>您向天問了一卦，卦象天成；老易做的，是把這一卦的本卦、變卦、動爻，一樣樣為您讀出來，看清這件事此刻的形勢、往哪裡轉。</p>
       <div class="lp-quote">「善為易者不占。」<br>真正懂易的人，不求一個算定的答案，是看懂當下形勢、自己拿主意。</div>
-      <p>老易在這裡，陪您把要緊的決定，看得更清楚一點。</p>
-      <div class="about-signpost"><!-- T6:尾部路標 -->
-        <p>老易在書房這頭。要緊的事,向天問一卦,他為您讀。</p>
-        <button type="button" class="sp-btn" onclick="location.href='./index.html'">🎴 向天問卦</button>
+      <p>不必先有一卦。讀不懂一句、想知道一個觀念，或只是想把剛讀完的文章再問深一點，都可以來坐坐。</p>
+      <div class="ask-prompts" aria-label="可以問老易的方向">
+        <button type="button" class="ask-prompt" data-ask-laoyi="我沒讀過古文，也能讀《易經》嗎？">我沒讀過古文，也能讀《易經》嗎？</button>
+        <button type="button" class="ask-prompt" data-ask-laoyi="卦辭有吉有凶，該怎麼讀才不把它當成判決？">卦辭有吉有凶，該怎麼讀才不把它當成判決？</button>
+        <button type="button" class="ask-prompt" data-ask-laoyi="做事的人，可以怎麼學《易經》？">做事的人，可以怎麼學《易經》？</button>
+        <button type="button" class="ask-prompt" data-ask-laoyi="我剛讀完一篇書房文章，想再問深一點。">我剛讀完一篇書房文章，想再問深一點。</button>
+      </div>
+      <div class="about-signpost"><!-- 005A:免費優先；向天問卦為次要路標 -->
+        <p>選一題，或先跟老易打聲招呼。這條路不使用問卦銅錢。</p>
+        <div class="ask-actions">
+          <button type="button" class="sp-btn ask-primary" id="askLaoyiStart">開始問老易</button>
+          <button type="button" class="ask-secondary" onclick="location.href='./index.html?action=study'">回易經書房</button>
+          <button type="button" class="ask-secondary" onclick="location.href='./index.html'">向天問卦</button>
+        </div>
+        <p class="ask-status" id="askLaoyiStatus" role="status" aria-live="polite"></p>
+        <div class="ask-fallback" id="askLaoyiFallback" hidden>
+          <label for="askLaoyiFallbackText">若目前不在 LINE 內，請複製這句，回到命格易經的對話貼上：</label>
+          <textarea id="askLaoyiFallbackText" readonly></textarea>
+        </div>
       </div>
     </div>
   </div>
@@ -797,6 +841,13 @@ function studyRenderRead(gidx,from){
     if(line===''){ return; } /* 空行=段落界,由 p 間距承;內文字元零改 */
     body.appendChild(studyParagraph(line));
   });
+  var ask=document.getElementById('studyAskLaoyi');
+  if(ask){
+    ask.onclick=function(){
+      sendAskLaoyiIntent('問老易\n我剛讀完〈'+(a.title||'這篇文章')+'〉，想再問深一點。','studyAskStatus','studyAskFallback','studyAskFallbackText');
+    };
+  }
+  resetAskLaoyiFeedback('studyAskStatus','studyAskFallback','studyAskFallbackText');
 }
 
 /* 導覽狀態機:單次 fetch 快取,層間不重抓;pushState/popstate + 邊界 guard(R1-#5) */
@@ -845,6 +896,63 @@ async function initStudyPage(){
     studyFail('書房暫時無法開門，請稍後再試。');
     console.warn('[study page]',e);
   }
+}
+
+/* ===== 005A 問老易：只送回 LINE 對話，不經問卦 Worker / quota POST ===== */
+function resetAskLaoyiFeedback(statusId,fallbackId,textId){
+  var status=document.getElementById(statusId); if(status){ status.textContent=''; }
+  var fallback=document.getElementById(fallbackId); if(fallback){ fallback.hidden=true; }
+  var text=document.getElementById(textId); if(text){ text.value=''; }
+}
+
+function showAskLaoyiFallback(message,statusId,fallbackId,textId){
+  var status=document.getElementById(statusId);
+  var fallback=document.getElementById(fallbackId);
+  var text=document.getElementById(textId);
+  if(text){ text.value=message; }
+  if(fallback){ fallback.hidden=false; }
+  if(status){ status.textContent='目前無法直接送回 LINE；文字已備好，請複製後貼到對話。'; }
+  if(text){ try{ text.focus(); text.select(); }catch(e){} }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(message).then(function(){
+      if(status){ status.textContent='已複製，回到命格易經的 LINE 對話貼上即可。'; }
+    }).catch(function(){});
+  }
+}
+
+async function sendAskLaoyiIntent(message,statusId,fallbackId,textId){
+  var status=document.getElementById(statusId);
+  resetAskLaoyiFeedback(statusId,fallbackId,textId);
+  if(status){ status.textContent='正在帶回 LINE 對話……'; }
+  try{
+    if(typeof liff==='undefined'){ throw new Error('LIFF unavailable'); }
+    await liff.init({liffId:LIFF_ID});
+    if(!liff.isInClient || !liff.isInClient()){ throw new Error('not in LINE client'); }
+    if(!liff.isLoggedIn || !liff.isLoggedIn()){ throw new Error('not logged in'); }
+    if(typeof liff.sendMessages!=='function'){ throw new Error('sendMessages unavailable'); }
+    await liff.sendMessages([{type:'text',text:message}]);
+    if(status){ status.textContent='已送到 LINE 對話，老易會在那裡接著聊。'; }
+    if(typeof liff.closeWindow==='function'){
+      setTimeout(function(){ try{ liff.closeWindow(); }catch(e){} },700);
+    }
+  }catch(e){
+    showAskLaoyiFallback(message,statusId,fallbackId,textId);
+    console.warn('[ask laoyi fallback]',e && e.message ? e.message : e);
+  }
+}
+
+function initAskLaoyiPage(){
+  var start=document.getElementById('askLaoyiStart');
+  if(start){
+    start.addEventListener('click',function(){
+      sendAskLaoyiIntent('問老易','askLaoyiStatus','askLaoyiFallback','askLaoyiFallbackText');
+    });
+  }
+  document.querySelectorAll('[data-ask-laoyi]').forEach(function(button){
+    button.addEventListener('click',function(){
+      sendAskLaoyiIntent(button.getAttribute('data-ask-laoyi'),'askLaoyiStatus','askLaoyiFallback','askLaoyiFallbackText');
+    });
+  });
 }
 
 window.addEventListener('popstate',function(e){
@@ -1047,10 +1155,10 @@ async function initLogPage(){
   }
 }
 
-/* ===== LIFF 子頁面路由 (E14/E09/E13/E12) ===== */
+/* ===== LIFF 子頁面路由 (005A/E14/E09/E13/E12) ===== */
 (function(){
   var action = new URLSearchParams(window.location.search).get('action') || 'divine';
-  var pageMap = {about:'page-about', log:'page-log', study:'page-study', pay:'page-pay'};
+  var pageMap = {ask:'page-about', about:'page-about', log:'page-log', study:'page-study', pay:'page-pay'};
   var pageId = pageMap[action];
   if(!pageId) return;
   document.addEventListener('DOMContentLoaded', function(){
@@ -1060,6 +1168,7 @@ async function initLogPage(){
     if(action==='log'){ initLogPage(); }
     if(action==='pay'){ initPayPage(); }
     if(action==='study'){ initStudyPage(); }
+    if(action==='ask' || action==='about'){ initAskLaoyiPage(); }
   });
 })();
 
@@ -1731,8 +1840,8 @@ async function enterWithConsent(){
 }
 
 /* 頁面載入即初始化 LIFF(DEV 模式自動略過,不影響瀏覽器測試)
-   ★ S137-R03:action≠divine 時(log/study/pay/about 子頁)不呼叫 —— 這些子頁各自的
-   initLogPage()/initStudyPage()/initPayPage() 已自帶各自的 liff.init()。若這裡仍無條件
+   ★ S137-R03:action≠divine 時(log/study/pay/ask/about 子頁)不呼叫 —— 需要 LIFF 的子頁
+   由各自 init 或點擊時 lazy-init。若這裡仍無條件
    呼叫,會跟子頁的 liff.init() 同頁面雙重初始化搶跑,LIFF SDK 不支援重複初始化,
    第二個呼叫會卡死(不 resolve 也不 reject)——這正是 E09「驗證身分中」卡住不動的根因。 */
 var __bootAction = new URLSearchParams(window.location.search).get('action') || 'divine';
