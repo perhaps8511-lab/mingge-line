@@ -844,7 +844,7 @@ function studyRenderRead(gidx,from){
   var ask=document.getElementById('studyAskLaoyi');
   if(ask){
     ask.onclick=function(){
-      sendAskLaoyiIntent('問老易\n我剛讀完〈'+(a.title||'這篇文章')+'〉，想再問深一點。','studyAskStatus','studyAskFallback','studyAskFallbackText');
+      sendAskLaoyiIntent(buildStudyAskLaoyiMessage(a),'studyAskStatus','studyAskFallback','studyAskFallbackText');
     };
   }
   resetAskLaoyiFeedback('studyAskStatus','studyAskFallback','studyAskFallbackText');
@@ -898,24 +898,65 @@ async function initStudyPage(){
   }
 }
 
-/* ===== 005A 問老易：只送回 LINE 對話，不經問卦 Worker / quota POST ===== */
+/* ===== 005B 問老易：只送回 LINE 對話，不經問卦 Worker / quota POST ===== */
+function buildStudyAskLaoyiMessage(article){
+  var raw=(article&&typeof article.title==='string')?article.title:'這篇文章';
+  var title=raw.replace(/\s+/g,' ').trim()||'這篇文章';
+  if(title.length>80){ title=title.slice(0,80); }
+  return '我剛讀完易經書房的〈'+title+'〉，想請老易再講深一點：這篇對我現在做事有什麼提醒？';
+}
+
 function resetAskLaoyiFeedback(statusId,fallbackId,textId){
-  var status=document.getElementById(statusId); if(status){ status.textContent=''; }
+  var status=document.getElementById(statusId);
+  if(status){
+    status.textContent='';
+    if(status.dataset){ delete status.dataset.askError; }
+  }
   var fallback=document.getElementById(fallbackId); if(fallback){ fallback.hidden=true; }
   var text=document.getElementById(textId); if(text){ text.value=''; }
+}
+
+function askLaoyiTaggedError(code,message){
+  var err=new Error(message||code);
+  err.askCode=code;
+  return err;
+}
+
+function askLaoyiFailureCode(error){
+  if(error&&error.askCode){ return error.askCode; }
+  if(error&&(error.code===403||String(error.code)==='403')){ return 'send-403'; }
+  return 'send-failed';
+}
+
+function askLaoyiFallbackStatus(code){
+  if(code==='not-liff-chat'){
+    return '這次不是從 LINE 聊天室的服務入口開啟；文字已備好。';
+  }
+  if(code==='chat-message-unavailable'){
+    return '這個入口尚未開啟 LINE 傳訊權限；文字已備好。';
+  }
+  if(code==='chat-message-prompt'||code==='send-403'){
+    return 'LINE 尚未允許這個入口代您送出；文字已備好。';
+  }
+  return '目前無法直接送回 LINE；文字已備好。';
 }
 
 function showAskLaoyiFallback(message,statusId,fallbackId,textId){
   var status=document.getElementById(statusId);
   var fallback=document.getElementById(fallbackId);
   var text=document.getElementById(textId);
+  var code=(status&&status.dataset&&status.dataset.askError)||'send-failed';
+  var base=askLaoyiFallbackStatus(code);
   if(text){ text.value=message; }
   if(fallback){ fallback.hidden=false; }
-  if(status){ status.textContent='目前無法直接送回 LINE；文字已備好，請複製後貼到對話。'; }
+  if(status){
+    status.textContent=base+' 請回命格易經的對話貼上。';
+    if(status.dataset){ status.dataset.askError=code; }
+  }
   if(text){ try{ text.focus(); text.select(); }catch(e){} }
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(message).then(function(){
-      if(status){ status.textContent='已複製，回到命格易經的 LINE 對話貼上即可。'; }
+      if(status){ status.textContent=base+' 已複製，回到命格易經的 LINE 對話貼上即可。'; }
     }).catch(function(){});
   }
 }
@@ -927,15 +968,38 @@ async function sendAskLaoyiIntent(message,statusId,fallbackId,textId){
   try{
     if(typeof liff==='undefined'){ throw new Error('LIFF unavailable'); }
     await liff.init({liffId:LIFF_ID});
-    if(!liff.isInClient || !liff.isInClient()){ throw new Error('not in LINE client'); }
-    if(!liff.isLoggedIn || !liff.isLoggedIn()){ throw new Error('not logged in'); }
-    if(typeof liff.sendMessages!=='function'){ throw new Error('sendMessages unavailable'); }
+    if(!liff.isInClient || !liff.isInClient()){
+      throw askLaoyiTaggedError('not-liff-chat','not in LIFF chat');
+    }
+    if(!liff.isLoggedIn || !liff.isLoggedIn()){
+      throw askLaoyiTaggedError('not-liff-chat','not logged in');
+    }
+    var context=(typeof liff.getContext==='function')?(liff.getContext()||{}):{};
+    if(context.type==='external'){
+      throw askLaoyiTaggedError('not-liff-chat','external context');
+    }
+    if(liff.permission&&typeof liff.permission.query==='function'){
+      var permission=await liff.permission.query('chat_message.write');
+      var state=permission&&permission.state;
+      if(state!=='granted'){
+        throw askLaoyiTaggedError(state==='prompt'?'chat-message-prompt':'chat-message-unavailable','chat_message.write '+(state||'unknown'));
+      }
+    }else if(Array.isArray(context.scope)&&context.scope.indexOf('chat_message.write')<0){
+      throw askLaoyiTaggedError('chat-message-unavailable','chat_message.write missing');
+    }
+    if(typeof liff.sendMessages!=='function'){
+      throw askLaoyiTaggedError('chat-message-unavailable','sendMessages unavailable');
+    }
     await liff.sendMessages([{type:'text',text:message}]);
-    if(status){ status.textContent='已送到 LINE 對話，老易會在那裡接著聊。'; }
+    if(status){
+      status.textContent='已送到 LINE 對話，老易會在那裡接著聊。';
+      if(status.dataset){ status.dataset.askError='sent'; }
+    }
     if(typeof liff.closeWindow==='function'){
       setTimeout(function(){ try{ liff.closeWindow(); }catch(e){} },700);
     }
   }catch(e){
+    if(status&&status.dataset){ status.dataset.askError=askLaoyiFailureCode(e); }
     showAskLaoyiFallback(message,statusId,fallbackId,textId);
     console.warn('[ask laoyi fallback]',e && e.message ? e.message : e);
   }

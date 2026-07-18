@@ -1,0 +1,59 @@
+{
+  "size": {
+    "width": 2500,
+    "height": 1686
+  },
+  "selected": true,
+  "name": "MINGGE-SHOWCASE-005B-sealed-candidate",
+  "chatBarText": "書房常開，向天問卦",
+  "areas": [
+    {
+      "bounds": { "x": 0, "y": 0, "width": 834, "height": 843 },
+      "action": {
+        "type": "uri",
+        "label": "向天問卦",
+        "uri": "https://liff.line.me/2010192384-9AwjI8qH/"
+      }
+    },
+    {
+      "bounds": { "x": 834, "y": 0, "width": 833, "height": 843 },
+      "action": {
+        "type": "uri",
+        "label": "我的卦記",
+        "uri": "https://liff.line.me/2010192384-9AwjI8qH/?action=log"
+      }
+    },
+    {
+      "bounds": { "x": 1667, "y": 0, "width": 833, "height": 843 },
+      "action": {
+        "type": "uri",
+        "label": "訂閱方案",
+        "uri": "https://liff.line.me/2010192384-9AwjI8qH/?action=pay"
+      }
+    },
+    {
+      "bounds": { "x": 0, "y": 843, "width": 834, "height": 843 },
+      "action": {
+        "type": "uri",
+        "label": "易經書房",
+        "uri": "https://liff.line.me/2010192384-9AwjI8qH/?action=study"
+      }
+    },
+    {
+      "bounds": { "x": 834, "y": 843, "width": 833, "height": 843 },
+      "action": {
+        "type": "message",
+        "label": "問老易",
+        "text": "問老易"
+      }
+    },
+    {
+      "bounds": { "x": 1667, "y": 843, "width": 833, "height": 843 },
+      "action": {
+        "type": "message",
+        "label": "書僮客服",
+        "text": "書僮客服"
+      }
+    }
+  ]
+}
