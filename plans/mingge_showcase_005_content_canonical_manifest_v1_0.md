@@ -39,6 +39,18 @@
 正式驗收與 exact hashes：`plans/review_logs/mingge_showcase_005_claude_content_qa_return_v1_0.md`。
 最小差分卡：`plans/dispatch/mingge_showcase_005_claude_content_qa_delta_v1_0.md`。
 
+### 2.2 Content QA v1.2 最終裁定（2026-07-18）
+
+| 正式資產 | 狀態 | SHA-256／處置 |
+|---|---|---|
+| `sample_A_kb2_31_reception_revised_v1_2.md` | `CANDIDATE-QA-ACCEPTED` | `2aae7ee056212244fc473821dddfd0ef42ddea8b2814e4b14cdf9967c40b698e`；唯一 Sample A 候選 |
+| `sample_B_shufang_rumen_revised_v1_0.md` | `CANDIDATE-QA-ACCEPTED` | 沿用第一組已接受版本；第二組替代稿不採 |
+| `sample_C_dg20_pi_revised_v1_0.md` | `CANDIDATE-QA-ACCEPTED` | 沿用第一組已接受版本；第二組替代稿不採 |
+| `claude_batch_revision_rules_v1_2.md` | `SUPPORTING-SPEC-ACCEPTED` | `8434efe7585b1a42adcb2fdaacea7a3478cb3677fae86a726a41cbf47db09ecc` |
+| `qa_report_mingge_showcase_005_samples_v1_2.md` | `SUPPORTING-EVIDENCE-ACCEPTED` | `dab087cd0593a924e1efdca0bd18ddd7a8201d5c394df309d9e2ba30337610f5`；兩項歷史措辭依 acceptance receipt 降為 non-authoritative |
+
+上述三份 v1.2 正本位於 `plans/returns/mingge_showcase_005/`；正式裁定見 `plans/review_logs/mingge_showcase_005_claude_content_qa_v1_2_acceptance.md`。所有 Sample A v1.0／v1.1 回件均 `SUPERSEDED`，不得 ingestion。
+
 ## 3. 明確新舊關係
 
 | 舊檔 | 狀態 | 取代／用途 |
