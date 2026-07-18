@@ -110,10 +110,11 @@ else
   echo "[FAIL] V1 條件矩陣未全過(FAIL=$NODE_FAIL PASS=$NODE_PASS)"; ((FAIL++))
 fi
 
-# V1 結構斷言:entryGiftEntry 落在 id="s1" 與 <div class="mark"> 之間
-S1_BLOCK=$(awk '/id="s1"/{flag=1} flag{print} /class="mark"/{if(flag)exit}' "$IDX")
-if echo "$S1_BLOCK" | grep -q 'entryGiftEntry' && echo "$S1_BLOCK" | grep -q 'class="mark"'; then
-  echo "[PASS] V1 結構斷言:entryGiftEntry 落在 s1 內、mark 之前"; ((PASS++))
+# V1 結構斷言:E40 後續修正已把 entryGiftEntry 移至進場 s0；不得退回 s1
+S0_BLOCK=$(awk '/id="s0"/{flag=1} flag{print} /id="s1"/{if(flag)exit}' "$IDX")
+S1_BLOCK=$(awk '/id="s1"/{flag=1} flag{print} /id="s2"/{if(flag)exit}' "$IDX")
+if echo "$S0_BLOCK" | grep -q 'entryGiftEntry' && ! echo "$S1_BLOCK" | grep -q 'entryGiftEntry'; then
+  echo "[PASS] V1 結構斷言:entryGiftEntry 落在 s0，且未退回 s1"; ((PASS++))
 else
   echo "[FAIL] V1 結構斷言:entryGiftEntry 未落在預期位置"; ((FAIL++))
 fi
