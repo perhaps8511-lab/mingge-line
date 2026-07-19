@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.6.0</title>
+<title>命格 · 進場儀式 v1.6.1</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -737,7 +737,7 @@
     </div>
   </div>
 
-      <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.6.0(E48/E52 書房分享卡+讀卦隨筆)</div>
+      <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.6.1(E55 拿這篇問老易直送對話)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -844,9 +844,7 @@ function studyRenderRead(gidx,from){
   });
   var ask=document.getElementById('studyAskLaoyi');
   if(ask){
-    ask.onclick=function(){
-      sendAskLaoyiIntent('問老易\n我剛讀完〈'+(a.title||'這篇文章')+'〉，想再問深一點。','studyAskStatus','studyAskFallback','studyAskFallbackText');
-    };
+    ask.onclick=function(){ studySendAskLaoyi(gidx,ask); };
   }
   var shareBtn=document.getElementById('studyShareBtn');
   if(shareBtn){ shareBtn.onclick=function(){ studyShareArticle(gidx,shareBtn); }; }
@@ -870,7 +868,21 @@ function studyBuildShareText(a){
   lines.push(OA_ADD_FRIEND_URL+'?src=share');
   return lines.join('\n');
 }
-/* LIFF 優先(liffReady 旗標防護,同既有 recoverLiffToken 慣例,防 E09 同頁雙重初始化搶跑)
+/* E55:liff.init() 共享 promise cache(取代原本各自獨立的 liffReady 布林檢查)。
+   S167 中樞核准邊界修訂:studyShareArticle(E48)僅此一行改採此函式取得 init,
+   payload/文案/?src=share 邏輯零改。修法:同頁兩鈕(分享這一篇/拿這篇問老易)
+   共享同一個 in-flight promise,消除 liffReady 布林 check-then-act 競態
+   (獨立審查發現:純布林旗標無法真正防住 E09 同頁雙重初始化搶跑,只縮小視窗)。
+   失敗後清快取,容許下一次非併發點擊重試(非永久卡死)。 */
+var liffInitPromise=null;
+function ensureLiffInit(){
+  if(!liffInitPromise){
+    liffInitPromise=liff.init({liffId:LIFF_ID}).then(function(){ liffReady=true; })
+      .catch(function(e){ liffInitPromise=null; throw e; });
+  }
+  return liffInitPromise;
+}
+/* LIFF 優先(init 取得共享 ensureLiffInit,防 E09 同頁雙重初始化搶跑)
    fallback = location.href(同步賦值不拋錯,同既有跨頁導覽慣例;不用 window.open,
    避免 await 之後脫離使用者手勢鏈被行動瀏覽器靜默擋下卻不拋錯) */
 async function studyShareArticle(gidx,btnEl){
@@ -879,13 +891,42 @@ async function studyShareArticle(gidx,btnEl){
   if(btnEl){ btnEl.disabled=true; }
   try{
     if(typeof liff==='undefined'){ throw new Error('LIFF unavailable'); }
-    if(!liffReady){ await liff.init({liffId:LIFF_ID}); liffReady=true; }
+    await ensureLiffInit();
     if(!(liff.isInClient && liff.isInClient())){ throw new Error('not in LINE client'); }
     if(!(liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker'))){ throw new Error('shareTargetPicker unavailable'); }
     await liff.shareTargetPicker([{type:'text',text:text}]);
   }catch(e){
     location.href='https://line.me/R/share?text='+encodeURIComponent(text);
     console.warn('[study share fallback]',e && e.message?e.message:e);
+  }finally{
+    if(btnEl){ btnEl.disabled=false; }
+  }
+}
+
+/* E55:書房「拿這篇問老易」直送對話。定稿句沿用現行(零改字);
+   成功提示句為本卡唯一新增合法字面。init 取得走共享 ensureLiffInit()(同上)。
+   失敗 → 走現行 showAskLaoyiFallback,一字不動(零回歸)。 */
+async function studySendAskLaoyi(gidx,btnEl){
+  var a=studyState.articles[gidx]; if(!a){ return; }
+  var message='問老易\n我剛讀完〈'+(a.title||'這篇文章')+'〉，想再問深一點。';
+  var statusId='studyAskStatus', fallbackId='studyAskFallback', textId='studyAskFallbackText';
+  resetAskLaoyiFeedback(statusId,fallbackId,textId);
+  if(btnEl){ btnEl.disabled=true; }
+  try{
+    if(typeof liff==='undefined'){ throw new Error('LIFF unavailable'); }
+    await ensureLiffInit();
+    if(!(liff.isInClient && liff.isInClient())){ throw new Error('not in LINE client'); }
+    if(!(liff.isLoggedIn && liff.isLoggedIn())){ throw new Error('not logged in'); }
+    if(typeof liff.sendMessages!=='function'){ throw new Error('sendMessages unavailable'); }
+    await liff.sendMessages([{type:'text',text:message}]);
+    var status=document.getElementById(statusId);
+    if(status){ status.textContent='已送進對話。回到聊天室,老易接著說。'; }
+    setTimeout(function(){
+      if(typeof liff.closeWindow==='function'){ try{ liff.closeWindow(); }catch(e){} }
+    },1500);
+  }catch(e){
+    showAskLaoyiFallback(message,statusId,fallbackId,textId);
+    console.warn('[study ask laoyi fallback]',e && e.message?e.message:e);
   }finally{
     if(btnEl){ btnEl.disabled=false; }
   }
