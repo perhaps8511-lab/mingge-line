@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>命格 · 進場儀式 v1.5.1</title>
+<title>命格 · 進場儀式 v1.6.0</title>
 <style>
   :root{
     --moss:#2C3E2D; --moss-2:#22351f; --moss-soft:#3d5240;
@@ -671,6 +671,7 @@
             <div class="ask-actions">
               <button type="button" class="sp-btn ask-primary" id="studyAskLaoyi">拿這篇問老易</button>
               <button type="button" class="ask-secondary" onclick="location.href='./index.html'">向天問卦</button>
+              <button type="button" class="ask-secondary" id="studyShareBtn">分享這一篇</button>
             </div>
             <p class="ask-status" id="studyAskStatus" role="status" aria-live="polite"></p>
             <div class="ask-fallback" id="studyAskFallback" hidden>
@@ -736,13 +737,13 @@
     </div>
   </div>
 
-      <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.5.1(E30/E46 書房的來法五卡)</div>
+      <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.6.0(E48/E52 書房分享卡+讀卦隨筆)</div>
 
 <!-- LINE LIFF SDK(S37 啟用真實串接時生效;DEV 模式下不呼叫,僅載入無害) -->
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
 /* ===== E42 易經書房呈現層(三層:門面→列表→閱讀)· 卡B ===== */
-var STUDY_CATS=['節氣信','人際小文','時節問候']; /* 分類籤 closed-set 白名單+序(空籤零出 ②) */
+var STUDY_CATS=['節氣信','人際小文','時節問候','讀卦隨筆']; /* 分類籤 closed-set 白名單+序(空籤零出 ②);E52 新增第四分類(dg 讀卦隨筆) */
 var STUDY_MARK='(?:大象傳|大象說|大象|彖傳|彖曰|象傳|象曰|卦辭|爻辭|卦說|初九|九二|九三|九四|九五|上九|初六|六二|六三|六四|六五|上六|用九|用六)';
 var STUDY_QUOTE_RE=new RegExp(STUDY_MARK+'[^「『」』]{0,6}?(「[^」]+」|『[^』]+』)');
 var studyState={loaded:false,articles:[],byCat:{},featured:[]};
@@ -847,7 +848,47 @@ function studyRenderRead(gidx,from){
       sendAskLaoyiIntent('問老易\n我剛讀完〈'+(a.title||'這篇文章')+'〉，想再問深一點。','studyAskStatus','studyAskFallback','studyAskFallbackText');
     };
   }
+  var shareBtn=document.getElementById('studyShareBtn');
+  if(shareBtn){ shareBtn.onclick=function(){ studyShareArticle(gidx,shareBtn); }; }
   resetAskLaoyiFeedback('studyAskStatus','studyAskFallback','studyAskFallbackText');
+}
+
+/* ===== E48 書房分享卡:引文抽取(重用 STUDY_QUOTE_RE)+ 文案組字(逐字模板,禁改寫)===== */
+function studyShareQuote(body){
+  var lines=(body||'').split('\n');
+  for(var i=0;i<lines.length;i++){
+    var m=lines[i].match(STUDY_QUOTE_RE);
+    if(m){ return m[1]; }
+  }
+  return '';
+}
+function studyBuildShareText(a){
+  var lines=['【易經書房】'+(a.title||''),''];
+  var quote=studyShareQuote(a.body);
+  if(quote){ lines.push(quote); lines.push(''); }
+  lines.push('—— 易經書房 · 命格');
+  lines.push(OA_ADD_FRIEND_URL+'?src=share');
+  return lines.join('\n');
+}
+/* LIFF 優先(liffReady 旗標防護,同既有 recoverLiffToken 慣例,防 E09 同頁雙重初始化搶跑)
+   fallback = location.href(同步賦值不拋錯,同既有跨頁導覽慣例;不用 window.open,
+   避免 await 之後脫離使用者手勢鏈被行動瀏覽器靜默擋下卻不拋錯) */
+async function studyShareArticle(gidx,btnEl){
+  var a=studyState.articles[gidx]; if(!a){ return; }
+  var text=studyBuildShareText(a);
+  if(btnEl){ btnEl.disabled=true; }
+  try{
+    if(typeof liff==='undefined'){ throw new Error('LIFF unavailable'); }
+    if(!liffReady){ await liff.init({liffId:LIFF_ID}); liffReady=true; }
+    if(!(liff.isInClient && liff.isInClient())){ throw new Error('not in LINE client'); }
+    if(!(liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker'))){ throw new Error('shareTargetPicker unavailable'); }
+    await liff.shareTargetPicker([{type:'text',text:text}]);
+  }catch(e){
+    location.href='https://line.me/R/share?text='+encodeURIComponent(text);
+    console.warn('[study share fallback]',e && e.message?e.message:e);
+  }finally{
+    if(btnEl){ btnEl.disabled=false; }
+  }
 }
 
 /* 導覽狀態機:單次 fetch 快取,層間不重抓;pushState/popstate + 邊界 guard(R1-#5) */
@@ -1423,6 +1464,7 @@ function applyDebugVisibility(){ var d=document.querySelector('.devjson'); if(d)
    前端只知道轉發層,永遠看不到真實 Make webhook(藏在 Worker 的 Secret)。
    前端不持有任何固定密語;認證靠 LINE 簽發的 ID Token(每次即時拿、會過期、不可偽造)。 */
 const RELAY_URL = "https://mingge-relay.perhaps8511.workers.dev/";
+const OA_ADD_FRIEND_URL = "https://lin.ee/pWlYLBe";  // E48 書房分享卡 · OA 加好友短鏈(Perth 2026-07-19 提供)
 
 /* ★ v1.2.3:卦記會話編號(D3 卦記 schema 唯一缺口補件)
    ──────────────────────────────────────────────
