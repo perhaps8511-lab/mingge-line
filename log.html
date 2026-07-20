@@ -342,7 +342,7 @@ async function handleDeepdiveClick(logId, token) {
   if (btn.dataset.mode === "purchase") {
     if (statusEl) statusEl.textContent = "深讀之門設在書房，這就帶你過去。";
     btn.disabled = true;
-    setTimeout(() => { window.location.href = "./index.html?action=pay"; }, 1200);
+    setTimeout(() => { window.location.href = "./index.html?action=pay&src=deepdive"; }, 1200);
     return;
   }
 

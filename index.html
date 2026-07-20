@@ -616,7 +616,7 @@
         <p class="pl-copy"><strong>囊中銅錢|399</strong> — 三枚一包,收在囊中,不催著用。要緊的事不挑日子來;哪天心裡又起了一問,囊中有錢,隨時進門。一枚一問,枚枚都是完整的一卦。</p>
         <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
       </div>
-      <div class="pay-plan">
+      <div class="pay-plan" id="planDeepdive200">
         <p class="pl-copy">〔讀完若想再往深處走〕同一卦,可再請老易多開幾面 —— <strong>四鏡·深卜 200</strong>,看互卦、序卦、變與不變裡的「轉」。不換卦、不重卜,只把這一卦讀到透。</p>
         <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
       </div>
@@ -1056,6 +1056,10 @@ async function initPayPage(){
   var _payCtxMap={zero:'囊中銅錢用盡了。要緊的事還在,來的路都在這裡。',deepdive:'方才那一卦,若想再往深處讀——深卜的來法在這裡。',fupan:'想把走過的決定回頭看——問道·複盤的來法在這裡。'};
   var _payCtxEl=document.getElementById('payCtx');
   if(_payCtxEl&&_payCtxMap[_src]){_payCtxEl.textContent=_payCtxMap[_src];_payCtxEl.hidden=false;}
+  if(_src==='deepdive'){
+    var _deepdiveCard=document.getElementById('planDeepdive200');
+    if(_deepdiveCard){ setTimeout(function(){ _deepdiveCard.scrollIntoView({behavior:'smooth',block:'center'}); }, 60); }
+  }
   try{
     await liff.init({liffId:LIFF_ID});
     if(!liff.isLoggedIn()){return;}

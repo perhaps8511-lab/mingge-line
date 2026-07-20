@@ -1,0 +1,13 @@
+[fresh-context 複核 · 第1輪 · same-vendor(Claude) subagent · 無過程對話,只給成品 diff+spec+card]
+審查對象:git diff -- log.html index.html(uncommitted working tree)
+對照:001_spec_ge3_copy_S159_v1_0.md + 001_taskcard_soul03_paycontext_S20260720_v1_1.md
+
+a. 規則衝突:無。v1.1 明示取代 v1_0,diff 完全落在授權範圍(id 屬性+JS 邏輯,零新文案)。
+b. 弱模型誤讀風險:無發現。URL 參數拼接正確、getElementById 有防呆(if 判斷元素存在)、scroll 邏輯與 payCtx 邏輯故意分離(context 行四態皆顯示/捲動僅 deepdive)。
+c. ID/路徑/選擇器核對:id="planDeepdive200" 全檔僅2處無重複無孤兒引用;src=deepdive 字串在 log.html/index.html/_payCtxMap 三處一致;initPayPage 僅在 action=pay 分支呼叫,與 src 參數互不干擾;log.html 按鈕字/橋句零改動。
+卡C 查證:全文檢索無「即將開放」字樣/按鈕/click handler 導向書房,E29 描述之 bug 現code中不存在,無需改動,與 card 判定一致。
+
+驗收§3 六項:
+1 PASS  2 PASS  3 PASS  4 PASS  5 無法由靜態審查驗證(需瀏覽器截圖)  6 尚未執行(non-blocker,審查後續步驟)
+
+VERDICT: APPROVED
