@@ -312,15 +312,21 @@
     border-radius:2px;padding:12px 30px;font-family:inherit;font-size:14.5px;letter-spacing:.14em;cursor:pointer;transition:.45s;}
   .log-empty-card .lec-btn:hover{background:var(--gold);color:var(--paper);box-shadow:0 0 26px rgba(184,134,11,.35);}
   .log-loading{text-align:center;padding:40px 0;color:var(--jade);font-size:13px;letter-spacing:.18em;opacity:.65;}
-  /* ★ S138 格2卡片版(E09視覺升級①②;③蓋金印留痕另排E25,本輪不動) */
+  /* ★ S138 格2卡片版(E09視覺升級①②;③墨印留痕 SOUL-02 補上) */
   .log-card{
-    display:block;text-decoration:none;
+    position:relative;display:block;text-decoration:none;
     border:1px solid rgba(216,207,188,.14);border-left:3px solid var(--gold-soft);
     border-radius:10px;padding:16px 18px;margin-bottom:13px;
     background:rgba(245,241,232,.03);
     transition:background .2s ease,border-color .2s ease;
   }
   .log-card:hover,.log-card:focus{background:rgba(245,241,232,.06);border-left-color:var(--gold-lit);}
+  /* SOUL-02 W1:已落款的卦,卡角顯小墨印 */
+  .log-card .lc-traced{
+    position:absolute;top:12px;right:14px;
+    width:7px;height:7px;border-radius:50%;background:var(--jade);
+    box-shadow:0 0 0 3px rgba(139,166,140,.14);
+  }
   .log-card .lc-head{display:flex;align-items:baseline;gap:11px;margin-bottom:9px;}
   .log-card .lc-glyph{font-size:26px;line-height:1;color:var(--gold-lit);flex-shrink:0;}
   .log-card .lc-gua{font-size:14.5px;color:var(--rice);letter-spacing:.1em;}
@@ -1209,6 +1215,7 @@ async function initLogPage(){
           (r.entry_type&&r.entry_type!=='divination'?lcEsc(r.entry_type):'')
         ].filter(Boolean).join(' · ');
         var card=''
+          +(r.trace_text?'<span class="lc-traced" title="已補後續"></span>':'')
           +'<div class="lc-head">'
             +'<span class="lc-glyph">'+glyph+'</span>'
             +(guaLine?('<span class="lc-gua">'+guaLine+'</span>'):'')

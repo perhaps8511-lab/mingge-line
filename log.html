@@ -121,29 +121,51 @@
   .report-body em{color:var(--ink-soft);}
   .report-body hr{border:none;border-top:1px solid var(--line);margin:16px 0;}
 
+  /* ---- SOUL-02 D2:屏10 頂部定向句 ---- */
+  .orient-block{padding:16px 22px 4px;text-align:center;}
+  .orient-main{
+    font-family:var(--serif);font-size:17px;line-height:1.9;color:var(--ink);
+    font-weight:600;letter-spacing:.04em;
+  }
+  .orient-sub{margin-top:6px;font-size:13px;line-height:1.8;color:var(--ink-soft);letter-spacing:.02em;}
+
+  /* ---- SOUL-02 §4:落款/深卜卡欄題共用(≥17px,不同於內容 .sec-title) ---- */
+  .cta-title{font-family:var(--serif);font-size:18px;font-weight:700;color:var(--ink);letter-spacing:.04em;margin-bottom:8px;}
+
   /* ---- E27→lettertail_taskB 深卜 CTA(升級為信箋卡同視覺重量區塊,沿用既有深色 token --ink/--gold) ---- */
+  /* SOUL-02 D4:金框 offer 卡,與落款欄(紙面記事風)視覺分層 */
   .deepen-section{
     text-align:center;background:var(--ink);color:var(--paper);
-    border-radius:10px;padding:20px 18px;border-bottom:none;
+    border:2px solid var(--gold);border-radius:10px;padding:20px 18px;border-bottom:none;
   }
-  .deepen-sub{font-size:13px;color:var(--paper);opacity:.75;line-height:1.8;margin-bottom:16px;}
+  .deepen-section .cta-title{color:var(--paper);}
+  .deepen-sub{font-size:13px;color:var(--paper);opacity:.75;line-height:1.8;margin-bottom:12px;}
+  .deepen-bridge{font-size:14px;color:var(--paper);opacity:.88;line-height:1.85;margin-bottom:16px;letter-spacing:.02em;}
   .deepen-btn{
     display:block;width:100%;background:var(--gold);color:#fff;
     border:none;border-radius:8px;
-    padding:14px 20px;font-family:var(--serif);font-size:15px;letter-spacing:.1em;
+    padding:14px 20px;font-family:var(--serif);font-size:17px;letter-spacing:.1em;
     cursor:pointer;transition:.25s;font-weight:600;
   }
   .deepen-btn:hover{opacity:.85;}
   .deepen-status{font-size:12px;color:var(--paper);opacity:.7;margin-top:10px;min-height:1.4em;}
 
-  /* ---- E25:卦記蓋印(補後續)---- */
-  .stamp-btn{
-    display:block;width:100%;background:none;color:var(--gold);
-    border:1.5px solid var(--gold);border-radius:8px;
-    padding:12px 20px;font-family:var(--serif);font-size:14px;letter-spacing:.08em;
-    cursor:pointer;transition:.25s;
+  /* ---- E25:卦記蓋印(補後續)· SOUL-02 D3:落款欄=紙面記事風,單一「落款」鈕,舊化石字樣已拆除 ---- */
+  .stamp-sub{font-size:13px;color:var(--ink-soft);line-height:1.7;margin-bottom:14px;}
+  .stamp-textarea{
+    width:100%;min-height:88px;
+    border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+    font-family:var(--sans);font-size:15px;line-height:1.7;color:var(--ink);
+    background:#fff;resize:vertical;
   }
-  .stamp-btn:hover{background:rgba(201,168,76,.08);}
+  .stamp-confirm{
+    display:block;width:100%;margin-top:14px;background:var(--gold);color:#fff;
+    border:none;border-radius:8px;padding:12px 20px;
+    font-family:var(--serif);font-size:17px;letter-spacing:.1em;
+    cursor:pointer;transition:.25s;font-weight:600;
+  }
+  .stamp-confirm:hover{opacity:.85;}
+  .stamp-confirm:disabled{opacity:.5;cursor:default;}
   .stamp-success-card{
     background:var(--paper-card);border:1px solid var(--gold);border-radius:12px;
     padding:22px 20px;margin:8px 0 12px;
@@ -164,33 +186,19 @@
     border-top:1px solid var(--line);margin-top:18px;padding-top:12px;
     font-size:17px;line-height:1.6;color:var(--ink-soft);letter-spacing:.03em;
   }
-  .stamp-overlay{
-    position:fixed;inset:0;background:rgba(44,62,45,.55);
-    display:none;align-items:center;justify-content:center;z-index:50;padding:24px;
+  /* 墨印落款動畫(輕、一次) */
+  @keyframes stampSealIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+  .stamp-just-sealed .stamp-success-card{animation:stampSealIn .5s ease;}
+
+  /* ---- SOUL-02 D5:屏10 最尾回程門 ---- */
+  .return-section{text-align:center;border-bottom:none;padding-top:8px;}
+  .return-btn{
+    display:inline-block;background:none;color:var(--ink);
+    border:1px solid var(--line);border-radius:20px;
+    padding:10px 28px;font-family:var(--serif);font-size:17px;letter-spacing:.12em;
+    text-decoration:none;cursor:pointer;transition:.25s;
   }
-  .stamp-overlay.open{display:flex;}
-  .stamp-sheet{
-    background:var(--paper-card);border-radius:14px;padding:22px 20px;
-    width:100%;max-width:340px;box-shadow:0 10px 40px rgba(0,0,0,.25);
-  }
-  .stamp-sheet .stamp-close{
-    float:right;background:none;border:none;color:var(--ink-soft);
-    font-size:18px;line-height:1;cursor:pointer;padding:0 0 8px 8px;
-  }
-  .stamp-sheet textarea{
-    width:100%;min-height:88px;margin-top:6px;
-    border:1px solid var(--line);border-radius:8px;padding:10px 12px;
-    font-family:var(--sans);font-size:15px;line-height:1.7;color:var(--ink);
-    background:#fff;resize:vertical;
-  }
-  .stamp-sheet .stamp-confirm{
-    display:block;width:100%;margin-top:14px;background:var(--gold);color:#fff;
-    border:none;border-radius:8px;padding:12px 20px;
-    font-family:var(--serif);font-size:15px;letter-spacing:.1em;
-    cursor:pointer;transition:.25s;font-weight:600;
-  }
-  .stamp-sheet .stamp-confirm:hover{opacity:.85;}
-  .stamp-sheet .stamp-confirm:disabled{opacity:.5;cursor:default;}
+  .return-btn:hover{background:var(--paper-card);border-color:var(--ink-soft);}
 </style>
 </head>
 <body>
@@ -214,15 +222,6 @@
 
 <!-- 詳情 -->
 <div class="detail-wrap" id="viewDetail"></div>
-
-<!-- E25:蓋印彈窗 -->
-<div class="stamp-overlay" id="stampOverlay">
-  <div class="stamp-sheet">
-    <button class="stamp-close" id="stampClose" type="button" aria-label="close">×</button>
-    <textarea id="stampTextarea" placeholder="當時所問的事,後來往哪邊走了 —— 一兩句即可。" maxlength="500" required></textarea>
-    <button class="stamp-confirm" id="stampConfirmBtn" type="button">蓋下金印</button>
-  </div>
-</div>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
@@ -327,8 +326,9 @@ function buildDeepdiveCtaHtml(tierInfo) {
   const btnLabel = "四鏡·深卜 200";
   return `
     <div class="section deepen-section">
-      <div class="sec-title">往裡再讀四面？</div>
+      <div class="cta-title">往裡再讀四面？</div>
       <div class="deepen-sub">同一卦，不重卜、不換卦——互、綜、錯、序，四鏡合看。</div>
+      <div class="deepen-bridge">方才那封信，是這一卦的正面。四鏡，是同一卦的另外四面——加讀 200，連同先前的問一卦，這一卦最多 349，不再多收。</div>
       <button class="deepen-btn" id="deepdiveBtn" type="button" data-mode="${isSubscriber ? "trigger" : "purchase"}">${btnLabel}</button>
       <div class="deepen-status" id="deepdiveStatus"></div>
     </div>`;
@@ -377,8 +377,7 @@ async function handleDeepdiveClick(logId, token) {
   btn.textContent = originalLabel;
 }
 
-/* ===== E25:卦記蓋印(補後續)===== */
-let stampState = { logId: null, token: null };
+/* ===== E25:卦記蓋印(補後續)· SOUL-02 D3:落款正名,單一鈕「落款」,舊化石字樣已拆除 ===== */
 
 function formatTraceAt(traceAt) {
   if (!traceAt) return "";
@@ -401,8 +400,8 @@ function buildStampBadgeHtml(traceText, traceAt) {
     : "";
   return `
     <div class="stamp-success-card">
-      <div class="stamp-badge"><span class="dot"></span>金印 · 已補後續</div>
-      <div class="stamp-toast">已蓋印。這一卦,有了後續。</div>
+      <div class="stamp-badge"><span class="dot"></span>墨印 · 已補後續</div>
+      <div class="stamp-toast">記下了，收在您的卦記裡。往後老易讀您的卦，這一筆也會一併看見。</div>
       <div class="stamp-trace-text">${textToHtml(traceText)}</div>
       ${timeHtml}
     </div>`;
@@ -414,33 +413,20 @@ function buildStampSectionHtml(rec) {
   }
   return `
     <div class="section">
-      <button class="stamp-btn" id="stampOpenBtn" type="button">補後續 · 蓋金印</button>
+      <div class="cta-title">補個後續</div>
+      <div class="stamp-sub">後來怎麼了？記一筆。</div>
+      <textarea class="stamp-textarea" id="stampTextarea" placeholder="後來，這件事走到了哪裡——記下來，日後回頭看。" maxlength="500"></textarea>
+      <button class="stamp-confirm" id="stampConfirmBtn" type="button">落款</button>
     </div>`;
 }
 
-function openStampModal(logId, token) {
-  stampState = { logId, token };
-  const overlay = document.getElementById("stampOverlay");
-  const textarea = document.getElementById("stampTextarea");
-  const confirmBtn = document.getElementById("stampConfirmBtn");
-  textarea.value = "";
-  confirmBtn.disabled = false;
-  overlay.classList.add("open");
-  textarea.focus();
-}
-
-function closeStampModal() {
-  document.getElementById("stampOverlay").classList.remove("open");
-}
-
-async function submitStamp() {
+async function submitStamp(logId, token) {
   const textarea = document.getElementById("stampTextarea");
   const confirmBtn = document.getElementById("stampConfirmBtn");
   const traceText = textarea.value.trim();
 
-  /* 無新增文案:空白/無 logId 靜默不送出(交由 textarea required 屬性攔),
-     失敗分支僅 console.warn、保留入口按鈕,不彈出未定稿文案(見 plan §3 失敗分支) */
-  if (!traceText || !stampState.logId) {
+  /* 無新增文案:空白靜默不送出;失敗分支僅 console.warn、保留入口,不彈出未定稿文案(見 plan §3 失敗分支) */
+  if (!traceText || !logId) {
     return;
   }
 
@@ -449,8 +435,8 @@ async function submitStamp() {
   try {
     const res = await fetch(`${RELAY_URL}trace`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Line-AccessToken": stampState.token },
-      body: JSON.stringify({ log_id: stampState.logId, trace_text: traceText }),
+      headers: { "Content-Type": "application/json", "X-Line-AccessToken": token },
+      body: JSON.stringify({ log_id: logId, trace_text: traceText }),
     });
     if (!res.ok) {
       console.warn("stamp submit failed", res.status);
@@ -463,7 +449,6 @@ async function submitStamp() {
       confirmBtn.disabled = false;
       return;
     }
-    closeStampModal();
     renderStampResult(data.trace_text, data.trace_at);
   } catch (e) {
     console.warn("stamp submit error", e.message || e);
@@ -472,19 +457,18 @@ async function submitStamp() {
 }
 
 function renderStampResult(traceText, traceAt) {
-  const openBtn = document.getElementById("stampOpenBtn");
-  if (!openBtn) return;
-  const section = openBtn.closest(".section");
+  const confirmBtn = document.getElementById("stampConfirmBtn");
+  if (!confirmBtn) return;
+  const section = confirmBtn.closest(".section");
+  section.classList.add("stamp-just-sealed");
   section.innerHTML = buildStampBadgeHtml(traceText, traceAt);
 }
 
 function wireStampHandlers(logId, token) {
-  const openBtn = document.getElementById("stampOpenBtn");
-  if (openBtn) {
-    openBtn.addEventListener("click", () => openStampModal(logId, token));
+  const confirmBtn = document.getElementById("stampConfirmBtn");
+  if (confirmBtn) {
+    confirmBtn.addEventListener("click", () => submitStamp(logId, token));
   }
-  document.getElementById("stampClose").addEventListener("click", closeStampModal);
-  document.getElementById("stampConfirmBtn").addEventListener("click", submitStamp);
 }
 
 function renderDetail(rec, tierInfo, token) {
@@ -496,7 +480,16 @@ function renderDetail(rec, tierInfo, token) {
   const qtime   = fmtDate(rec.qigua_time);
   const q       = rec.question_text || "（未留問句）";
 
+  const returnDoorHtml = `
+    <div class="section return-section">
+      <a class="return-btn" href="./index.html?action=log">回到卦記</a>
+    </div>`;
+
   let html = `
+    <div class="orient-block">
+      <div class="orient-main">這封信，已收進您的卦記。</div>
+      <div class="orient-sub">往下可補個後續；想往深處讀，四鏡在頁尾。</div>
+    </div>
     <div class="gua-header">
       <div class="sym">${benSym}</div>
       <div class="names">${rec.ben_gua || "—"}${rec.bian_gua ? " → " + rec.bian_gua : ""}</div>
@@ -531,6 +524,7 @@ function renderDetail(rec, tierInfo, token) {
         此類型（${esc(entryType)}）詳情頁尚未支援。
       </div>
     </div>`;
+    html += returnDoorHtml;
     wrap.innerHTML = html;
     return;
   }
@@ -591,6 +585,9 @@ function renderDetail(rec, tierInfo, token) {
 
   // E27:深卜 CTA —— 走到這裡已保證 entryType === "divination"(其他類型在函式前段已早退)
   html += buildDeepdiveCtaHtml(tierInfo);
+
+  // SOUL-02 D5:屏10 最尾回程門(律8,三扇門缺一即 FAIL)
+  html += returnDoorHtml;
 
   wrap.innerHTML = html;
 
