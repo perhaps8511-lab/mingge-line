@@ -1,0 +1,640 @@
+Reading additional input from stdin...
+2026-07-21T11:44:05.367103Z ERROR codex_models_manager::cache: failed to load models cache: missing field `supports_reasoning_summaries` at line 88 column 5
+OpenAI Codex v0.144.6
+--------
+workdir: D:\CBD_Lab_OS\001_mingge\mingge-line
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: low
+reasoning summaries: none
+session id: 019f847d-8516-7320-ad42-7b739be512e7
+--------
+user
+你是資深後端架構審稿人。嚴格審查以下實作計畫,找出:遺漏的 corner case、邊界條件、錯誤處理缺口、資料契約矛盾、與驗收標準不符之處。逐條列出,每條標 [BLOCKER](不改不能過)或 [SUGGEST](建議)。若無問題,回覆 VERDICT: APPROVED。計畫全文:# plan_e56_laoyi_center_v0_1 — 老易學習中心(格5 兩態 LIFF 問答面 + relay 新路由 + 單向帶話 + polish)
+
+> 對應卡:`governance/cards/001_taskcard_e56_laoyi_center_S20260721_v1_1.md`。
+> 基礎檔:對照 `D:\CBD_Lab_OS\001_mingge\mingge-line`(origin/main 乾淨、clean、HEAD `9c71a15`)當前版本撰寫,非記憶/舊夾。
+> 狀態:🟡 待審 —— 待 Codex 模式A 互審至 APPROVED 蓋 marker,才進 C1-C4 施工。
+
+---
+
+## 0. 現況查證(先讀後寫,禁猜)
+
+### 0.1 格5 現行架構(index.html,`#page-about`,約 711-745 行)
+`action=ask`/`action=about` 兩路由指到同一 `#page-about`,`initAskLaoyiPage()`(約 1033-1045 行)掛四顆 `data-ask-laoyi` prompt 按鈕 + 一顆 `askLaoyiStart`,全部呼叫 `sendAskLaoyiIntent(message,...)`(約 1012-1031 行)── 該函式**只做一件事**:`liff.sendMessages([{type:'text',text:message}])` 把文字丟回 LINE 原生對話,不經任何 relay/Dify,失敗才顯示 `showAskLaoyiFallback`(複製到剪貼簿+textarea 備援)。這就是卡上說的「寄生書僮客服鏈」── 訊息一旦送進 LINE 對話,後續處理權完全在 Make/Dify 那端的既有 OA 流程(客服鏈 5379670 或其他分流),前端無從得知、也管不到。
+
+書房層3(`#page-study` 閱讀頁)的「拿這篇問老易」按鈕(`studySendAskLaoyi`,約 916-940 行)走同一套 `liff.sendMessages` 機制,只是訊息文字帶了篇名(`'問老易\n我剛讀完〈'+title+'〉，想再問深一點。'`)。
+
+### 0.2 relay 既有七路由模式(workers/mingge-relay/worker.js)
+七路由:`GET /history`、`GET /log`、`GET /study`、`POST /log/seal`、`POST /trace`、`POST /trigger/deepdive`、`POST /trigger/fupan`,加上根路徑 `POST /`(起卦主閘)。POST 類路由共同骨架(以 `/trigger/deepdive` 第 403-502 行為範本):
+1. `Content-Type: application/json` 檢查
+2. `request.json()` parse,失敗回 400
+3. `X-Line-AccessToken` header 必帶,缺回 401
+4. `resolveUserId(accessToken, LINE_CHANNEL_ID)`(第 654-677 行):先 `GET https://api.line.me/oauth2/v2.1/verify?access_token=...` 驗 token 有效且 `client_id===LINE_CHANNEL_ID`,再 `GET https://api.line.me/v2/profile`(帶 `Authorization: Bearer <token>`)取 `userId`/`displayName`。驗證失敗回 401。
+5. payload 欄位白名單檢查(多餘欄位直接 400)
+6. 業務邏輯 → 轉發下游(webhook 或未來的 Dify)
+7. 統一用 `json(obj, status)` 輔助函式回應,CORS 由 `corsHeaders()` 處理
+
+沒有任何既有路由呼叫過 Dify API(`grep -i dify` 零命中)── `/laoyi/chat` 是本 repo第一個 Dify 直連路由,呼叫慣例需自訂,採 Dify 官方 `chat-messages` blocking 端點慣例(`POST https://api.dify.ai/v1/chat-messages`,`Authorization: Bearer <app_key>`,body `{inputs:{}, query, response_mode:"blocking", user, conversation_id}`,回應含 `answer`/`conversation_id`)。
+
+### 0.3 C4 字級殘項實查
+`.lp-header .lp-sub`(index.html 約 264 行)base = `font-size:13px`。已知兩處 override 到 17px(對齊 E47 熟齡內文≥17px 基準,S20260720 卡A/卡B polish 已做):
+- `#page-pay .lp-header .lp-sub{font-size:17px;}`(約 420 行,格3 五卡卡 polish 帶做)
+- `.lp-body p.study-intro{font-size:17px;...}`(約 371 行,書房門面放大 item2)
+
+`#page-log`(「我的卦記」hub,約 700-701 行 `<h1>我的卦記</h1><div class="lp-sub">您問過的卦，都在這裡記著。</div>`)**沒有**對應 override,沿用 base 13px ── 這就是卡上「卦記字級一致(E47 殘項)」指的缺口:同一批(page-pay/page-study)做過的 17px 基準,page-log 漏掉了。修法比照既有 pattern,加一行 `#page-log .lp-header .lp-sub{font-size:17px;}`,不動 `.log-card` 系列(那是列表卡片元資料,非「內文」,E47 條款不適用,維持現狀)。
+
+---
+
+## 1. C1 — index.html 格5 兩態改造
+
+### 1.1 DOM 結構
+`#page-about` 拆成兩個子 view(仿書房 `.study-view` 的顯隱慣例,同頁面內切換,不走路由):
+
+```html
+<div class="liff-page" id="page-about">
+  <div class="lp-header">…(沿用現行標題/icon,不重寫)…</div>
+  <!-- 態1:門廳 -->
+  <div class="laoyi-view laoyi-hall" id="laoyiHall">
+    …現行 lp-body 介紹段落(721-724 行原文,零改字)…
+    <div class="laoyi-hall-close"><!-- S1 --></div>
+    <div class="ask-actions">
+      <button type="button" class="sp-btn ask-primary" id="laoyiHallEnter">向老易請教</button>
+      <button type="button" class="ask-secondary" id="laoyiHallStudy">先逛書房</button>
+    </div>
+  </div>
+  <!-- 態2:問答室 -->
+  <div class="laoyi-view laoyi-room" id="laoyiRoom" hidden>
+    <div class="laoyi-thread" id="laoyiThread" role="log" aria-live="polite"></div>
+    <div class="laoyi-closing" id="laoyiClosing" hidden><!-- 25輪收尾 --></div>
+    <div class="laoyi-svc-link"><button type="button" id="laoyiSvcEntry">店務找書僮</button></div>
+    <div class="laoyi-composer">
+      <textarea id="laoyiInput" placeholder="請教老易——卦、文章、易經都可問" rows="2"></textarea>
+      <button type="button" id="laoyiSend">送出</button>
+    </div>
+  </div>
+</div>
+```
+沿用既有 CSS token(`--rice`/`--gold`/`--moss`/`--paper`/`--serif`)與 `.sp-btn`/`.ask-primary`/`.ask-secondary` 既有類別,不新造色票。新增類別(`.laoyi-view`/`.laoyi-hall`/`.laoyi-room`/`.laoyi-thread`/`.laoyi-bubble`/`.laoyi-closing`/`.laoyi-svc-link`/`.laoyi-composer`)比照 `.study-view`/`.lp-body p` 既有 CSS 手法寫,內文與訊息泡泡字級直接繼承 `.lp-body p`(14.5px)基底再 override 到 **≥17px / line-height≥1.9**(E47 硬約束①②),composer 按鈕字不縮(E47 約束⑤,沿用 `.sp-btn` 既有 padding/font-size)。
+
+### 1.2 show-once 門廳/問答室切換
+```js
+var LAOYI_HALL_SEEN_KEY='mg_laoyi_hall_seen';
+function laoyiHasSeenHall(){ try{ return localStorage.getItem(LAOYI_HALL_SEEN_KEY)==='1'; }catch(e){ return false; } }
+function laoyiMarkHallSeen(){ try{ localStorage.setItem(LAOYI_HALL_SEEN_KEY,'1'); }catch(e){} }
+```
+`localStorage` 包 try/catch(比照既有 `SESSION_ID` 對 `sessionStorage` 的防禦寫法,約 1523-1536 行慣例)── 私密瀏覽/儲存被鎖時退化為「每次都見門廳」,不炸頁。
+
+### 1.3 進場判斷(取代現行 `initAskLaoyiPage`)
+```js
+function initAskLaoyiPage(){
+  var contentId = new URLSearchParams(location.search).get('content_id'); // 篇名本身,已 encodeURIComponent(見 1.6)
+  if(contentId){
+    laoyiEnterRoom({opener:'content', contentTitle:decodeURIComponent(contentId)});
+  } else if(laoyiHasSeenHall()){
+    laoyiEnterRoom({opener:'blank'});
+  } else {
+    laoyiShowHall();
+  }
+  // 門廳按鈕
+  var enterBtn=document.getElementById('laoyiHallEnter');
+  if(enterBtn){ enterBtn.addEventListener('click',function(){ laoyiMarkHallSeen(); laoyiEnterRoom({opener:'blank'}); }); }
+  var studyBtn=document.getElementById('laoyiHallStudy');
+  if(studyBtn){ studyBtn.addEventListener('click',function(){ location.href='./index.html?action=study'; }); }
+}
+```
+`content_id` deep link **繞過門廳**(卡 1 條驗收硬性要求)── 不論 `laoyiHasSeenHall()` 為何,帶 `content_id` 一律直達問答室,且不寫入 hall-seen(避免分享連結進來的人被永久跳過門廳的正常首訪體驗)。
+
+### 1.4 開場句組裝(S2/S3)
+```js
+function laoyiOpeningLine(opts){
+  if(opts.opener==='content' && opts.contentTitle){
+    return '你帶來的是〈'+opts.contentTitle+'〉。文中何處讓你停下了？'; // S3,逐字
+  }
+  return '坐。今日想問哪一卦、哪一篇、哪一句？'; // S2,逐字
+}
+```
+`laoyiEnterRoom` 顯示問答室、隱藏門廳、把 `laoyiOpeningLine` 的字串當**第一則老易泡泡**塞進 `#laoyiThread`(純文字氣泡,`.laoyi-bubble.laoyi-bubble-bot`,不呼叫 relay ── 開場句是前端定稿字,不用引擎生成)。
+
+### 1.5 對話送出(呼叫 C2 新路由)
+```js
+var laoyiConvId=null; // 頁面記憶體,不落地(卡 stateless 鐵則)
+var laoyiTurnCount=0;
+async function laoyiSend(text){
+  laoyiAppendBubble(text,'user');
+  laoyiInput.value='';
+  var typing=laoyiAppendBubble('……','bot',{pending:true});
+  try{
+    if(typeof liff==='undefined'){ throw new Error('LIFF unavailable'); }
+    await ensureLiffInit();
+    var accessToken = liff.getAccessToken ? liff.getAccessToken() : null;
+    if(!accessToken){ throw new Error('no access token'); }
+    var res = await fetch(RELAY_URL+'laoyi/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Line-AccessToken':accessToken},
+      body: JSON.stringify({query:text, conversation_id: laoyiConvId||''})
+    });
+    if(!res.ok){ throw new Error('HTTP '+res.status); }
+    var data = await res.json();
+    laoyiConvId = data.conversation_id || laoyiConvId;
+    laoyiReplaceBubble(typing, data.answer || '（老易暫時沒有回應，請再問一次。）');
+  }catch(e){
+    laoyiReplaceBubble(typing,'老易這頭暫時聽不清，請再說一次，或稍後再試。');
+    console.warn('[laoyi chat]',e && e.message?e.message:e);
+  }
+  laoyiTurnCount++;
+  if(laoyiTurnCount>=25){ laoyiShowClosing(); } // 25輪軟收束
+}
+```
+- 送出鍵/textarea Enter 皆呼叫 `laoyiSend`,空字串不送。
+- `ensureLiffInit()` 沿用既有共用函式(885 行),不重寫初始化。
+- `liff.getAccessToken()` 是既有 LIFF SDK 標準 API(本 repo 之前用 `liff.isLoggedIn`/`liff.sendMessages` 但沒直接取過 access token 送 relay ── 此為 C2 路由需要,取代舊有「送 LINE 訊息」模式);若 SDK 版本/情境取不到 token,直接落 catch 顯示錯誤泡泡,不做 sendMessages fallback(fallback 語意在這裡不成立 ── 對話室没有「複製貼上」的退路,直接請使用者重試)。
+
+### 1.6 25 輪軟收束
+`laoyiShowClosing()` 在 `#laoyiClosing` 塞入兩顆按鈕〔回書房〕〔起一卦〕(對應 S7 收尾按鈕),`#laoyiClosing.hidden=false`,不隱藏 composer(TA 仍可繼續問,收尾按鈕只是「軟」提示,不鎖死輸入)。
+
+### 1.7 決策題收束(S4)── 判斷方式(最薄可行,card 授權 plan 自訂)
+**設計取捨(請 Codex/Perth 特別檢視這條)**:S4「前端零句,引擎講」代表 S4 的**文字**由 Dify 回答內容本身提供,前端不能杜撰內容 ── 但前端仍要決定「這一輪該不該補〔心中默念此問,起一卦〕按鈕」。因為 Dify prompt/KB 屬禁碰邊界(動了要回歸觸發+Perth 核),前端不對**答案**內容做語意偵測(易碎、且等同於偷測 Dify 措辭)。改為對**TA 剛送出的提問文字**做關鍵詞判斷(送出當下就決定,不看回覆):
+```js
+var LAOYI_DECISION_RE=/要不要|該不該|值不值得|該如何選|怎麼決定|該不該做|go\s*or\s*no\s*go/i;
+```
+命中則在**該輪引擎回覆泡泡下方**附掛 CTA 按鈕〔心中默念此問，起一卦〕(連到 `location.href='./index.html'`,向天問卦零 quota 判斷交回既有起卦流程,本卡不碰)。未命中不附掛,零視覺變化。此為 heuristic,非語意理解,可能有漏判/誤判 ── 已在案上寫明是技術判斷,不是話術判斷,S4 本身仍是「前端零句」(按鈕文字是固定 CTA,不是 S4 本身的話)。
+
+### 1.8 熟齡硬約束(E47 五條)對照表
+| 條款 | 落實方式 |
+|---|---|
+| 內文≥17px | `.laoyi-bubble`/composer textarea/門廳沿用段落全部 override 17px |
+| 行高≥1.9 | 泡泡與門廳段落 `line-height:1.9` |
+| 目標動作≤3步 | 門廳(1 鍵進問答室)→輸入→送出,3 步內達成核心動作;店務轉交獨立入口另計 |
+| 段落≤4行 | 泡泡文字為對話體,天然短句;不做字數硬切,由話術定稿本身已控制長度 |
+| 按鈕字不縮 | 全部按鈕沿用 `.sp-btn`/`.ask-secondary` 既有 font-size,不另縮小 |
+
+---
+
+## 2. C2 — worker.js 新路由 `POST /laoyi/chat`
+
+插入位置:緊接 `/trigger/fupan` 區塊之後(第 567 行 `}` 後)、`POST /` 主閘(第 569 行)之前,維持既有路由由上而下比對的順序慣例。
+
+```js
+if (request.method === "POST" && url.pathname === "/laoyi/chat") {
+  const contentType = request.headers.get("Content-Type") || "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return json({ error: "Bad JSON body" }, 400);
+  }
+  let payload;
+  try { payload = await request.json(); }
+  catch (e) { return json({ error: "Bad JSON body" }, 400); }
+
+  const accessToken = request.headers.get("X-Line-AccessToken");
+  if (!accessToken) return json({ error: "Missing access token" }, 401);
+
+  let verifiedUserId;
+  try {
+    ({ userId: verifiedUserId } = await resolveUserId(accessToken, LINE_CHANNEL_ID));
+  } catch (e) {
+    console.log("Laoyi chat access token validation failed", e.message || e);
+    return json({ error: "Invalid access token" }, 401);
+  }
+
+  const payloadIsObject = payload && typeof payload === "object" && !Array.isArray(payload);
+  const payloadKeys = payloadIsObject ? Object.keys(payload) : [];
+  if (payloadKeys.some(k => k !== "query" && k !== "conversation_id")) {
+    return json({ error: "Unexpected field in payload" }, 400);
+  }
+
+  const rawQuery = payloadIsObject ? payload.query : undefined;
+  const query = typeof rawQuery === "string" ? rawQuery.trim() : "";
+  if (!query || query.length > 2000) {
+    return json({ error: "Invalid query" }, 400);
+  }
+  const rawConvId = payloadIsObject ? payload.conversation_id : undefined;
+  const conversationId = typeof rawConvId === "string" ? rawConvId.slice(0, 128) : "";
+
+  if (!env.DIFY_LAOYI_KEY) {
+    return json({ error: "DIFY_LAOYI_KEY not configured" }, 503);
+  }
+
+  let difyRes;
+  try {
+    difyRes = await fetch("https://api.dify.ai/v1/chat-messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + env.DIFY_LAOYI_KEY,
+      },
+      body: JSON.stringify({
+        inputs: {},
+        query,
+        response_mode: "blocking",
+        user: verifiedUserId,
+        conversation_id: conversationId,
+      }),
+    });
+  } catch (e) {
+    console.log("Laoyi Dify forward failed", e.message || e);
+    return json({ error: "Dify request failed" }, 502);
+  }
+  if (!difyRes.ok) {
+    console.log("Laoyi Dify forward failed", difyRes.status);
+    return json({ error: "Dify request failed" }, 502);
+  }
+  let difyData;
+  try { difyData = await difyRes.json(); }
+  catch (e) { return json({ error: "Dify response parse failed" }, 502); }
+
+  return json({
+    answer: typeof difyData.answer === "string" ? difyData.answer : "",
+    conversation_id: typeof difyData.conversation_id === "string" ? difyData.conversation_id : "",
+  }, 200);
+}
+```
+
+**B2 標註**:`env.DIFY_LAOYI_KEY` 目前 Cloudflare Secrets 未貼(卡上明訂由 Perth 親貼)── 本路由施工時以此佔位變數名稱寫入代碼(不硬編任何金鑰字面值),缺鑰時路由回 503(`DIFY_LAOYI_KEY not configured`),不擋其他三件(C1/C3/C4)的施工與驗收。`wrangler.toml` 不需改(secret 不進 toml)。**待 Perth 執行 `wrangler secret put DIFY_LAOYI_KEY` 後,C2 才能真機通話驗收(卡驗收條件②)**。
+
+**Stateless 落實**:整條路由不寫 Airtable、不寫 D1/KV,`conversation_id` 純粹是 Dify 自己維護的 session 概念,relay 只透傳、不留存 ── 卡「不落任何持久層」鐵則。
+
+---
+
+## 3. C3 — E57 單向帶話「交給書僮」
+
+### 3.1 常駐入口(問答室內)
+`#laoyiSvcEntry` 按鈕(1.1 DOM,`.laoyi-svc-link`)全程可見(不需引擎偵測觸發)── 這是「最薄可行」設計取捨:卡面文字「引擎收束店務題時顯示 S5 引路」與「常駐次要入口」兩者用同一顆按鈕滿足 ── 按下即顯示 S5,不做 Dify 回覆內容的店務語意偵測(理由同 1.7:偵測 Dify 輸出內容 = 間接依賴 KB/prompt 措辭,易碎且逼近禁碰邊界)。
+
+```js
+document.getElementById('laoyiSvcEntry').addEventListener('click', laoyiShowSvcHandoff);
+function laoyiShowSvcHandoff(){
+  laoyiAppendBubble('這是店務，老夫不管帳——書僮就在門外。你這一問，我替你帶到他案上。','bot',{system:true}); // S5
+  var btn=document.createElement('button');
+  btn.type='button'; btn.className='sp-btn ask-primary'; btn.textContent='交給書僮';
+  btn.addEventListener('click', laoyiHandoffToService);
+  laoyiThread.appendChild(btn); // 附掛在 S5 泡泡下方
+  laoyiThread.scrollTop = laoyiThread.scrollHeight;
+}
+```
+
+### 3.2 交給書僮(liff.sendMessages,比照既有 `studySendAskLaoyi` 錯誤處理慣例)
+```js
+async function laoyiHandoffToService(){
+  var lastUserMsg = laoyiLastUserMessage() || '（TA 尚未輸入問題，直接請書僮協助）';
+  try{
+    if(typeof liff==='undefined'){ throw new Error('LIFF unavailable'); }
+    await ensureLiffInit();
+    if(!(liff.isInClient && liff.isInClient())){ throw new Error('not in LINE client'); }
+    if(!(liff.isLoggedIn && liff.isLoggedIn())){ throw new Error('not logged in'); }
+    if(typeof liff.sendMessages!=='function'){ throw new Error('sendMessages unavailable'); }
+    await liff.sendMessages([{type:'text',text:lastUserMsg}]); // 原句送出,不加工、不冠老易措辭
+    laoyiAppendBubble('已送到書僮案上。回到聊天室，書僮接著答。','bot',{system:true}); // S6
+  }catch(e){
+    showAskLaoyiFallback(lastUserMsg,'askLaoyiStatus','askLaoyiFallback','askLaoyiFallbackText'); // 沿用既有 005A fallback 機制/DOM(頁面共用)
+    console.warn('[laoyi handoff fallback]',e && e.message?e.message:e);
+  }
+}
+```
+`laoyiLastUserMessage()` 從 `#laoyiThread` 內最後一則 `.laoyi-bubble-user` 取文字 ── 「原句送出」(卡 3 條驗收:按鈕 sendMessages 原句進 OA)。`書僮鏈 5379670 零改動`(卡六禁碰邊界)── 本段只呼叫既有 `liff.sendMessages`,不碰 Make scenario。
+
+### 3.3 決策題 CTA(S4 附掛按鈕,承 1.7)
+與 3.1/3.2 平行,不互斥 ── 同一輪回覆下最多同時掛「起一卦」CTA(1.7 命中時)+ 常駐「店務找書僮」入口(全程可見),兩者互不遮蔽(常駐入口在 composer 上方固定位,CTA 掛在該輪泡泡下)。
+
+---
+
+## 4. C4 — 卦記字級一致
+
+單行 CSS 新增(緊鄰第 420 行 `#page-pay .lp-header .lp-sub{font-size:17px;}` 之後,同 pattern):
+```css
+#page-log .lp-header .lp-sub{font-size:17px;}
+```
+**Computed-style 驗收提醒(SOUL-04b 教訓)**:施工後須用瀏覽器 computed style 實測 `#page-log .lp-sub` 渲染值確為 17px(不可只 grep 規則存在),比照 [[mingge-soul04b-dualface-polish]] 記載的 CSS specificity 陷阱教訓(改字級後純 grep 不可靠)。
+
+---
+
+## 5. 驗收斷言對照卡四(逐條可機讀化)
+
+| 卡驗收條件 | 斷言方式 |
+|---|---|
+| ①首訪見門廳、再訪直達問答室;deep link 繞門廳、S3 帶篇名 | 抽取 `#page-about` markup + `initAskLaoyiPage`/`laoyiOpeningLine` 邏輯,注入假 `localStorage`/`location.search` 三種情境(無 seen 無 content_id/有 seen 無 content_id/有 content_id)斷言渲染出的 view 與開場句字串逐字比對 S2/S3 |
+| ②relay 直連、前端無端點/金鑰、5379670 與 5202754 diff=0 | grep index.html 新增碼段落不含 `dify.ai`/任何金鑰字面;grep 全 diff 確認 `Make` scenario 相關字串(5379670/5202754)zero touch |
+| ③客服題按鈕 sendMessages 原句、S6、書僮接手 | 真機(Perth 執行,不在本卡 headless 範圍內);headless 僅能斷言 `laoyiHandoffToService` 呼叫 `liff.sendMessages` 時傳入值===`laoyiLastUserMessage()` 回傳值(mock liff) |
+| ④E47 五條+卦記字級+25輪收尾 | grep 新增 CSS 選擇器 font-size/line-height 數值;25輪:mock `laoyiSend` 呼叫 25 次後斷言 `#laoyiClosing.hidden===false` |
+| ⑤對話不跨 session | grep 確認無 `localStorage`/`sessionStorage`/fetch 寫入 conversation 記錄之外的持久化呼叫;`laoyiConvId` 為純 JS 變數,reload 後歸零(靜態可證) |
+| ⑥headless 測試腳本 | 新增 `tests/test_e56_laoyi_center_v1_0.sh`,沿用既有腳本慣例(段①DOM 抽取/段②Worker payload 驗證/段③文案逐字比對) |
+
+20-case + 5 偽裝題回歸(卡四條 6 後半)明訂「中樞後續跑,非本卡範圍」── 本 plan 不含此項施工,僅留意不破壞既有 5202754/5379670 鏈路。
+
+---
+
+## 6. 風險與邊界重申
+
+- 🔴 不動 Make 5379670/5202754、不動老易說易 Dify prompt/KB(1.7/3.1 的 heuristic 設計正是為了不去偵測/依賴 Dify 輸出內容)。
+- 🔴 `DIFY_LAOYI_KEY` 佔位施工,B2 卡住點已於 §2 標註,回報時列入 B2 分類。
+- 🔴 stateless 鐵則:全程無 Airtable/D1/KV 寫入,`conversation_id` 只活在頁面記憶體。
+- C1 對現行 `initAskLaoyiPage`/`#page-about` 是**取代式重寫**(卡明講「純文字對話流」新架構),但門廳段落文字本身(現行 721-724 行介紹段)逐字保留,不改一字,只改變其所在的 DOM/顯隱邏輯。
+- `studySendAskLaoyi`(書房「拿這篇問老易」按鈕)**本卡不改動其 `liff.sendMessages` 邏輯**;book 房入口是否要改走 `?action=ask&content_id=` deep link 屬於「哪個入口用哪種進場方式」的產品決策,卡上未明訂要求改書房端呼叫方式,只定義了 `#page-about` 自己要接受 `content_id` 參數 ── 為避免超出卡範圍動到已於 SOUL-04b 上線驗收過的書房程式碼,本 plan **不改 `studySendAskLaoyi`**,`content_id` deep link 先做為 `#page-about` 具備的能力(卡驗收①明訂要驗這條路徑本身),書房是否接上留給後續變更單。此為技術範圍界定,請 Codex/Perth 檢視是否認同。
+
+---
+
+## 7. 檔案異動清單
+
+- `index.html`:`#page-about` 區塊(711-745 行)重寫;新增 CSS(`.laoyi-*` 系列 + C4 單行);新增 JS(取代 `initAskLaoyiPage`,新增 `laoyi*` 函式群);`initAskLaoyiPage` 呼叫點(1266 行)不變(函式簽名不變)。
+- `workers/mingge-relay/worker.js`:新增 `/laoyi/chat` 路由區塊(約 30 行),插入 `/trigger/fupan` 與主閘之間。
+- `tests/test_e56_laoyi_center_v1_0.sh`:新建。
+- `governance/STATUS_BOARD.md` / `governance/CHANGELOG.md`:施工完成後各加一行留痕。
+
+<!-- CODEX-REVIEW: PENDING -->
+warning: Skill descriptions were shortened to fit the 2% skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+codex
+上傳歸因：本輪未驗證到 `/mnt/user-data/uploads/` 有新內容，因此不宣稱有上傳檔。
+
+本輪判定為「繼續型／建置型」。開場八自報先行：目前可確認工作座標是 E56 老易學習中心的「計畫互審」，尚未授權施工；Project 六格在所附母版仍未填，故歸類／定位／味道紅線／凍結區／合規基準不能臆補；前線 100% AI、TA 35–65 歲且女70男30為既定錨。上 session 的 recent_chats、closeout／萃取卡，以及 Airtable Build_Nodes／Live_Artifacts 在目前工具狀態尚未取得，所以不能假稱已完成回溯、固化查核或吐出 SSOT 證明行；本輪只做唯讀審稿，不修改活檔、prompt、KB、Make、Dify 或看板。平台層若有新的 CEO 裁決卡，現有上下文未提供。
+
+我會以 repo 現況、指定 taskcard、既有測試與資料契約逐條交叉核對，再給 BLOCKER／SUGGEST verdict。
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$mem='"'C:\\Users\\ivych\\.codex\\memories\\MEMORY.md'; Select-String -LiteralPath "'$mem -Pattern '"'E56|laoyi|老易|mingge-line|S20260721' -Context 2,3; Write-Output '---FILES---'; rg --files | rg '("'^|/|'"\\\\)(AGENTS\\.md|001_taskcard_e56_laoyi_center_S20260721_v1_1\\.md|worker\\.js|index\\.html|test_.*laoyi|STATUS_BOARD\\.md|CHANGELOG\\.md)"'$'"'; Write-Output '---STATUS---'; git status --short; git rev-parse HEAD" in D:\CBD_Lab_OS\001_mingge\mingge-line
+2026-07-21T11:44:21.608882Z ERROR codex_core::exec: exec error: windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\CBD_Lab_OS\001_mingge\mingge-line, log=C:\Users\ivych\.codex\.sandbox\sandbox.2026-07-21.log, error=program not found
+2026-07-21T11:44:21.609545Z ERROR codex_core::tools::router: error=execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\CBD_Lab_OS\\001_mingge\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-21.log, error=program not found" })
+ exited -1 in 0ms:
+execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\CBD_Lab_OS\\001_mingge\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-21.log, error=program not found" })
+codex
+VERDICT: CHANGES REQUIRED
+
+以下問題未修正前不能蓋 `APPROVED`。
+
+1. [BLOCKER] `content_id` 被重複 decode，且例外會炸掉整個初始化  
+   `URLSearchParams.get()` 已經完成 percent-decoding，再呼叫 `decodeURIComponent(contentId)` 會：
+
+   - 把合法的 `%` 篇名誤判為 malformed URI
+   - 遇到 `%E0...` 等輸入直接丟例外
+   - 使 `initAskLaoyiPage()` 中止、頁面無法進場
+
+   應直接使用 `contentId`，並限制長度。若真正需要二次編碼，必須把契約寫清楚並捕捉 decode 例外。
+
+2. [BLOCKER] `content_id` 的資料契約自相矛盾  
+   名稱叫 `content_id`，實際傳入「篇名」。這會造成後續把資料庫 ID、slug 或篇名混用。至少應二選一：
+
+   - 改名 `content_title`
+   - `content_id` 傳穩定 ID，前端再從 `/study` 查正式篇名
+
+   現行方案還沒有長度上限、控制字元規則與不存在文章的處理。
+
+3. [BLOCKER] deep-link 能力沒有任何正式入口接上，驗收①可能只是在測死碼  
+   計畫刻意不改 `studySendAskLaoyi`，因此「拿這篇問老易」仍走舊 `sendMessages`，正常使用者旅程根本不會進入 S3。若 taskcard 的 deep link 是實際產品流程要求，只有人工拼 URL 不算完成。必須由卡明確裁決：
+
+   - 本卡接上書房入口；或
+   - 驗收明文允許本卡只提供路由能力，並列出後續卡與 owner
+
+4. [BLOCKER] 對話送出存在並行競態，會破壞 Dify conversation  
+   使用者可連點或連按 Enter。在第一輪尚未取得 `conversation_id` 前，第二輪也會以空 ID 發出，建立兩條 Dify conversation；回覆又可能倒序，最後回來的 response 會覆蓋 `laoyiConvId`。必須定義：
+
+   - 單飛：請求完成前鎖 send/composer；或
+   - 明確 queue，依序送出
+   - 防 double-submit
+   - 回覆順序與 conversation ID 更新規則
+
+5. [BLOCKER] 25 輪計數語意錯誤  
+   `laoyiTurnCount++` 放在 catch 後，因此 token 失效、503、網路失敗也算一輪；第 25 輪後每次又會反覆執行 `laoyiShowClosing()`，可能產生重複按鈕。需定義「一輪」是成功的 user–assistant exchange，並讓 closing render idempotent。
+
+6. [BLOCKER] E47「段落 ≤4 行」沒有實作，也無法驗收  
+   「對話體天然短句」不是控制機制。Dify 回覆長度完全不受前端掌控，螢幕寬度與字級也會改變實際行數。目前斷言表沒有測此條，與「E47 五條」驗收宣稱不符。需明確採用可驗證方案，例如分段／摘要摺疊／最大可視行數加展開，並以目標 viewport 做 DOM 渲染測試。
+
+7. [BLOCKER] 客服 fallback 所依賴的 DOM 在新 DOM 規格中不存在  
+   `laoyiHandoffToService()` 呼叫：
+
+   ```js
+   showAskLaoyiFallback(lastUserMsg,'askLaoyiStatus','askLaoyiFallback','askLaoyiFallbackText')
+   ```
+
+   但 1.1 的重寫 DOM 沒列出這三個元素。若舊 `#page-about` 被取代，它們很可能一起消失，fallback 將無法顯示，甚至在 helper 未做 null 防禦時二次拋錯。必須保留對應 DOM，或設計問答室專用 fallback。
+
+8. [BLOCKER] 「原句送出」在沒有 user message 時被違反  
+   計畫會送：
+
+   ```text
+   （TA 尚未輸入問題，直接請書僮協助）
+   ```
+
+   這不是 TA 原句，卻會作為 TA 訊息進 OA。應在沒有原句時禁止送出、要求先輸入，或提供獨立客服輸入框；不能替使用者發明內容。
+
+9. [BLOCKER] 「最後一則 user message」不等於「客服題原句」  
+   常駐入口可在任意時點按下，因此可能把上一個易經問題、健康資訊或其他敏感內容送往書僮鏈。這不符合「客服題原句」契約，也造成非預期資料轉送。必須把 handoff 綁定到明確選取的訊息，或在送出前顯示內容並讓使用者確認。
+
+10. [BLOCKER] 書僮交接缺少防重複與狀態控制  
+    重複點「店務找書僮」會反覆插入 S5 和新按鈕；連點「交給書僮」會重複呼叫 `sendMessages`，可能在 OA 建立多筆相同事件。需要 busy/disabled 狀態、成功後不可重送，並讓 S5/CTA 建立具冪等性。
+
+11. [BLOCKER] S6 對下游成功狀態作了未經證實的承諾  
+    `liff.sendMessages()` 成功只代表訊息送進 LINE 對話，不代表 5379670 已接收、成功分流或「書僮接著答」。若 S6 是卡上已定稿文字，驗收必須包含下游真機結果；否則這句會把 transport success 說成 business success。
+
+12. [BLOCKER] Dify route 沒有 timeout，blocking request 可無限拖住  
+    Worker 對 token verify、profile 與 Dify blocking 呼叫均未定義 timeout。Dify 卡住時前端 typing bubble 會長時間不結束，Worker 資源也被占用。需要 `AbortController` timeout，並區分 timeout 與其他 upstream failure。
+
+13. [BLOCKER] 新付費端點沒有 rate limit／濫用邊界  
+    任一有效 LINE access token 都可以無限制呼叫 blocking Dify API，且 query 可達 2000 字。這會形成成本與 DoS 入口。即使 stateless 禁止 D1/KV，也必須在計畫中明確裁決可接受的限制方式，例如 Cloudflare Rate Limiting、WAF 規則或既有 gateway 配額；不能完全不處理。
+
+14. [BLOCKER] `conversation_id` 被靜默截斷，會改壞資料  
+    `slice(0,128)` 會把不合法 ID 變成另一個 ID，再交給 Dify。應依 Dify 實際契約驗證格式和最大長度；超限回 400，不得靜默變造。非字串但有值也應回 400，而不是悄悄當新 conversation。
+
+15. [BLOCKER] Dify 成功回應驗證不足  
+    `answer` 或 `conversation_id` 缺失時，relay 仍回 200。前端甚至可能顯示自製的「老易暫時沒有回應」，把 upstream schema error 偽裝成正常對話。至少應驗證：
+
+    - response 是 object
+    - `answer` 是非空字串
+    - `conversation_id` 是符合契約的非空字串
+    - 回應大小在上限內
+
+    不符應回 502，不能回成功。
+
+16. [BLOCKER] 前端沒有 query 長度契約，會先顯示使用者泡泡再收到 400  
+    Worker 限制 2000，但 textarea 沒 `maxlength`，`laoyiSend()` 也沒相同 validation。使用者輸入過長時，UI 先把內容當成功送出，再顯示泛化錯誤。前後端必須共享同一限制，並在送出前顯示具體錯誤。
+
+17. [BLOCKER] S4 heuristic 無法符合「決策題收束」的一般驗收  
+    regex 明知會漏判／誤判，且缺少大量自然說法，如「是否適合」「哪個比較好」「現在能不能」「A 還是 B」。若卡要求決策題均出現 CTA，這個實作無法通過。需要：
+
+    - 由 Dify 回傳結構化旗標，但這涉及 prompt 契約及回歸；或
+    - 明確限縮 taskcard 的可驗收語句集合，並以 fixtures 鎖定
+
+    「plan 自訂」不能取代可測資料契約。
+
+18. [BLOCKER] 驗收②的「前端無端點」與實作矛盾  
+    前端必須持有 relay URL；表格卻寫「前端無端點/金鑰」，斷言又只 grep `dify.ai`。應改成精確契約：「前端可含 relay endpoint，不得含 Dify endpoint 或 Dify key」。否則驗收文字與實作互相衝突。
+
+19. [BLOCKER] CORS/OPTIONS 契約沒有納入新自訂 header 驗收  
+    使用 `X-Line-AccessToken` 會觸發 preflight。不能只說沿用 `corsHeaders()`；必須驗證 `Access-Control-Allow-Headers` 確實包含 `Content-Type, X-Line-AccessToken`，且 `OPTIONS /laoyi/chat` 能成功。否則瀏覽器會在路由前攔掉請求。
+
+20. [BLOCKER] 測試計畫不足以驗證主要失敗路徑  
+    Worker 至少缺以下測例：
+
+    - JSON scalar／array／null
+    - 缺 query、非字串 query、純空白、超長 query
+    - `conversation_id` 非字串／超長／非法格式
+    - token 缺失、verify 失敗、channel mismatch、profile 失敗
+    - secret 缺失
+    - Dify timeout、network error、非 2xx、非 JSON、空 answer、缺 conversation ID
+    - CORS preflight
+    - 連續送出與回覆倒序
+    - handoff double-click／無 user message／sendMessages failure
+    - malformed deep link、超長篇名
+    - IME composition 下按 Enter 不可誤送
+
+    現有「DOM 抽取／payload 驗證／文案比對」不足以證明驗收成立。
+
+21. [SUGGEST] `RELAY_URL+'laoyi/chat'` 有 slash 契約風險  
+    若 `RELAY_URL` 不以 `/` 結尾會組成錯誤 URL；若以 `/` 結尾才正確。建議使用 `new URL('/laoyi/chat', RELAY_URL)` 或共用 URL builder。
+
+22. [SUGGEST] 必須明訂 bubble 使用 `textContent`  
+    `contentTitle`、query、Dify answer 都是不可信文字。計畫只說「純文字氣泡」，應在實作與測試中鎖定不得使用 `innerHTML`。
+
+23. [SUGGEST] Enter 行為需處理熟齡輸入與 IME  
+    建議明訂 Enter 送出、Shift+Enter 換行，且 `event.isComposing` 或 keyCode 229 時不得送出，避免中文選字被當成提交。
+
+24. [SUGGEST] `initAskLaoyiPage()` 應可重入  
+    若 SPA 路由反覆進入 `#page-about`，目前可能重複掛 listener、重複開場泡泡。建議設初始化旗標，或先移除 listener／清理 thread，並定義返回格5時是延續當頁 conversation 還是重置。
+
+25. [SUGGEST] Dify 第三方資料傳輸需列入資料邊界  
+    `verifiedUserId` 與使用者全文會送至 Dify。即使不寫 Airtable/D1/KV，也不等於「不持久化」；Dify 可能保存 conversation/log。應在 stateless 宣稱中明確區分「relay 不落地」和「Dify 端保存政策」，並確認告知／隱私基準。
+
+26. [SUGGEST] 錯誤回應應提供穩定 error code  
+    UI 現在只能看到 HTTP status。建議 worker 回 `code`，例如 `INVALID_QUERY`、`UPSTREAM_TIMEOUT`、`UPSTREAM_SCHEMA_ERROR`，前端只顯示安全、可理解的分類訊息，不暴露內部設定名稱。
+
+補充：本輪嘗試讀取 taskcard、repo HEAD 與現有 helper 時，本機 sandbox helper 無法啟動，因此以上是依你提供的完整計畫做的嚴格契約審查，尚未把行號與 taskcard 原文作第二次實檔核驗。就計畫本身，已存在足以阻止 `APPROVED` 的明確矛盾。
+tokens used
+37,570
+VERDICT: CHANGES REQUIRED
+
+以下問題未修正前不能蓋 `APPROVED`。
+
+1. [BLOCKER] `content_id` 被重複 decode，且例外會炸掉整個初始化  
+   `URLSearchParams.get()` 已經完成 percent-decoding，再呼叫 `decodeURIComponent(contentId)` 會：
+
+   - 把合法的 `%` 篇名誤判為 malformed URI
+   - 遇到 `%E0...` 等輸入直接丟例外
+   - 使 `initAskLaoyiPage()` 中止、頁面無法進場
+
+   應直接使用 `contentId`，並限制長度。若真正需要二次編碼，必須把契約寫清楚並捕捉 decode 例外。
+
+2. [BLOCKER] `content_id` 的資料契約自相矛盾  
+   名稱叫 `content_id`，實際傳入「篇名」。這會造成後續把資料庫 ID、slug 或篇名混用。至少應二選一：
+
+   - 改名 `content_title`
+   - `content_id` 傳穩定 ID，前端再從 `/study` 查正式篇名
+
+   現行方案還沒有長度上限、控制字元規則與不存在文章的處理。
+
+3. [BLOCKER] deep-link 能力沒有任何正式入口接上，驗收①可能只是在測死碼  
+   計畫刻意不改 `studySendAskLaoyi`，因此「拿這篇問老易」仍走舊 `sendMessages`，正常使用者旅程根本不會進入 S3。若 taskcard 的 deep link 是實際產品流程要求，只有人工拼 URL 不算完成。必須由卡明確裁決：
+
+   - 本卡接上書房入口；或
+   - 驗收明文允許本卡只提供路由能力，並列出後續卡與 owner
+
+4. [BLOCKER] 對話送出存在並行競態，會破壞 Dify conversation  
+   使用者可連點或連按 Enter。在第一輪尚未取得 `conversation_id` 前，第二輪也會以空 ID 發出，建立兩條 Dify conversation；回覆又可能倒序，最後回來的 response 會覆蓋 `laoyiConvId`。必須定義：
+
+   - 單飛：請求完成前鎖 send/composer；或
+   - 明確 queue，依序送出
+   - 防 double-submit
+   - 回覆順序與 conversation ID 更新規則
+
+5. [BLOCKER] 25 輪計數語意錯誤  
+   `laoyiTurnCount++` 放在 catch 後，因此 token 失效、503、網路失敗也算一輪；第 25 輪後每次又會反覆執行 `laoyiShowClosing()`，可能產生重複按鈕。需定義「一輪」是成功的 user–assistant exchange，並讓 closing render idempotent。
+
+6. [BLOCKER] E47「段落 ≤4 行」沒有實作，也無法驗收  
+   「對話體天然短句」不是控制機制。Dify 回覆長度完全不受前端掌控，螢幕寬度與字級也會改變實際行數。目前斷言表沒有測此條，與「E47 五條」驗收宣稱不符。需明確採用可驗證方案，例如分段／摘要摺疊／最大可視行數加展開，並以目標 viewport 做 DOM 渲染測試。
+
+7. [BLOCKER] 客服 fallback 所依賴的 DOM 在新 DOM 規格中不存在  
+   `laoyiHandoffToService()` 呼叫：
+
+   ```js
+   showAskLaoyiFallback(lastUserMsg,'askLaoyiStatus','askLaoyiFallback','askLaoyiFallbackText')
+   ```
+
+   但 1.1 的重寫 DOM 沒列出這三個元素。若舊 `#page-about` 被取代，它們很可能一起消失，fallback 將無法顯示，甚至在 helper 未做 null 防禦時二次拋錯。必須保留對應 DOM，或設計問答室專用 fallback。
+
+8. [BLOCKER] 「原句送出」在沒有 user message 時被違反  
+   計畫會送：
+
+   ```text
+   （TA 尚未輸入問題，直接請書僮協助）
+   ```
+
+   這不是 TA 原句，卻會作為 TA 訊息進 OA。應在沒有原句時禁止送出、要求先輸入，或提供獨立客服輸入框；不能替使用者發明內容。
+
+9. [BLOCKER] 「最後一則 user message」不等於「客服題原句」  
+   常駐入口可在任意時點按下，因此可能把上一個易經問題、健康資訊或其他敏感內容送往書僮鏈。這不符合「客服題原句」契約，也造成非預期資料轉送。必須把 handoff 綁定到明確選取的訊息，或在送出前顯示內容並讓使用者確認。
+
+10. [BLOCKER] 書僮交接缺少防重複與狀態控制  
+    重複點「店務找書僮」會反覆插入 S5 和新按鈕；連點「交給書僮」會重複呼叫 `sendMessages`，可能在 OA 建立多筆相同事件。需要 busy/disabled 狀態、成功後不可重送，並讓 S5/CTA 建立具冪等性。
+
+11. [BLOCKER] S6 對下游成功狀態作了未經證實的承諾  
+    `liff.sendMessages()` 成功只代表訊息送進 LINE 對話，不代表 5379670 已接收、成功分流或「書僮接著答」。若 S6 是卡上已定稿文字，驗收必須包含下游真機結果；否則這句會把 transport success 說成 business success。
+
+12. [BLOCKER] Dify route 沒有 timeout，blocking request 可無限拖住  
+    Worker 對 token verify、profile 與 Dify blocking 呼叫均未定義 timeout。Dify 卡住時前端 typing bubble 會長時間不結束，Worker 資源也被占用。需要 `AbortController` timeout，並區分 timeout 與其他 upstream failure。
+
+13. [BLOCKER] 新付費端點沒有 rate limit／濫用邊界  
+    任一有效 LINE access token 都可以無限制呼叫 blocking Dify API，且 query 可達 2000 字。這會形成成本與 DoS 入口。即使 stateless 禁止 D1/KV，也必須在計畫中明確裁決可接受的限制方式，例如 Cloudflare Rate Limiting、WAF 規則或既有 gateway 配額；不能完全不處理。
+
+14. [BLOCKER] `conversation_id` 被靜默截斷，會改壞資料  
+    `slice(0,128)` 會把不合法 ID 變成另一個 ID，再交給 Dify。應依 Dify 實際契約驗證格式和最大長度；超限回 400，不得靜默變造。非字串但有值也應回 400，而不是悄悄當新 conversation。
+
+15. [BLOCKER] Dify 成功回應驗證不足  
+    `answer` 或 `conversation_id` 缺失時，relay 仍回 200。前端甚至可能顯示自製的「老易暫時沒有回應」，把 upstream schema error 偽裝成正常對話。至少應驗證：
+
+    - response 是 object
+    - `answer` 是非空字串
+    - `conversation_id` 是符合契約的非空字串
+    - 回應大小在上限內
+
+    不符應回 502，不能回成功。
+
+16. [BLOCKER] 前端沒有 query 長度契約，會先顯示使用者泡泡再收到 400  
+    Worker 限制 2000，但 textarea 沒 `maxlength`，`laoyiSend()` 也沒相同 validation。使用者輸入過長時，UI 先把內容當成功送出，再顯示泛化錯誤。前後端必須共享同一限制，並在送出前顯示具體錯誤。
+
+17. [BLOCKER] S4 heuristic 無法符合「決策題收束」的一般驗收  
+    regex 明知會漏判／誤判，且缺少大量自然說法，如「是否適合」「哪個比較好」「現在能不能」「A 還是 B」。若卡要求決策題均出現 CTA，這個實作無法通過。需要：
+
+    - 由 Dify 回傳結構化旗標，但這涉及 prompt 契約及回歸；或
+    - 明確限縮 taskcard 的可驗收語句集合，並以 fixtures 鎖定
+
+    「plan 自訂」不能取代可測資料契約。
+
+18. [BLOCKER] 驗收②的「前端無端點」與實作矛盾  
+    前端必須持有 relay URL；表格卻寫「前端無端點/金鑰」，斷言又只 grep `dify.ai`。應改成精確契約：「前端可含 relay endpoint，不得含 Dify endpoint 或 Dify key」。否則驗收文字與實作互相衝突。
+
+19. [BLOCKER] CORS/OPTIONS 契約沒有納入新自訂 header 驗收  
+    使用 `X-Line-AccessToken` 會觸發 preflight。不能只說沿用 `corsHeaders()`；必須驗證 `Access-Control-Allow-Headers` 確實包含 `Content-Type, X-Line-AccessToken`，且 `OPTIONS /laoyi/chat` 能成功。否則瀏覽器會在路由前攔掉請求。
+
+20. [BLOCKER] 測試計畫不足以驗證主要失敗路徑  
+    Worker 至少缺以下測例：
+
+    - JSON scalar／array／null
+    - 缺 query、非字串 query、純空白、超長 query
+    - `conversation_id` 非字串／超長／非法格式
+    - token 缺失、verify 失敗、channel mismatch、profile 失敗
+    - secret 缺失
+    - Dify timeout、network error、非 2xx、非 JSON、空 answer、缺 conversation ID
+    - CORS preflight
+    - 連續送出與回覆倒序
+    - handoff double-click／無 user message／sendMessages failure
+    - malformed deep link、超長篇名
+    - IME composition 下按 Enter 不可誤送
+
+    現有「DOM 抽取／payload 驗證／文案比對」不足以證明驗收成立。
+
+21. [SUGGEST] `RELAY_URL+'laoyi/chat'` 有 slash 契約風險  
+    若 `RELAY_URL` 不以 `/` 結尾會組成錯誤 URL；若以 `/` 結尾才正確。建議使用 `new URL('/laoyi/chat', RELAY_URL)` 或共用 URL builder。
+
+22. [SUGGEST] 必須明訂 bubble 使用 `textContent`  
+    `contentTitle`、query、Dify answer 都是不可信文字。計畫只說「純文字氣泡」，應在實作與測試中鎖定不得使用 `innerHTML`。
+
+23. [SUGGEST] Enter 行為需處理熟齡輸入與 IME  
+    建議明訂 Enter 送出、Shift+Enter 換行，且 `event.isComposing` 或 keyCode 229 時不得送出，避免中文選字被當成提交。
+
+24. [SUGGEST] `initAskLaoyiPage()` 應可重入  
+    若 SPA 路由反覆進入 `#page-about`，目前可能重複掛 listener、重複開場泡泡。建議設初始化旗標，或先移除 listener／清理 thread，並定義返回格5時是延續當頁 conversation 還是重置。
+
+25. [SUGGEST] Dify 第三方資料傳輸需列入資料邊界  
+    `verifiedUserId` 與使用者全文會送至 Dify。即使不寫 Airtable/D1/KV，也不等於「不持久化」；Dify 可能保存 conversation/log。應在 stateless 宣稱中明確區分「relay 不落地」和「Dify 端保存政策」，並確認告知／隱私基準。
+
+26. [SUGGEST] 錯誤回應應提供穩定 error code  
+    UI 現在只能看到 HTTP status。建議 worker 回 `code`，例如 `INVALID_QUERY`、`UPSTREAM_TIMEOUT`、`UPSTREAM_SCHEMA_ERROR`，前端只顯示安全、可理解的分類訊息，不暴露內部設定名稱。
+
+補充：本輪嘗試讀取 taskcard、repo HEAD 與現有 helper 時，本機 sandbox helper 無法啟動，因此以上是依你提供的完整計畫做的嚴格契約審查，尚未把行號與 taskcard 原文作第二次實檔核驗。就計畫本身，已存在足以阻止 `APPROVED` 的明確矛盾。

@@ -1,0 +1,544 @@
+﻿codex : 2026-07-21T12:56:01.753911Z ERROR codex_models_manager::cache: failed to load models cache: missing field `supp
+orts_reasoning_summaries` at line 88 column 5
+At line:2 char:58
++ ... Raw "plans\review_logs\_codeB_prompt.txt" | codex exec - 2>&1 | Out-F ...
++                                                 ~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (2026-07-21T12:5...ine 88 column 5:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+OpenAI Codex v0.144.6
+--------
+workdir: D:\CBD_Lab_OS\001_mingge\mingge-line
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: low
+reasoning summaries: none
+session id: 019f84bf-6260-7910-bec2-a233d4601a69
+--------
+user
+這是 Codex 互審 Skill 模式B(反向 code review)。以下是 Claude Code 依 plans\plan_e56_laoyi_center_v0_1.md(已 r1-r4 互審+Perth 拍板)施工完成的 g
+it diff,對照派工卡驗收條件與範圍逐項審查:①範圍守門──任何範圍外變動一律攔下;②驗收條件逐條 PASS/FAIL;③紅線掃描──token/金鑰/硬編碼endpoint/TA文案變動一律攔下(TA文案=紅線區)。請給出:PASS
+項清單/攔下項(附行號)/退回修正指令。若整體通過,請明確說 overall PASS。
+
+===派工卡===
+# 001_taskcard_e56_laoyi_center_S20260721_v1_1 · E56 老易學習中心施工卡【發包版·取代 v1_0】
+
+> 2026-07-21 · 中樞 S-20260721-Hub 出卡 · **Perth 已放行發包＋話術 7 句終審全過（本卡話術＝定稿，逐字貼裝禁改字）**
+> 執行：Claude Code（唯一 writer）· 互審：Codex CLI（讀本卡→寫 plan→審至 APPROVED→施工→反向互審→交回；Codex 不通則 Gemini 2.5 Flash）
+> 板證：Journey_Edges E56 recCQsIVDnItKqLP9／E57 recIcclxRzKVxx4zV＋Change_Log rec0fhVhxgAl74EAW·recl6dVQuYb9xqQlG
+> P0 前置三項已完（話術包終審過／relay 盤點過／QA 5 題已入庫）——本卡直接進施工。
+
+## 一、目標動機
+
+給老易一個自己的面。老易＝TA 學習交流中心（答卦理/文章/易經），現寄生書僮客服鏈 5379670＝架構錯位。本卡建「格5 兩態 LIFF 問答面 → relay 新路由 → 老易說易 app-gQwG4 直連」，完全繞開客服鏈。這同時
+是 E55「拿這篇問老易」的前置、與 Phase 2 HeyGen 的既成軌道（屆時只換表現層）。快跟項：不擋 8/1 軟啟動，但驗收過即補上。
+
+## 二、施工範圍（repo: mingge-line）
+
+**C1 格5 兩態（index.html）**
+- 門廳態：沉用 live index.html 現行格5 介紹段（code 真相源自抓，禁重寫）＋定稿 S1 收口段＋兩按鈕。show-once：首訪見門廳，再訪直達問答室（localStorage 鍵建議 `mg_laoyi_hall
+_seen`，實作可議）。
+- 問答室態：純文字對話流（禁 Flex 化回答）。開場句：空手進用 S2；帶 `?content_id=` 進用 S3（篇名由書房前端既有文章資料組裝；deep link 繞過門廳）。
+- 熟齡硬約束（E47 五條）：內文≥17px、行高≥1.9、目標動作≤3步、段落≤4行、按鈕字不縮。
+- 25 輪軟收束：前端計數配合引擎既有 rail，收尾補按鈕〔回書房〕〔起一卦〕。
+
+**C2 relay 新路由（workers/mingge-relay/worker.js）**
+- `POST /laoyi/chat`：照既有七路由同款「驗 LINE access token（api.line.me /v2/profile）→ 持鑰轉發」模式 → Dify app-gQwG4 chat-messages（bloc
+king）。
+- 金鑰＝Worker env（`DIFY_LAOYI_KEY`，**Perth 親貼 wrangler secret，永不入檔入 repo**——缺鑰時以佔位變數施工＋標註 B2，禁硬編）。
+- conversation_id 僅存頁面記憶體（session 內多輪）；**不落任何持久層**＝stateless 鐵則（不接卦記/Divination_Log，明文不做）。
+
+**C3 E57 單向帶話（index.html）**
+- 問答室常駐次要入口「店務找書僮」＋引擎收束店務題時顯示 S5 引路；按〔交給書僮〕→ `liff.sendMessages` 以 TA 名義把其原句送進 OA → 顯示 S6 成功提示。書僮鏈 5379670 照舊接手，**零改動**
+。
+- 個人決策題收束＝S4 原則：前端零句，引擎講（Patch C 既有），前端只在該類回覆下補〔心中默念此問，起一卦〕按鈕（判斷方式由 plan 提，最薄可行即可）。
+
+**C4 併批 polish**：「卦記」字級一致（E47 殘項，比照全站基準）。
+
+## 三、話術定稿（Perth 終審過 2026-07-21，逐字貼裝）
+
+- **S1 門廳收口**：「老易這裡。這一進是問學的地方——易經的道理、卦的意思、書房裡的文章，都可以問。但有三件事老夫不做：不替你占、不替你斷、不談店務帳目。占卦是天的事，店務找書僮。想清楚了，就進來坐。」按鈕〔向老易請教〕〔先逛書房
+〕
+- **S2 開場（空手）**：「坐。今日想問哪一卦、哪一篇、哪一句？」
+- **S3 開場（帶篇）**：「你帶來的是〈{篇名}〉。文中何處讓你停下了？」
+- **S4 決策題收束**：前端零句（引擎講），補按鈕〔心中默念此問，起一卦〕
+- **S5 引路**：「這是店務，老夫不管帳——書僮就在門外。你這一問，我替你帶到他案上。」按鈕〔交給書僮〕
+- **S6 送出成功**：「已送到書僮案上。回到聊天室，書僮接著答。」
+- **S7 placeholder**：「請教老易——卦、文章、易經都可問」；收尾按鈕〔回書房〕〔起一卦〕
+
+## 四、驗收條件（過完才交回）
+
+1. 格5 首訪見門廳、再訪直達問答室；`?content_id=` deep link 繞門廳、S3 正確帶篇名。
+2. 問答室經 relay 直連 app-gQwG4 有問有答；前端無任何真實端點/金鑰；5379670 與 5202754 diff＝零。
+3. 客服題按鈕 sendMessages 原句進 OA、S6 顯示、書僮照舊接手（真機）。
+4. E47 五條全過＋卦記字級一致；25 輪收尾行為正確。
+5. 對話不跨 session 留存（重開 LIFF＝全新對話）。
+6. headless 測試腳本（tests/ 慣例）附斷言；**新鏈 20-case＋5 偽裝題回歸＝中樞後續跑（V1 硬閘，非本卡範圍但上線以此為準）**。
+
+## 五、回報格式（build-evidence rule）
+
+remote SHA（exact-head，push 後 origin/main）｜互審輪次與結果｜測試腳本路徑＋PASS 數｜rollback 點（前一 SHA＋Worker 部署版本）｜B1/B2/B3 卡住即標分類回報，禁靜默 DE
+FER。
+
+## 六、禁碰邊界
+
+Make 5379670／5202754｜老易說易 Dify prompt 與 KB（動＝回歸觸發＋Perth 核）｜任何持久化 TA 對話的設計｜金鑰入檔。
+
+---
+*發包 2026-07-21 · 家：00B_taskcard · rollback：git revert＋Worker 版本回滾；5379670 sb_orig／5202754 bp_orig · 善為易者不占*
+
+
+===git diff===
+diff --git a/index.html b/index.html index 4cae507..bc2d2b1 100755 --- a/index.html +++ b/index.html @@ -296,6 +296,37 
+@@    .ask-fallback textarea{width:100%;min-height:72px;resize:vertical;border:1px solid rgba(184,134,11,.3);      bord
+er-radius:4px;padding:9px;background:rgba(7,11,7,.7);color:var(--rice);font-family:inherit;      font-size:13px;line-he
+ight:1.7;} +  /* E56:格5 老易兩態(門廳/問答室)—— E47熟齡硬約束:內文≥17px/行高≥1.9,按鈕沿用既有 .sp-btn/.ask-secondary 不縮 */ +  .laoyi-view{displ
+ay:none;} +  .laoyi-view.laoyi-visible{display:block;} +  .laoyi-hall .lp-body p{font-size:17px;line-height:1.9;} +  .l
+aoyi-hall-close{margin-top:22px;padding-top:18px;border-top:1px solid rgba(184,134,11,.18); +    font-size:17px;line-he
+ight:1.9;letter-spacing:.05em;color:var(--gold-soft);text-align:center;} +  .laoyi-room{padding:0 28px;display:flex;fle
+x-direction:column;flex:1;} +  .laoyi-thread{flex:1;padding:14px 0 10px;display:flex;flex-direction:column;gap:14px;} +
+  .laoyi-bubble{max-width:88%;padding:14px 16px;border-radius:8px;font-size:17px;line-height:1.9; +    letter-spacing:.
+03em;white-space:pre-wrap;} +  .laoyi-bubble-bot{align-self:flex-start;background:rgba(245,241,232,.05);color:var(--ric
+e-deep); +    border:1px solid rgba(184,134,11,.22);} +  .laoyi-bubble-user{align-self:flex-end;background:rgba(184,134
+,11,.16);color:var(--rice); +    border:1px solid rgba(184,134,11,.3);} +  .laoyi-bubble-pending{opacity:.6;} +  .laoyi
+-svc-confirm{align-self:flex-start;max-width:88%;padding:12px 14px;border:1px dashed rgba(184,134,11,.35); +    border-
+radius:8px;background:rgba(245,241,232,.03);} +  .laoyi-svc-preview{font-size:15px;line-height:1.8;color:var(--gold-sof
+t);margin:0 0 10px;} +  .laoyi-closing{margin:6px 0 14px;padding:14px;border-top:1px solid rgba(184,134,11,.18); +    d
+isplay:flex;flex-wrap:wrap;gap:10px;justify-content:center;} +  .laoyi-svc-link{text-align:center;padding:4px 0 10px;} 
++  .laoyi-svc-link button{background:none;border:none;color:var(--moss-soft);font-family:inherit; +    font-size:13.5px
+;letter-spacing:.08em;text-decoration:underline;text-underline-offset:4px;cursor:pointer;} +  .laoyi-composer{display:f
+lex;gap:10px;align-items:flex-end;padding:10px 0 24px; +    border-top:1px solid rgba(184,134,11,.18);} +  .laoyi-compo
+ser textarea{flex:1;resize:none;border:1px solid rgba(184,134,11,.3);border-radius:6px; +    padding:12px;background:rg
+ba(7,11,7,.7);color:var(--rice);font-family:inherit; +    font-size:17px;line-height:1.9;} +  .laoyi-composer button{ba
+ckground:var(--gold);color:#15200f;border:none;border-radius:6px; +    padding:12px 20px;font-family:inherit;font-size:
+15px;font-weight:600;cursor:pointer;white-space:nowrap;} +  .laoyi-composer button:disabled{opacity:.5;cursor:not-allow
+ed;}    /* ====================================================       E09 歷史卦例    =====================================
+=============== */ @@ -418,6 +449,8 @@    ==================================================== */    /* polish batch(§3
+-1):格3 字級統一表 —— 全卡(featured/非featured)同層同級,一律 ≥17px */    #page-pay .lp-header .lp-sub{font-size:17px;} +  /* E56 polis
+h(卦記字級一致,E47殘項):我的卦記 hub 副標比照格3/書房既有 17px 基準補齊 */ +  #page-log .lp-header .lp-sub{font-size:17px;}    .pay-sub-active{ 
+     border:1px solid rgba(122,154,114,.3);border-radius:4px;      padding:16px 18px;font-size:17px;letter-spacing:.08e
+m; @@ -708,40 +741,44 @@      </div>    </div>   -  <!-- P-ASK 格5 問老易 (005A · action=ask；保留 action=about 相容入口) --> +  <
+!-- P-ASK 格5 老易學習中心(E56 · action=ask；保留 action=about 相容入口) -->    <div class="liff-page" id="page-about">      <div cla
+ss="lp-header">        <div class="lp-icon">👤</div>        <h1>問老易</h1> -      <div class="lp-sub">不必問卦，也能來聊《易經》的學問。</
+div> +      <div class="lp-sub">易經的道理、卦的意思、書房裡的文章，都可以問。</div>      </div> -    <div class="lp-body"> -      <div class=
+"about-portrait" aria-hidden="true"></div><!-- T6:頁首老易形象 image-slot 留白框(米白紙感·無人像);raster 待 Design 另輪換皮補 --> -      <p>老
+易，六十出頭，讀了大半輩子的《易經》。</p> -      <p>他不是算命的，也不替您決定什麼——他是替您把卦讀清楚的人。</p> -      <p>您向天問了一卦，卦象天成；老易做的，是把這一卦的本卦、變卦、動爻，一樣樣為您讀出來
+，看清這件事此刻的形勢、往哪裡轉。</p> -      <div class="lp-quote">「善為易者不占。」<br>真正懂易的人，不求一個算定的答案，是看懂當下形勢、自己拿主意。</div> -      <p>不必先有一卦。
+讀不懂一句、想知道一個觀念，或只是想把剛讀完的文章再問深一點，都可以來坐坐。</p> -      <div class="ask-prompts" aria-label="可以問老易的方向"> -        <button type
+="button" class="ask-prompt" data-ask-laoyi="我沒讀過古文，也能讀《易經》嗎？">我沒讀過古文，也能讀《易經》嗎？</button> -        <button type="button"
+ class="ask-prompt" data-ask-laoyi="卦辭有吉有凶，該怎麼讀才不把它當成判決？">卦辭有吉有凶，該怎麼讀才不把它當成判決？</button> -        <button type="button" 
+class="ask-prompt" data-ask-laoyi="做事的人，可以怎麼學《易經》？">做事的人，可以怎麼學《易經》？</button> -        <button type="button" class="ask-
+prompt" data-ask-laoyi="我剛讀完一篇書房文章，想再問深一點。">我剛讀完一篇書房文章，想再問深一點。</button> -      </div> -      <div class="about-signpost
+"><!-- 005A:免費優先；向天問卦為次要路標 --> -        <p>選一題，或先跟老易打聲招呼。這條路不使用問卦銅錢。</p> +    <!-- 態1:門廳 --> +    <div class="laoyi-vie
+w laoyi-hall" id="laoyiHall"> +      <div class="lp-body"> +        <div class="about-portrait" aria-hidden="true"></di
+v><!-- T6:頁首老易形象 image-slot 留白框(米白紙感·無人像);raster 待 Design 另輪換皮補 --> +        <p>老易，六十出頭，讀了大半輩子的《易經》。</p> +        <p>他不
+是算命的，也不替您決定什麼——他是替您把卦讀清楚的人。</p> +        <p>您向天問了一卦，卦象天成；老易做的，是把這一卦的本卦、變卦、動爻，一樣樣為您讀出來，看清這件事此刻的形勢、往哪裡轉。</p> +        <di
+v class="lp-quote">「善為易者不占。」<br>真正懂易的人，不求一個算定的答案，是看懂當下形勢、自己拿主意。</div> +        <p>不必先有一卦。讀不懂一句、想知道一個觀念，或只是想把剛讀完的文章再問深一點
+，都可以來坐坐。</p> +        <div class="laoyi-hall-close"><!-- S1 --><p>老易這裡。這一進是問學的地方——易經的道理、卦的意思、書房裡的文章，都可以問。但有三件事老夫不做：不替你占
+、不替你斷、不談店務帳目。占卦是天的事，店務找書僮。想清楚了，就進來坐。</p></div>          <div class="ask-actions"> -          <button type="button" clas
+s="sp-btn ask-primary" id="askLaoyiStart">開始問老易</button> -          <button type="button" class="ask-secondary" onclick
+="location.href='./index.html?action=study'">回易經書房</button> -          <button type="button" class="ask-secondary" oncl
+ick="location.href='./index.html'">向天問卦</button> -        </div> -        <p class="ask-status" id="askLaoyiStatus" rol
+e="status" aria-live="polite"></p> -        <div class="ask-fallback" id="askLaoyiFallback" hidden> -          <label f
+or="askLaoyiFallbackText">若目前不在 LINE 內，請複製這句，回到命格易經的對話貼上：</label> -          <textarea id="askLaoyiFallbackText" readon
+ly></textarea> +          <button type="button" class="sp-btn ask-primary" id="laoyiHallEnter">向老易請教</button> +        
+  <button type="button" class="ask-secondary" id="laoyiHallStudy">先逛書房</button>          </div>        </div>      </di
+v> +    <!-- 態2:問答室 --> +    <div class="laoyi-view laoyi-room" id="laoyiRoom" hidden> +      <div class="laoyi-thread"
+ id="laoyiThread" role="log" aria-live="polite"></div> +      <div class="laoyi-closing" id="laoyiClosing" hidden></div
+> +      <p class="ask-status" id="askLaoyiStatus" role="status" aria-live="polite"></p> +      <div class="ask-fallbac
+k" id="askLaoyiFallback" hidden> +        <label for="askLaoyiFallbackText">若目前不在 LINE 內，請複製這句，回到命格易經的對話貼上：</label> +  
+      <textarea id="askLaoyiFallbackText" readonly></textarea> +      </div> +      <div class="laoyi-svc-link"><button
+ type="button" id="laoyiSvcEntry">店務找書僮</button></div> +      <div class="laoyi-composer"> +        <textarea id="laoyi
+Input" placeholder="請教老易——卦、文章、易經都可問" rows="2" maxlength="2000"></textarea> +        <button type="button" id="laoyiSen
+d">送出</button> +      </div> +    </div>    </div>          <div class="foot">善為易者不占 · 介面謙卑於源頭 · 進場儀式 v1.6.1(E55 拿這篇問老易
+直送對話)</div> @@ -913,30 +950,10 @@ async function studyShareArticle(gidx,btnEl){  /* E55:書房「拿這篇問老易」直送對話。定稿句沿用現行(零改字);   
+  成功提示句為本卡唯一新增合法字面。init 取得走共享 ensureLiffInit()(同上)。     失敗 → 走現行 showAskLaoyiFallback,一字不動(零回歸)。 */ -async function stu
+dySendAskLaoyi(gidx,btnEl){ +function studySendAskLaoyi(gidx,btnEl){    var a=studyState.articles[gidx]; if(!a){ return
+; } -  var message='問老易\n我剛讀完〈'+(a.title||'這篇文章')+'〉，想再問深一點。'; -  var statusId='studyAskStatus', fallbackId='studyAskFa
+llback', textId='studyAskFallbackText'; -  resetAskLaoyiFeedback(statusId,fallbackId,textId); -  if(btnEl){ btnEl.disab
+led=true; } -  try{ -    if(typeof liff==='undefined'){ throw new Error('LIFF unavailable'); } -    await ensureLiffIni
+t(); -    if(!(liff.isInClient && liff.isInClient())){ throw new Error('not in LINE client'); } -    if(!(liff.isLogged
+In && liff.isLoggedIn())){ throw new Error('not logged in'); } -    if(typeof liff.sendMessages!=='function'){ throw ne
+w Error('sendMessages unavailable'); } -    await liff.sendMessages([{type:'text',text:message}]); -    var status=docu
+ment.getElementById(statusId); -    if(status){ status.textContent='已送進對話。回到聊天室,老易接著說。'; } -    setTimeout(function(){ 
+-      if(typeof liff.closeWindow==='function'){ try{ liff.closeWindow(); }catch(e){} } -    },1500); -  }catch(e){ -  
+  showAskLaoyiFallback(message,statusId,fallbackId,textId); -    console.warn('[study ask laoyi fallback]',e && e.messa
+ge?e.message:e); -  }finally{ -    if(btnEl){ btnEl.disabled=false; } -  } +  if(btnEl){ btnEl.disabled=true; } // E56:
+改走格5老易問答室 deep link(帶篇名,S3開場),不再送 LINE 訊息寄生客服鏈 +  location.href='./index.html?action=ask&content_id='+encodeURIComponen
+t(a.title||'這篇文章');  }    /* 導覽狀態機:單次 fetch 快取,層間不重抓;pushState/popstate + 邊界 guard(R1-#5) */ @@ -987,7 +1004,7 @@ async
+ function initStudyPage(){    }  }   -/* ===== 005A 問老易：只送回 LINE 對話，不經問卦 Worker / quota POST ===== */ +/* ===== E56 老易學
+習中心:格5 兩態(門廳/問答室)LIFF 直連問答,繞開客服鏈 5379670 ===== */  function resetAskLaoyiFeedback(statusId,fallbackId,textId){    var s
+tatus=document.getElementById(statusId); if(status){ status.textContent=''; }    var fallback=document.getElementById(f
+allbackId); if(fallback){ fallback.hidden=true; } @@ -1009,39 +1026,217 @@ function showAskLaoyiFallback(message,status
+Id,fallbackId,textId){    }  }   -async function sendAskLaoyiIntent(message,statusId,fallbackId,textId){ -  var status=
+document.getElementById(statusId); -  resetAskLaoyiFeedback(statusId,fallbackId,textId); -  if(status){ status.textCont
+ent='正在帶回 LINE 對話……'; } +var LAOYI_HALL_SEEN_KEY='mg_laoyi_hall_seen'; +function laoyiHasSeenHall(){ try{ return localS
+torage.getItem(LAOYI_HALL_SEEN_KEY)==='1'; }catch(e){ return false; } } +function laoyiMarkHallSeen(){ try{ localStorag
+e.setItem(LAOYI_HALL_SEEN_KEY,'1'); }catch(e){} } + +var LAOYI_TITLE_MAX=200; +function laoyiSanitizeTitle(raw){ +  if(
+typeof raw!=='string') return ''; +  var stripped=raw.replace(/[\x00-\x1F\x7F]/g,'').trim(); +  return stripped.slice(0
+,LAOYI_TITLE_MAX); +} + +var laoyiInput, laoyiSendBtn, laoyiThread; +var laoyiConvId=null;      // 頁面記憶體,不落地(stateless 
+鐵則) +var laoyiTurnCount=0; +var laoyiClosingShown=false; +var laoyiSending=false;    // 單飛鎖,防連點/連按 Enter 建出兩條 Dify conv
+ersation +var LAOYI_QUERY_MAX=2000;  // 與 worker 端上限同值 +var LAOYI_DECISION_RE=/要不要|該不該|值不值得|該如何選|怎麼決定|該不該做|是否適合|哪個比較好|哪
+一個好|現在能不能|要選.+還是|.+還是.+[?？]|go\s*or\s*no\s*go/i; +var laoyiSvcHandoffOpen=false; + +function laoyiShowHall(){ +  var ha
+ll=document.getElementById('laoyiHall'), room=document.getElementById('laoyiRoom'); +  if(hall){ hall.hidden=false; } +
+  if(room){ room.hidden=true; } +} + +function laoyiOpeningLine(opts){ +  if(opts.opener==='content' && opts.contentTit
+le){ +    return '你帶來的是〈'+opts.contentTitle+'〉。文中何處讓你停下了？'; // S3,逐字 +  } +  return '坐。今日想問哪一卦、哪一篇、哪一句？'; // S2,逐字 +} +
+ +function laoyiEnterRoom(opts){ +  var hall=document.getElementById('laoyiHall'), room=document.getElementById('laoyiR
+oom'); +  if(hall){ hall.hidden=true; } +  if(room){ room.hidden=false; } +  laoyiAppendBubble(laoyiOpeningLine(opts||{
+}),'bot',{system:true}); +} + +function laoyiAppendBubble(text,role,opts){ +  if(!laoyiThread) return null; +  var el=d
+ocument.createElement('div'); +  el.className='laoyi-bubble laoyi-bubble-'+(role==='user'?'user':'bot')+((opts&&opts.pe
+nding)?' laoyi-bubble-pending':''); +  el.textContent=text; // textContent only,不用 innerHTML(TA輸入/Dify回覆/篇名皆不可信文字) +  l
+aoyiThread.appendChild(el); +  laoyiThread.scrollTop=laoyiThread.scrollHeight; +  return el; +} +function laoyiReplaceB
+ubble(el,text){ +  if(!el) return; +  el.textContent=text; +  el.classList.remove('laoyi-bubble-pending'); +  if(laoyiT
+hread){ laoyiThread.scrollTop=laoyiThread.scrollHeight; } +} + +function laoyiSetComposerBusy(busy){ +  laoyiSending=bu
+sy; +  if(laoyiInput){ laoyiInput.disabled=busy; } +  if(laoyiSendBtn){ laoyiSendBtn.disabled=busy; } +} + +function la
+oyiAppendDecisionCta(){ +  var btn=document.createElement('button'); +  btn.type='button'; btn.className='sp-btn ask-pr
+imary'; +  btn.textContent='心中默念此問，起一卦'; +  btn.addEventListener('click',function(){ location.href='./index.html'; }); 
++  if(laoyiThread){ laoyiThread.appendChild(btn); laoyiThread.scrollTop=laoyiThread.scrollHeight; } +} + +function laoy
+iShowClosing(){ +  var closing=document.getElementById('laoyiClosing'); +  if(!closing) return; +  closing.innerHTML=''
+; +  var backBtn=document.createElement('button'); +  backBtn.type='button'; backBtn.className='sp-btn ask-primary'; ba
+ckBtn.textContent='回書房'; +  backBtn.addEventListener('click',function(){ location.href='./index.html?action=study'; });
+ +  var divineBtn=document.createElement('button'); +  divineBtn.type='button'; divineBtn.className='ask-secondary'; di
+vineBtn.textContent='起一卦'; +  divineBtn.addEventListener('click',function(){ location.href='./index.html'; }); +  closi
+ng.appendChild(backBtn); closing.appendChild(divineBtn); +  closing.hidden=false; +} + +async function laoyiSend(text){
+ +  if(laoyiSending) return; +  var trimmed=(text||'').trim(); +  if(!trimmed) return; +  if(trimmed.length>LAOYI_QUERY
+_MAX){ +    laoyiAppendBubble('這一句太長了,請分段問(上限 '+LAOYI_QUERY_MAX+' 字)。','bot',{system:true}); +    return; +  } +  laoyi
+SetComposerBusy(true); +  laoyiAppendBubble(trimmed,'user'); +  if(laoyiInput){ laoyiInput.value=''; } +  var typing=la
+oyiAppendBubble('……','bot',{pending:true}); +  var convIdAtSend=laoyiConvId; +  var ok=false, answerText='';    try{   
+   if(typeof liff==='undefined'){ throw new Error('LIFF unavailable'); } -    await liff.init({liffId:LIFF_ID}); -    i
+f(!liff.isInClient || !liff.isInClient()){ throw new Error('not in LINE client'); } -    if(!liff.isLoggedIn || !liff.i
+sLoggedIn()){ throw new Error('not logged in'); } +    await ensureLiffInit(); +    var accessToken=liff.getAccessToken
+?liff.getAccessToken():null; +    if(!accessToken){ throw new Error('no access token'); } +    var res=await fetch(RELA
+Y_URL+'laoyi/chat',{ +      method:'POST', +      headers:{'Content-Type':'application/json','X-Line-AccessToken':acces
+sToken}, +      body:JSON.stringify({query:trimmed, conversation_id:convIdAtSend||''}) +    }); +    if(!res.ok){ throw
+ new Error('HTTP '+res.status); } +    var data=await res.json(); +    if(!data || typeof data.answer!=='string' || !da
+ta.answer){ throw new Error('bad payload'); } +    laoyiConvId=data.conversation_id||laoyiConvId; +    answerText=data.
+answer; +    ok=true; +  }catch(e){ +    answerText='老易這頭暫時聽不清，請再說一次，或稍後再試。'; +    console.warn('[laoyi chat]',e && e.m
+essage?e.message:e); +  } +  laoyiReplaceBubble(typing,answerText); +  laoyiSetComposerBusy(false); +  if(ok){ +    lao
+yiTurnCount++; +    if(LAOYI_DECISION_RE.test(trimmed)){ laoyiAppendDecisionCta(); } +    if(laoyiTurnCount>=25 && !lao
+yiClosingShown){ laoyiShowClosing(); laoyiClosingShown=true; } +  } +} + +function laoyiComposerKeydown(e){ +  if(e.key
+!=='Enter' || e.shiftKey) return; +  if(e.isComposing || e.keyCode===229) return; +  e.preventDefault(); +  laoyiSend(l
+aoyiInput?laoyiInput.value:''); +} + +function laoyiLastUserMessage(){ +  if(!laoyiThread) return ''; +  var bubbles=la
+oyiThread.querySelectorAll('.laoyi-bubble-user'); +  if(!bubbles.length) return ''; +  return bubbles[bubbles.length-1]
+.textContent||''; +} + +function laoyiShowSvcHandoff(){ +  if(laoyiSvcHandoffOpen) return; +  laoyiSvcHandoffOpen=true;
+ +  var entry=document.getElementById('laoyiSvcEntry'); +  if(entry){ entry.disabled=true; } +  laoyiAppendBubble('這是店務
+，老夫不管帳——書僮就在門外。你這一問，我替你帶到他案上。','bot',{system:true}); // S5 + +  var lastUserMsg=laoyiLastUserMessage(); +  if(!lastUser
+Msg){ +    laoyiAppendBubble('你還沒問過問題，先打字問一句，我再原句帶給書僮。','bot',{system:true}); +    if(entry){ entry.disabled=false; } +
+    laoyiSvcHandoffOpen=false; +    return; +  } +  var confirmBox=document.createElement('div'); +  confirmBox.classNa
+me='laoyi-svc-confirm'; +  var preview=document.createElement('p'); +  preview.className='laoyi-svc-preview'; +  previe
+w.textContent='將原句帶給書僮:「'+lastUserMsg+'」'; +  var btn=document.createElement('button'); +  btn.type='button'; btn.class
+Name='sp-btn ask-primary'; btn.textContent='交給書僮'; +  btn.addEventListener('click',function(){ laoyiHandoffToService(la
+stUserMsg,btn,confirmBox); }); +  confirmBox.appendChild(preview); confirmBox.appendChild(btn); +  if(laoyiThread){ lao
+yiThread.appendChild(confirmBox); laoyiThread.scrollTop=laoyiThread.scrollHeight; } +} + +async function laoyiHandoffTo
+Service(messageText,btnEl,confirmBoxEl){ +  if(btnEl.disabled) return; +  btnEl.disabled=true; +  try{ +    if(typeof l
+iff==='undefined'){ throw new Error('LIFF unavailable'); } +    await ensureLiffInit(); +    if(!(liff.isInClient && li
+ff.isInClient())){ throw new Error('not in LINE client'); } +    if(!(liff.isLoggedIn && liff.isLoggedIn())){ throw new
+ Error('not logged in'); }      if(typeof liff.sendMessages!=='function'){ throw new Error('sendMessages unavailable');
+ } -    await liff.sendMessages([{type:'text',text:message}]); -    if(status){ status.textContent='已送到 LINE 對話，老易會在那裡接
+著聊。'; } -    if(typeof liff.closeWindow==='function'){ -      setTimeout(function(){ try{ liff.closeWindow(); }catch(e)
+{} },700); -    } +    await liff.sendMessages([{type:'text',text:messageText}]); // 原句送出,不加工、不冠老易措辭 +    if(confirmBox
+El && confirmBoxEl.parentNode){ confirmBoxEl.parentNode.removeChild(confirmBoxEl); } +    laoyiAppendBubble('已送到書僮案上。回到
+聊天室，書僮接著答。','bot',{system:true}); // S6,逐字定稿    }catch(e){ -    showAskLaoyiFallback(message,statusId,fallbackId,textId
+); -    console.warn('[ask laoyi fallback]',e && e.message ? e.message : e); +    showAskLaoyiFallback(messageText,'ask
+LaoyiStatus','askLaoyiFallback','askLaoyiFallbackText'); +    btnEl.disabled=false; +    console.warn('[laoyi handoff f
+allback]',e && e.message?e.message:e);    }  }   +var __laoyiInited=false;  function initAskLaoyiPage(){ -  var start=d
+ocument.getElementById('askLaoyiStart'); -  if(start){ -    start.addEventListener('click',function(){ -      sendAskLa
+oyiIntent('問老易','askLaoyiStatus','askLaoyiFallback','askLaoyiFallbackText'); -    }); +  if(__laoyiInited) return; +  _
+_laoyiInited=true; + +  laoyiInput=document.getElementById('laoyiInput'); +  laoyiSendBtn=document.getElementById('laoy
+iSend'); +  laoyiThread=document.getElementById('laoyiThread'); +  if(laoyiSendBtn){ laoyiSendBtn.addEventListener('cli
+ck',function(){ laoyiSend(laoyiInput?laoyiInput.value:''); }); } +  if(laoyiInput){ laoyiInput.addEventListener('keydow
+n', laoyiComposerKeydown); } +  var svcEntry=document.getElementById('laoyiSvcEntry'); +  if(svcEntry){ svcEntry.addEve
+ntListener('click', laoyiShowSvcHandoff); } + +  var contentTitle=laoyiSanitizeTitle(new URLSearchParams(location.searc
+h).get('content_id')); +  if(contentTitle){ +    laoyiEnterRoom({opener:'content', contentTitle:contentTitle}); +  } el
+se if(laoyiHasSeenHall()){ +    laoyiEnterRoom({opener:'blank'}); +  } else { +    laoyiShowHall();    } -  document.qu
+erySelectorAll('[data-ask-laoyi]').forEach(function(button){ -    button.addEventListener('click',function(){ -      se
+ndAskLaoyiIntent(button.getAttribute('data-ask-laoyi'),'askLaoyiStatus','askLaoyiFallback','askLaoyiFallbackText'); -  
+  }); -  }); +  var enterBtn=document.getElementById('laoyiHallEnter'); +  if(enterBtn){ enterBtn.addEventListener('cli
+ck',function(){ laoyiMarkHallSeen(); laoyiEnterRoom({opener:'blank'}); }); } +  var studyBtn=document.getElementById('l
+aoyiHallStudy'); +  if(studyBtn){ studyBtn.addEventListener('click',function(){ location.href='./index.html?action=stud
+y'; }); }  }    window.addEventListener('popstate',function(e){ diff --git a/workers/mingge-relay/worker.js b/workers/m
+ingge-relay/worker.js index d78dce0..dad11bb 100644 --- a/workers/mingge-relay/worker.js +++ b/workers/mingge-relay/wor
+ker.js @@ -9,6 +9,8 @@  //         沿用現役 resolveUserId() 驗證,webhook URL 不進前端(依 S37 binding)  // S163: 新增 POST /trace(E25
+② 卦記蓋印·補後續)—— TA 事後補寫「後來怎麼走」,  //         寫入 Divination_Log.trace_text + trace_at;/history、/log 白名單追加回傳兩欄。 +// E56: 新增 
+POST /laoyi/chat(老易學習中心直連 Dify app-gQwG4,stateless,不落任何持久層) +//         需要 Secret: DIFY_LAOYI_KEY(Perth 貼進 Cloudflare S
+ecrets;缺鑰時路由回 503)  // ====================================================    const ALLOWED_ORIGIN = "https://perhaps8
+511-lab.github.io"; @@ -19,6 +21,8 @@ const AT_DIV_LOG     = "tblVyf8WfTQxvtpEg";  const AT_SUBS        = "tbljXninuBm7
+6D9nf";  const AT_SHUFANG     = "tblbzhwwmBDfAKQAs";  const TRACE_MAX_BODY_BYTES = 4096; +const LAOYI_CONV_ID_RE = /^[A
+-Za-z0-9_-]{1,128}$/; +const LAOYI_UPSTREAM_TIMEOUT_MS = 30000;    export default {    async fetch(request, env) { @@ -
+566,6 +570,99 @@ export default {        return json({ sent: true }, 202);      }   +    if (request.method === "POST" 
+&& url.pathname === "/laoyi/chat") { +      const contentType = request.headers.get("Content-Type") || ""; +      if (!
+contentType.toLowerCase().includes("application/json")) { +        return json({ error: "Bad JSON body", code: "BAD_BOD
+Y" }, 400); +      } +      let payload; +      try { payload = await request.json(); } +      catch (e) { return json(
+{ error: "Bad JSON body", code: "BAD_BODY" }, 400); } + +      const accessToken = request.headers.get("X-Line-AccessTo
+ken"); +      if (!accessToken) return json({ error: "Missing access token", code: "NO_TOKEN" }, 401); + +      let ver
+ifiedUserId; +      try { +        ({ userId: verifiedUserId } = await resolveUserId(accessToken, LINE_CHANNEL_ID)); + 
+     } catch (e) { +        console.log("Laoyi chat access token validation failed", e.message || e); +        return j
+son({ error: "Invalid access token", code: "INVALID_TOKEN" }, 401); +      } + +      const payloadIsObject = payload &
+& typeof payload === "object" && !Array.isArray(payload); +      const payloadKeys = payloadIsObject ? Object.keys(payl
+oad) : []; +      if (payloadKeys.some(k => k !== "query" && k !== "conversation_id")) { +        return json({ error: 
+"Unexpected field in payload", code: "BAD_FIELD" }, 400); +      } + +      const rawQuery = payloadIsObject ? payload.
+query : undefined; +      const query = typeof rawQuery === "string" ? rawQuery.trim() : ""; +      if (!query || query
+.length > 2000) { +        return json({ error: "Invalid query", code: "INVALID_QUERY" }, 400); +      } +      // conv
+ersation_id 非字串/不符格式一律 400,不得靜默 slice 變造成另一個 ID +      const rawConvId = payloadIsObject ? payload.conversation_id : un
+defined; +      let conversationId = ""; +      if (rawConvId !== undefined && rawConvId !== "") { +        if (typeof 
+rawConvId !== "string" || !LAOYI_CONV_ID_RE.test(rawConvId)) { +          return json({ error: "Invalid conversation_id
+", code: "INVALID_CONV_ID" }, 400); +        } +        conversationId = rawConvId; +      } + +      if (!env.DIFY_LAO
+YI_KEY) { +        return json({ error: "DIFY_LAOYI_KEY not configured", code: "NOT_CONFIGURED" }, 503); +      } + +  
+    // blocking 呼叫加 timeout,避免上游卡住無限拖住 Worker/前端 typing 泡泡 +      const laoyiController = new AbortController(); +     
+ const laoyiTimeoutId = setTimeout(() => laoyiController.abort(), LAOYI_UPSTREAM_TIMEOUT_MS); +      let difyRes; +    
+  try { +        difyRes = await fetch("https://api.dify.ai/v1/chat-messages", { +          method: "POST", +          
+headers: { +            "Content-Type": "application/json", +            "Authorization": "Bearer " + env.DIFY_LAOYI_KE
+Y, +          }, +          body: JSON.stringify({ +            inputs: {}, +            query, +            response_m
+ode: "blocking", +            user: verifiedUserId, +            conversation_id: conversationId, +          }), +     
+     signal: laoyiController.signal, +        }); +      } catch (e) { +        const timedOut = e && e.name === "Abort
+Error"; +        console.log("Laoyi Dify forward failed", timedOut ? "timeout" : (e.message || e)); +        return jso
+n({ error: timedOut ? "Dify request timed out" : "Dify request failed", +                      code: timedOut ? "UPSTRE
+AM_TIMEOUT" : "UPSTREAM_ERROR" }, 502); +      } finally { +        clearTimeout(laoyiTimeoutId); +      } +      if (!
+difyRes.ok) { +        console.log("Laoyi Dify forward failed", difyRes.status); +        return json({ error: "Dify re
+quest failed", code: "UPSTREAM_ERROR" }, 502); +      } +      let difyData; +      try { difyData = await difyRes.json
+(); } +      catch (e) { return json({ error: "Dify response parse failed", code: "UPSTREAM_SCHEMA_ERROR" }, 502); } + 
++      // 上游回應形狀驗證,answer/conversation_id 缺失或型別不符一律 502,不偽裝成成功 +      const answerOk = difyData && typeof difyData === 
+"object" && typeof difyData.answer === "string" && difyData.answer.length > 0; +      const convOk = difyData && typeof
+ difyData.conversation_id === "string" && difyData.conversation_id.length > 0; +      if (!answerOk || !convOk) { +    
+    // 診斷 log 只記型別存在性,不落 answer/conversation_id 原始內容,避免平台 log 變相持久化 +        console.log("Laoyi Dify response shape inv
+alid", { hasAnswer: !!(difyData && typeof difyData.answer === "string"), hasConversationId: !!(difyData && typeof difyD
+ata.conversation_id === "string") }); +        return json({ error: "Dify response malformed", code: "UPSTREAM_SCHEMA_E
+RROR" }, 502); +      } + +      return json({ answer: difyData.answer, conversation_id: difyData.conversation_id }, 20
+0); +    } +      if (request.method !== "POST") {        return new Response("Method not allowed", { status: 405, head
+ers: corsHeaders() });      }
+
+warning: Skill descriptions were shortened to fit the 2% skills context budget. Codex can still see every skill, but so
+me descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+codex
+開場判定：繼續型、建置型。先依契約回讀真相源與上場交接，再以 repo 實際檔案／實際 diff 為準做反向互審；本輪尚未驗證 `/mnt/user-data/uploads/`，因此不宣稱有任何新上傳。這次只讀取與審查，不改檔、不動部署
+、不碰 TA 話術。
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$paths = @('"'/mnt/user-data/uploads','C:\\m
+nt\\user-data\\uploads'); foreach ("'$p in $paths) { if (Test-Path -LiteralPath $p) { Write-Output "UPLOAD_PATH=$p"; Ge
+t-ChildItem -LiteralPath $p -Force | Select-Object FullName,LastWriteTime } }; Write-Output '"'---FILES---'; rg --files
+ -g \"AGENTS.md\" -g \"*closeout*\" -g \"*cuiqu*\" -g \"plans/plan_e56_laoyi_center_v0_1.md\" -g \"index.html\" -g \"wo
+rkers/mingge-relay/worker.js\" -g \"tests/**\"; Write-Output '---GIT---'; git status --short; git diff --stat; git diff
+ -- index.html workers/mingge-relay/worker.js" in D:\CBD_Lab_OS\001_mingge\mingge-line
+2026-07-21T12:56:15.561702Z ERROR codex_core::exec: exec error: windows sandbox: orchestrator_helper_launch_failed: set
+up refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\CBD_Lab_OS\001_mingge\mingge-line, l
+og=C:\Users\ivych\.codex\.sandbox\sandbox.2026-07-21.log, error=program not found
+2026-07-21T12:56:15.562365Z ERROR codex_core::tools::router: error=execution error: Io(Custom { kind: Other, error: "wi
+ndows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-s
+etup.exe, cwd=D:\\CBD_Lab_OS\\001_mingge\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-21.log, 
+error=program not found" })
+ exited -1 in 0ms:
+execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh fai
+led to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\CBD_Lab_OS\\001_mingge\\mingge-line, log=C:\\User
+s\\ivych\\.codex\\.sandbox\\sandbox.2026-07-21.log, error=program not found" })
+codex
+## 審查結論
+
+**overall FAIL／退回修正。**
+
+依派工卡與紅線，至少有 4 個硬攔項。以下行號以所提供 diff 的新版檔案行號為準。因本機 sandbox helper 啟動失敗，無法補跑 repo 實際測試與完整 `git diff`；本結論基於你貼出的 diff，未將未展示內容視
+為已通過。
+
+## PASS 項
+
+- 施工檔案限於 `index.html`、`workers/mingge-relay/worker.js`，屬 C1–C4 範圍。
+- 門廳首訪／再訪邏輯已用 `localStorage` 實作。
+- `?content_id=` 存在時會繞過門廳。
+- conversation ID 僅存在頁面記憶體，未寫入 localStorage、卦記或其他持久層。
+- relay 使用 `DIFY_LAOYI_KEY` Worker env，diff 未發現真實 token／金鑰。
+- LINE access token 由 header 傳入 relay，並經既有 `resolveUserId()` 驗證。
+- Dify 採 blocking 模式，包含 timeout、輸入欄位白名單與回應 schema 驗證。
+- Dify 回覆及 TA 輸入使用 `textContent`，未直接注入 HTML。
+- S1、S2、S3、S5、S6，以及指定 CTA／placeholder 的定稿文字本身未發現改字。
+- 書僮交接使用 `liff.sendMessages` 傳送原句，沒有替原句加前綴。
+- 25 個成功回合後會顯示〔回書房〕〔起一卦〕。
+- `#page-log .lp-header .lp-sub` 補為 17px。
+- 所提供 diff 未修改 Make 5379670／5202754，也未修改 Dify prompt／KB。
+
+## 攔下項
+
+### 1. TA 文案紅線遭修改及新增
+
+- `index.html:746`  
+  把既有格 5 副標由「不必問卦，也能來聊《易經》的學問。」改成另一句。施工卡只准沿用 live 現行介紹段並逐字貼裝 S1–S7，這是未授權 TA 文案變動。
+
+- `index.html:1095` 附近  
+  新增「這一句太長了,請分段問……」。
+
+- `index.html:1121` 附近  
+  新增「老易這頭暫時聽不清……」。
+
+- `index.html:1155` 附近  
+  新增「你還沒問過問題……」。
+
+- `index.html:1164` 附近  
+  新增「將原句帶給書僮……」。
+
+以上都是 S1–S7 以外、TA 看得到的新文案；依本輪明示紅線，一律攔下，不能由施工者自行定稿。
+
+### 2. 熟齡 E47 字級不合格
+
+- `index.html:318-319`：`店務找書僮` 按鈕字級為 `13.5px`。
+- `index.html:315` 附近：交接預覽文字為 `15px`。
+- `index.html:325` 附近：送出按鈕為 `15px`。
+
+新問答介面的可見內文／按鈕低於 17px，與「內文 ≥17px、按鈕字不縮」不符。因此驗收條件 4 FAIL。
+
+### 3. `content_id` 實作語意錯置
+
+- `index.html:956` 附近：
+
+```js
+content_id='+encodeURIComponent(a.title||'這篇文章')
+```
+
+這裡把「文章標題」塞進 `content_id`。施工卡要求帶 `?content_id=` 後，從書房既有文章資料取得篇名；目前沒有依 ID 查文章，外部真正傳入文章 ID 時，S3 反而會把 ID 當篇名顯示。
+
+因此驗收條件 1 的「S3 正確帶篇名」FAIL。
+
+### 4. 店務題引擎收束入口缺漏
+
+目前 S5 只在使用者手動按常駐「店務找書僮」後出現。未看到任何依引擎回覆／結構訊號，在「引擎收束店務題時」自動顯示 S5 與〔交給書僮〕的邏輯。
+
+因此 C3 只完成手動入口，未完成引擎收束分支；驗收條件 3 尚不能 PASS。
+
+### 5. 硬編碼 endpoint 紅線
+
+- `workers/mingge-relay/worker.js:620`
+
+```js
+fetch("https://api.dify.ai/v1/chat-messages", ...)
+```
+
+依本輪明示「硬編碼 endpoint 一律攔下」，此處必須攔下。即使它是公開 Dify API 位址，也仍是硬編碼 endpoint。
+
+### 6. 缺少 headless 測試證據
+
+提供的 diff 沒有 `tests/` 新增或修改，也沒有以下斷言證據：
+
+- 首訪／再訪／deep link
+- S3 篇名解析
+- conversation 不跨 session
+- 第 25 輪收束
+- 原句交接
+- relay 欄位、認證與錯誤處理
+- E47 字級
+
+驗收條件 6 FAIL。真機 sendMessages 與書僮實際接手也沒有證據，驗收條件 3 不能僅憑程式碼判 PASS。
+
+## 退回修正指令
+
+1. 還原格 5 原副標，並對照 base SHA 確認既有門廳介紹段逐字零變動。
+2. 把所有 S1–S7 以外的新 TA 可見文字整理成待 Perth 裁決清單；未獲逐字核准前不得自行留在成品。技術錯誤可先用非文案式狀態碼或既有已核准共用提示處理。
+3. 所有新問答室內文、預覽、次要入口及按鈕字級調整至至少 17px；補 headless computed-style 斷言。
+4. `content_id` 必須傳真正文章 ID；進入問答室時依書房既有文章資料由 ID 解析標題。未知 ID 要 fail closed，不可直接把參數當篇名。
+5. 補上「引擎判定店務題」的最薄契約與顯示路徑。前端不可自行猜 TA 語意；優先使用引擎既有結構化訊號。若現役引擎沒有可用訊號，標 B1/B2/B3 回報，不得靜默以手動入口替代驗收。
+6. 將 Dify API endpoint 改為 Worker binding／env config，例如 `DIFY_API_BASE`；repo 只保留讀取邏輯與缺設定時的 fail-closed 回應。
+7. 在 `tests/` 補 headless 測試及明確 PASS 數；至少覆蓋上述驗收條件。
+8. 重交時附完整 `git diff --check`、測試輸出、exact-head SHA、前一 SHA、Worker 部署版本，以及真機 sendMessages 證據。
+tokens used
+39,899
+## 審查結論
+
+**overall FAIL／退回修正。**
+
+依派工卡與紅線，至少有 4 個硬攔項。以下行號以所提供 diff 的新版檔案行號為準。因本機 sandbox helper 啟動失敗，無法補跑 repo 實際測試與完整 `git diff`；本結論基於你貼出的 diff，未將未展示內容視為已通過。
+
+## PASS 項
+
+- 施工檔案限於 `index.html`、`workers/mingge-relay/worker.js`，屬 C1–C4 範圍。
+- 門廳首訪／再訪邏輯已用 `localStorage` 實作。
+- `?content_id=` 存在時會繞過門廳。
+- conversation ID 僅存在頁面記憶體，未寫入 localStorage、卦記或其他持久層。
+- relay 使用 `DIFY_LAOYI_KEY` Worker env，diff 未發現真實 token／金鑰。
+- LINE access token 由 header 傳入 relay，並經既有 `resolveUserId()` 驗證。
+- Dify 採 blocking 模式，包含 timeout、輸入欄位白名單與回應 schema 驗證。
+- Dify 回覆及 TA 輸入使用 `textContent`，未直接注入 HTML。
+- S1、S2、S3、S5、S6，以及指定 CTA／placeholder 的定稿文字本身未發現改字。
+- 書僮交接使用 `liff.sendMessages` 傳送原句，沒有替原句加前綴。
+- 25 個成功回合後會顯示〔回書房〕〔起一卦〕。
+- `#page-log .lp-header .lp-sub` 補為 17px。
+- 所提供 diff 未修改 Make 5379670／5202754，也未修改 Dify prompt／KB。
+
+## 攔下項
+
+### 1. TA 文案紅線遭修改及新增
+
+- `index.html:746`  
+  把既有格 5 副標由「不必問卦，也能來聊《易經》的學問。」改成另一句。施工卡只准沿用 live 現行介紹段並逐字貼裝 S1–S7，這是未授權 TA 文案變動。
+
+- `index.html:1095` 附近  
+  新增「這一句太長了,請分段問……」。
+
+- `index.html:1121` 附近  
+  新增「老易這頭暫時聽不清……」。
+
+- `index.html:1155` 附近  
+  新增「你還沒問過問題……」。
+
+- `index.html:1164` 附近  
+  新增「將原句帶給書僮……」。
+
+以上都是 S1–S7 以外、TA 看得到的新文案；依本輪明示紅線，一律攔下，不能由施工者自行定稿。
+
+### 2. 熟齡 E47 字級不合格
+
+- `index.html:318-319`：`店務找書僮` 按鈕字級為 `13.5px`。
+- `index.html:315` 附近：交接預覽文字為 `15px`。
+- `index.html:325` 附近：送出按鈕為 `15px`。
+
+新問答介面的可見內文／按鈕低於 17px，與「內文 ≥17px、按鈕字不縮」不符。因此驗收條件 4 FAIL。
+
+### 3. `content_id` 實作語意錯置
+
+- `index.html:956` 附近：
+
+```js
+content_id='+encodeURIComponent(a.title||'這篇文章')
+```
+
+這裡把「文章標題」塞進 `content_id`。施工卡要求帶 `?content_id=` 後，從書房既有文章資料取得篇名；目前沒有依 ID 查文章，外部真正傳入文章 ID 時，S3 反而會把 ID 當篇名顯示。
+
+因此驗收條件 1 的「S3 正確帶篇名」FAIL。
+
+### 4. 店務題引擎收束入口缺漏
+
+目前 S5 只在使用者手動按常駐「店務找書僮」後出現。未看到任何依引擎回覆／結構訊號，在「引擎收束店務題時」自動顯示 S5 與〔交給書僮〕的邏輯。
+
+因此 C3 只完成手動入口，未完成引擎收束分支；驗收條件 3 尚不能 PASS。
+
+### 5. 硬編碼 endpoint 紅線
+
+- `workers/mingge-relay/worker.js:620`
+
+```js
+fetch("https://api.dify.ai/v1/chat-messages", ...)
+```
+
+依本輪明示「硬編碼 endpoint 一律攔下」，此處必須攔下。即使它是公開 Dify API 位址，也仍是硬編碼 endpoint。
+
+### 6. 缺少 headless 測試證據
+
+提供的 diff 沒有 `tests/` 新增或修改，也沒有以下斷言證據：
+
+- 首訪／再訪／deep link
+- S3 篇名解析
+- conversation 不跨 session
+- 第 25 輪收束
+- 原句交接
+- relay 欄位、認證與錯誤處理
+- E47 字級
+
+驗收條件 6 FAIL。真機 sendMessages 與書僮實際接手也沒有證據，驗收條件 3 不能僅憑程式碼判 PASS。
+
+## 退回修正指令
+
+1. 還原格 5 原副標，並對照 base SHA 確認既有門廳介紹段逐字零變動。
+2. 把所有 S1–S7 以外的新 TA 可見文字整理成待 Perth 裁決清單；未獲逐字核准前不得自行留在成品。技術錯誤可先用非文案式狀態碼或既有已核准共用提示處理。
+3. 所有新問答室內文、預覽、次要入口及按鈕字級調整至至少 17px；補 headless computed-style 斷言。
+4. `content_id` 必須傳真正文章 ID；進入問答室時依書房既有文章資料由 ID 解析標題。未知 ID 要 fail closed，不可直接把參數當篇名。
+5. 補上「引擎判定店務題」的最薄契約與顯示路徑。前端不可自行猜 TA 語意；優先使用引擎既有結構化訊號。若現役引擎沒有可用訊號，標 B1/B2/B3 回報，不得靜默以手動入口替代驗收。
+6. 將 Dify API endpoint 改為 Worker binding／env config，例如 `DIFY_API_BASE`；repo 只保留讀取邏輯與缺設定時的 fail-closed 回應。
+7. 在 `tests/` 補 headless 測試及明確 PASS 數；至少覆蓋上述驗收條件。
+8. 重交時附完整 `git diff --check`、測試輸出、exact-head SHA、前一 SHA、Worker 部署版本，以及真機 sendMessages 證據。

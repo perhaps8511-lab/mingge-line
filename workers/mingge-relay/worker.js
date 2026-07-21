@@ -9,6 +9,8 @@
 //         沿用現役 resolveUserId() 驗證,webhook URL 不進前端(依 S37 binding)
 // S163: 新增 POST /trace(E25② 卦記蓋印·補後續)—— TA 事後補寫「後來怎麼走」,
 //         寫入 Divination_Log.trace_text + trace_at;/history、/log 白名單追加回傳兩欄。
+// E56: 新增 POST /laoyi/chat(老易學習中心直連 Dify app-gQwG4,stateless,不落任何持久層)
+//         需要 Secret: DIFY_LAOYI_KEY(Perth 貼進 Cloudflare Secrets;缺鑰時路由回 503)
 // ====================================================
 
 const ALLOWED_ORIGIN = "https://perhaps8511-lab.github.io";
@@ -19,6 +21,8 @@ const AT_DIV_LOG     = "tblVyf8WfTQxvtpEg";
 const AT_SUBS        = "tbljXninuBm76D9nf";
 const AT_SHUFANG     = "tblbzhwwmBDfAKQAs";
 const TRACE_MAX_BODY_BYTES = 4096;
+const LAOYI_CONV_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+const LAOYI_UPSTREAM_TIMEOUT_MS = 30000;
 
 export default {
   async fetch(request, env) {
@@ -564,6 +568,99 @@ export default {
       }
 
       return json({ sent: true }, 202);
+    }
+
+    if (request.method === "POST" && url.pathname === "/laoyi/chat") {
+      const contentType = request.headers.get("Content-Type") || "";
+      if (!contentType.toLowerCase().includes("application/json")) {
+        return json({ error: "Bad JSON body", code: "BAD_BODY" }, 400);
+      }
+      let payload;
+      try { payload = await request.json(); }
+      catch (e) { return json({ error: "Bad JSON body", code: "BAD_BODY" }, 400); }
+
+      const accessToken = request.headers.get("X-Line-AccessToken");
+      if (!accessToken) return json({ error: "Missing access token", code: "NO_TOKEN" }, 401);
+
+      let verifiedUserId;
+      try {
+        ({ userId: verifiedUserId } = await resolveUserId(accessToken, LINE_CHANNEL_ID));
+      } catch (e) {
+        console.log("Laoyi chat access token validation failed", e.message || e);
+        return json({ error: "Invalid access token", code: "INVALID_TOKEN" }, 401);
+      }
+
+      const payloadIsObject = payload && typeof payload === "object" && !Array.isArray(payload);
+      const payloadKeys = payloadIsObject ? Object.keys(payload) : [];
+      if (payloadKeys.some(k => k !== "query" && k !== "conversation_id")) {
+        return json({ error: "Unexpected field in payload", code: "BAD_FIELD" }, 400);
+      }
+
+      const rawQuery = payloadIsObject ? payload.query : undefined;
+      const query = typeof rawQuery === "string" ? rawQuery.trim() : "";
+      if (!query || query.length > 2000) {
+        return json({ error: "Invalid query", code: "INVALID_QUERY" }, 400);
+      }
+      // conversation_id 非字串/不符格式一律 400,不得靜默 slice 變造成另一個 ID
+      const rawConvId = payloadIsObject ? payload.conversation_id : undefined;
+      let conversationId = "";
+      if (rawConvId !== undefined && rawConvId !== "") {
+        if (typeof rawConvId !== "string" || !LAOYI_CONV_ID_RE.test(rawConvId)) {
+          return json({ error: "Invalid conversation_id", code: "INVALID_CONV_ID" }, 400);
+        }
+        conversationId = rawConvId;
+      }
+
+      if (!env.DIFY_LAOYI_KEY) {
+        return json({ error: "DIFY_LAOYI_KEY not configured", code: "NOT_CONFIGURED" }, 503);
+      }
+
+      // blocking 呼叫加 timeout,避免上游卡住無限拖住 Worker/前端 typing 泡泡
+      const laoyiController = new AbortController();
+      const laoyiTimeoutId = setTimeout(() => laoyiController.abort(), LAOYI_UPSTREAM_TIMEOUT_MS);
+      let difyRes;
+      try {
+        difyRes = await fetch("https://api.dify.ai/v1/chat-messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + env.DIFY_LAOYI_KEY,
+          },
+          body: JSON.stringify({
+            inputs: {},
+            query,
+            response_mode: "blocking",
+            user: verifiedUserId,
+            conversation_id: conversationId,
+          }),
+          signal: laoyiController.signal,
+        });
+      } catch (e) {
+        const timedOut = e && e.name === "AbortError";
+        console.log("Laoyi Dify forward failed", timedOut ? "timeout" : (e.message || e));
+        return json({ error: timedOut ? "Dify request timed out" : "Dify request failed",
+                      code: timedOut ? "UPSTREAM_TIMEOUT" : "UPSTREAM_ERROR" }, 502);
+      } finally {
+        clearTimeout(laoyiTimeoutId);
+      }
+      if (!difyRes.ok) {
+        console.log("Laoyi Dify forward failed", difyRes.status);
+        return json({ error: "Dify request failed", code: "UPSTREAM_ERROR" }, 502);
+      }
+      let difyData;
+      try { difyData = await difyRes.json(); }
+      catch (e) { return json({ error: "Dify response parse failed", code: "UPSTREAM_SCHEMA_ERROR" }, 502); }
+
+      // 上游回應形狀驗證,answer/conversation_id 缺失或型別不符一律 502,不偽裝成成功
+      const answerOk = difyData && typeof difyData === "object" && typeof difyData.answer === "string" && difyData.answer.length > 0;
+      const convOk = difyData && typeof difyData.conversation_id === "string" && difyData.conversation_id.length > 0;
+      if (!answerOk || !convOk) {
+        // 診斷 log 只記型別存在性,不落 answer/conversation_id 原始內容,避免平台 log 變相持久化
+        console.log("Laoyi Dify response shape invalid", { hasAnswer: !!(difyData && typeof difyData.answer === "string"), hasConversationId: !!(difyData && typeof difyData.conversation_id === "string") });
+        return json({ error: "Dify response malformed", code: "UPSTREAM_SCHEMA_ERROR" }, 502);
+      }
+
+      return json({ answer: difyData.answer, conversation_id: difyData.conversation_id }, 200);
     }
 
     if (request.method !== "POST") {

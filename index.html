@@ -296,6 +296,38 @@
   .ask-fallback textarea{width:100%;min-height:72px;resize:vertical;border:1px solid rgba(184,134,11,.3);
     border-radius:4px;padding:9px;background:rgba(7,11,7,.7);color:var(--rice);font-family:inherit;
     font-size:13px;line-height:1.7;}
+  /* E56:格5 老易兩態(門廳/問答室)—— E47熟齡硬約束:內文≥17px/行高≥1.9,按鈕沿用既有 .sp-btn/.ask-secondary 不縮
+     顯隱唯一機制=HTML hidden 屬性(laoyiShowHall/laoyiEnterRoom 只切 .hidden);
+     [hidden] 選擇器具 attribute+class 高特異度,蓋過下方 .laoyi-room{display:flex} 等展示態規則,避免顯隱衝突(code review r2 blocker修正) */
+  .laoyi-hall[hidden],.laoyi-room[hidden]{display:none;}
+  .laoyi-hall .lp-body p{font-size:17px;line-height:1.9;}
+  .laoyi-hall-close{margin-top:22px;padding-top:18px;border-top:1px solid rgba(184,134,11,.18);
+    font-size:17px;line-height:1.9;letter-spacing:.05em;color:var(--gold-soft);text-align:center;}
+  .laoyi-room{padding:0 28px;display:flex;flex-direction:column;flex:1;}
+  .laoyi-thread{flex:1;padding:14px 0 10px;display:flex;flex-direction:column;gap:14px;}
+  .laoyi-bubble{max-width:88%;padding:14px 16px;border-radius:8px;font-size:17px;line-height:1.9;
+    letter-spacing:.03em;white-space:pre-wrap;}
+  .laoyi-bubble-bot{align-self:flex-start;background:rgba(245,241,232,.05);color:var(--rice-deep);
+    border:1px solid rgba(184,134,11,.22);}
+  .laoyi-bubble-user{align-self:flex-end;background:rgba(184,134,11,.16);color:var(--rice);
+    border:1px solid rgba(184,134,11,.3);}
+  .laoyi-bubble-pending{opacity:.6;}
+  .laoyi-svc-confirm{align-self:flex-start;max-width:88%;padding:12px 14px;border:1px dashed rgba(184,134,11,.35);
+    border-radius:8px;background:rgba(245,241,232,.03);}
+  .laoyi-svc-preview{font-size:17px;line-height:1.9;color:var(--gold-soft);margin:0 0 10px;}
+  .laoyi-closing{margin:6px 0 14px;padding:14px;border-top:1px solid rgba(184,134,11,.18);
+    display:flex;flex-wrap:wrap;gap:10px;justify-content:center;}
+  .laoyi-svc-link{text-align:center;padding:4px 0 10px;}
+  .laoyi-svc-link button{background:none;border:none;color:var(--moss-soft);font-family:inherit;
+    font-size:13.5px;letter-spacing:.08em;text-decoration:underline;text-underline-offset:4px;cursor:pointer;}
+  .laoyi-composer{display:flex;gap:10px;align-items:flex-end;padding:10px 0 24px;
+    border-top:1px solid rgba(184,134,11,.18);}
+  .laoyi-composer textarea{flex:1;resize:none;border:1px solid rgba(184,134,11,.3);border-radius:6px;
+    padding:12px;background:rgba(7,11,7,.7);color:var(--rice);font-family:inherit;
+    font-size:17px;line-height:1.9;}
+  .laoyi-composer button{background:var(--gold);color:#15200f;border:none;border-radius:6px;
+    padding:12px 20px;font-family:inherit;font-size:17px;font-weight:600;cursor:pointer;white-space:nowrap;}
+  .laoyi-composer button:disabled{opacity:.5;cursor:not-allowed;}
   /* ====================================================
      E09 歷史卦例
   ==================================================== */
@@ -418,6 +450,8 @@
   ==================================================== */
   /* polish batch(§3-1):格3 字級統一表 —— 全卡(featured/非featured)同層同級,一律 ≥17px */
   #page-pay .lp-header .lp-sub{font-size:17px;}
+  /* E56 polish(卦記字級一致,E47殘項):我的卦記 hub 副標比照格3/書房既有 17px 基準補齊 */
+  #page-log .lp-header .lp-sub{font-size:17px;}
   .pay-sub-active{
     border:1px solid rgba(122,154,114,.3);border-radius:4px;
     padding:16px 18px;font-size:17px;letter-spacing:.08em;
@@ -708,38 +742,42 @@
     </div>
   </div>
 
-  <!-- P-ASK 格5 問老易 (005A · action=ask；保留 action=about 相容入口) -->
+  <!-- P-ASK 格5 老易學習中心(E56 · action=ask；保留 action=about 相容入口) -->
   <div class="liff-page" id="page-about">
     <div class="lp-header">
       <div class="lp-icon">👤</div>
       <h1>問老易</h1>
       <div class="lp-sub">不必問卦，也能來聊《易經》的學問。</div>
     </div>
-    <div class="lp-body">
-      <div class="about-portrait" aria-hidden="true"></div><!-- T6:頁首老易形象 image-slot 留白框(米白紙感·無人像);raster 待 Design 另輪換皮補 -->
-      <p>老易，六十出頭，讀了大半輩子的《易經》。</p>
-      <p>他不是算命的，也不替您決定什麼——他是替您把卦讀清楚的人。</p>
-      <p>您向天問了一卦，卦象天成；老易做的，是把這一卦的本卦、變卦、動爻，一樣樣為您讀出來，看清這件事此刻的形勢、往哪裡轉。</p>
-      <div class="lp-quote">「善為易者不占。」<br>真正懂易的人，不求一個算定的答案，是看懂當下形勢、自己拿主意。</div>
-      <p>不必先有一卦。讀不懂一句、想知道一個觀念，或只是想把剛讀完的文章再問深一點，都可以來坐坐。</p>
-      <div class="ask-prompts" aria-label="可以問老易的方向">
-        <button type="button" class="ask-prompt" data-ask-laoyi="我沒讀過古文，也能讀《易經》嗎？">我沒讀過古文，也能讀《易經》嗎？</button>
-        <button type="button" class="ask-prompt" data-ask-laoyi="卦辭有吉有凶，該怎麼讀才不把它當成判決？">卦辭有吉有凶，該怎麼讀才不把它當成判決？</button>
-        <button type="button" class="ask-prompt" data-ask-laoyi="做事的人，可以怎麼學《易經》？">做事的人，可以怎麼學《易經》？</button>
-        <button type="button" class="ask-prompt" data-ask-laoyi="我剛讀完一篇書房文章，想再問深一點。">我剛讀完一篇書房文章，想再問深一點。</button>
-      </div>
-      <div class="about-signpost"><!-- 005A:免費優先；向天問卦為次要路標 -->
-        <p>選一題，或先跟老易打聲招呼。這條路不使用問卦銅錢。</p>
+    <!-- 態1:門廳 -->
+    <div class="laoyi-view laoyi-hall" id="laoyiHall">
+      <div class="lp-body">
+        <div class="about-portrait" aria-hidden="true"></div><!-- T6:頁首老易形象 image-slot 留白框(米白紙感·無人像);raster 待 Design 另輪換皮補 -->
+        <p>老易，六十出頭，讀了大半輩子的《易經》。</p>
+        <p>他不是算命的，也不替您決定什麼——他是替您把卦讀清楚的人。</p>
+        <p>您向天問了一卦，卦象天成；老易做的，是把這一卦的本卦、變卦、動爻，一樣樣為您讀出來，看清這件事此刻的形勢、往哪裡轉。</p>
+        <div class="lp-quote">「善為易者不占。」<br>真正懂易的人，不求一個算定的答案，是看懂當下形勢、自己拿主意。</div>
+        <p>不必先有一卦。讀不懂一句、想知道一個觀念，或只是想把剛讀完的文章再問深一點，都可以來坐坐。</p>
+        <div class="laoyi-hall-close"><!-- S1 --><p>老易這裡。這一進是問學的地方——易經的道理、卦的意思、書房裡的文章，都可以問。但有三件事老夫不做：不替你占、不替你斷、不談店務帳目。占卦是天的事，店務找書僮。想清楚了，就進來坐。</p></div>
         <div class="ask-actions">
-          <button type="button" class="sp-btn ask-primary" id="askLaoyiStart">開始問老易</button>
-          <button type="button" class="ask-secondary" onclick="location.href='./index.html?action=study'">回易經書房</button>
-          <button type="button" class="ask-secondary" onclick="location.href='./index.html'">向天問卦</button>
+          <button type="button" class="sp-btn ask-primary" id="laoyiHallEnter">向老易請教</button>
+          <button type="button" class="ask-secondary" id="laoyiHallStudy">先逛書房</button>
         </div>
-        <p class="ask-status" id="askLaoyiStatus" role="status" aria-live="polite"></p>
-        <div class="ask-fallback" id="askLaoyiFallback" hidden>
-          <label for="askLaoyiFallbackText">若目前不在 LINE 內，請複製這句，回到命格易經的對話貼上：</label>
-          <textarea id="askLaoyiFallbackText" readonly></textarea>
-        </div>
+      </div>
+    </div>
+    <!-- 態2:問答室 -->
+    <div class="laoyi-view laoyi-room" id="laoyiRoom" hidden>
+      <div class="laoyi-thread" id="laoyiThread" role="log" aria-live="polite"></div>
+      <div class="laoyi-closing" id="laoyiClosing" hidden></div>
+      <p class="ask-status" id="askLaoyiStatus" role="status" aria-live="polite"></p>
+      <div class="ask-fallback" id="askLaoyiFallback" hidden>
+        <label for="askLaoyiFallbackText">若目前不在 LINE 內，請複製這句，回到命格易經的對話貼上：</label>
+        <textarea id="askLaoyiFallbackText" readonly></textarea>
+      </div>
+      <div class="laoyi-svc-link"><button type="button" id="laoyiSvcEntry">店務找書僮</button></div>
+      <div class="laoyi-composer">
+        <textarea id="laoyiInput" placeholder="請教老易——卦、文章、易經都可問" rows="2" maxlength="2000"></textarea>
+        <button type="button" id="laoyiSend">送出</button>
       </div>
     </div>
   </div>
@@ -913,30 +951,10 @@ async function studyShareArticle(gidx,btnEl){
 /* E55:書房「拿這篇問老易」直送對話。定稿句沿用現行(零改字);
    成功提示句為本卡唯一新增合法字面。init 取得走共享 ensureLiffInit()(同上)。
    失敗 → 走現行 showAskLaoyiFallback,一字不動(零回歸)。 */
-async function studySendAskLaoyi(gidx,btnEl){
+function studySendAskLaoyi(gidx,btnEl){
   var a=studyState.articles[gidx]; if(!a){ return; }
-  var message='問老易\n我剛讀完〈'+(a.title||'這篇文章')+'〉，想再問深一點。';
-  var statusId='studyAskStatus', fallbackId='studyAskFallback', textId='studyAskFallbackText';
-  resetAskLaoyiFeedback(statusId,fallbackId,textId);
-  if(btnEl){ btnEl.disabled=true; }
-  try{
-    if(typeof liff==='undefined'){ throw new Error('LIFF unavailable'); }
-    await ensureLiffInit();
-    if(!(liff.isInClient && liff.isInClient())){ throw new Error('not in LINE client'); }
-    if(!(liff.isLoggedIn && liff.isLoggedIn())){ throw new Error('not logged in'); }
-    if(typeof liff.sendMessages!=='function'){ throw new Error('sendMessages unavailable'); }
-    await liff.sendMessages([{type:'text',text:message}]);
-    var status=document.getElementById(statusId);
-    if(status){ status.textContent='已送進對話。回到聊天室,老易接著說。'; }
-    setTimeout(function(){
-      if(typeof liff.closeWindow==='function'){ try{ liff.closeWindow(); }catch(e){} }
-    },1500);
-  }catch(e){
-    showAskLaoyiFallback(message,statusId,fallbackId,textId);
-    console.warn('[study ask laoyi fallback]',e && e.message?e.message:e);
-  }finally{
-    if(btnEl){ btnEl.disabled=false; }
-  }
+  if(btnEl){ btnEl.disabled=true; } // E56:改走格5老易問答室 deep link(帶篇名,S3開場),不再送 LINE 訊息寄生客服鏈
+  location.href='./index.html?action=ask&content_id='+encodeURIComponent(a.title||'這篇文章');
 }
 
 /* 導覽狀態機:單次 fetch 快取,層間不重抓;pushState/popstate + 邊界 guard(R1-#5) */
@@ -987,7 +1005,7 @@ async function initStudyPage(){
   }
 }
 
-/* ===== 005A 問老易：只送回 LINE 對話，不經問卦 Worker / quota POST ===== */
+/* ===== E56 老易學習中心:格5 兩態(門廳/問答室)LIFF 直連問答,繞開客服鏈 5379670 ===== */
 function resetAskLaoyiFeedback(statusId,fallbackId,textId){
   var status=document.getElementById(statusId); if(status){ status.textContent=''; }
   var fallback=document.getElementById(fallbackId); if(fallback){ fallback.hidden=true; }
@@ -1009,39 +1027,217 @@ function showAskLaoyiFallback(message,statusId,fallbackId,textId){
   }
 }
 
-async function sendAskLaoyiIntent(message,statusId,fallbackId,textId){
-  var status=document.getElementById(statusId);
-  resetAskLaoyiFeedback(statusId,fallbackId,textId);
-  if(status){ status.textContent='正在帶回 LINE 對話……'; }
+var LAOYI_HALL_SEEN_KEY='mg_laoyi_hall_seen';
+function laoyiHasSeenHall(){ try{ return localStorage.getItem(LAOYI_HALL_SEEN_KEY)==='1'; }catch(e){ return false; } }
+function laoyiMarkHallSeen(){ try{ localStorage.setItem(LAOYI_HALL_SEEN_KEY,'1'); }catch(e){} }
+
+var LAOYI_TITLE_MAX=200;
+function laoyiSanitizeTitle(raw){
+  if(typeof raw!=='string') return '';
+  var stripped=raw.replace(/[\x00-\x1F\x7F]/g,'').trim();
+  return stripped.slice(0,LAOYI_TITLE_MAX);
+}
+
+var laoyiInput, laoyiSendBtn, laoyiThread;
+var laoyiConvId=null;      // 頁面記憶體,不落地(stateless 鐵則)
+var laoyiTurnCount=0;
+var laoyiClosingShown=false;
+var laoyiSending=false;    // 單飛鎖,防連點/連按 Enter 建出兩條 Dify conversation
+var LAOYI_QUERY_MAX=2000;  // 與 worker 端上限同值
+var LAOYI_DECISION_RE=/要不要|該不該|值不值得|該如何選|怎麼決定|該不該做|是否適合|哪個比較好|哪一個好|現在能不能|要選.+還是|.+還是.+[?？]|go\s*or\s*no\s*go/i;
+var laoyiSvcHandoffOpen=false;
+
+function laoyiShowHall(){
+  var hall=document.getElementById('laoyiHall'), room=document.getElementById('laoyiRoom');
+  if(hall){ hall.hidden=false; }
+  if(room){ room.hidden=true; }
+}
+
+function laoyiOpeningLine(opts){
+  if(opts.opener==='content' && opts.contentTitle){
+    return '你帶來的是〈'+opts.contentTitle+'〉。文中何處讓你停下了？'; // S3,逐字
+  }
+  return '坐。今日想問哪一卦、哪一篇、哪一句？'; // S2,逐字
+}
+
+function laoyiEnterRoom(opts){
+  var hall=document.getElementById('laoyiHall'), room=document.getElementById('laoyiRoom');
+  if(hall){ hall.hidden=true; }
+  if(room){ room.hidden=false; }
+  laoyiAppendBubble(laoyiOpeningLine(opts||{}),'bot',{system:true});
+}
+
+function laoyiAppendBubble(text,role,opts){
+  if(!laoyiThread) return null;
+  var el=document.createElement('div');
+  el.className='laoyi-bubble laoyi-bubble-'+(role==='user'?'user':'bot')+((opts&&opts.pending)?' laoyi-bubble-pending':'');
+  el.textContent=text; // textContent only,不用 innerHTML(TA輸入/Dify回覆/篇名皆不可信文字)
+  laoyiThread.appendChild(el);
+  laoyiThread.scrollTop=laoyiThread.scrollHeight;
+  return el;
+}
+function laoyiReplaceBubble(el,text){
+  if(!el) return;
+  el.textContent=text;
+  el.classList.remove('laoyi-bubble-pending');
+  if(laoyiThread){ laoyiThread.scrollTop=laoyiThread.scrollHeight; }
+}
+
+function laoyiSetComposerBusy(busy){
+  laoyiSending=busy;
+  if(laoyiInput){ laoyiInput.disabled=busy; }
+  if(laoyiSendBtn){ laoyiSendBtn.disabled=busy; }
+}
+
+function laoyiAppendDecisionCta(){
+  var btn=document.createElement('button');
+  btn.type='button'; btn.className='sp-btn ask-primary';
+  btn.textContent='心中默念此問，起一卦';
+  btn.addEventListener('click',function(){ location.href='./index.html'; });
+  if(laoyiThread){ laoyiThread.appendChild(btn); laoyiThread.scrollTop=laoyiThread.scrollHeight; }
+}
+
+function laoyiShowClosing(){
+  var closing=document.getElementById('laoyiClosing');
+  if(!closing) return;
+  closing.innerHTML='';
+  var backBtn=document.createElement('button');
+  backBtn.type='button'; backBtn.className='sp-btn ask-primary'; backBtn.textContent='回書房';
+  backBtn.addEventListener('click',function(){ location.href='./index.html?action=study'; });
+  var divineBtn=document.createElement('button');
+  divineBtn.type='button'; divineBtn.className='ask-secondary'; divineBtn.textContent='起一卦';
+  divineBtn.addEventListener('click',function(){ location.href='./index.html'; });
+  closing.appendChild(backBtn); closing.appendChild(divineBtn);
+  closing.hidden=false;
+}
+
+async function laoyiSend(text){
+  if(laoyiSending) return;
+  var trimmed=(text||'').trim();
+  if(!trimmed) return;
+  if(trimmed.length>LAOYI_QUERY_MAX){
+    laoyiAppendBubble('這一句太長了,請分段問(上限 '+LAOYI_QUERY_MAX+' 字)。','bot',{system:true});
+    return;
+  }
+  laoyiSetComposerBusy(true);
+  laoyiAppendBubble(trimmed,'user');
+  if(laoyiInput){ laoyiInput.value=''; }
+  var typing=laoyiAppendBubble('……','bot',{pending:true});
+  var convIdAtSend=laoyiConvId;
+  var ok=false, answerText='';
   try{
     if(typeof liff==='undefined'){ throw new Error('LIFF unavailable'); }
-    await liff.init({liffId:LIFF_ID});
-    if(!liff.isInClient || !liff.isInClient()){ throw new Error('not in LINE client'); }
-    if(!liff.isLoggedIn || !liff.isLoggedIn()){ throw new Error('not logged in'); }
-    if(typeof liff.sendMessages!=='function'){ throw new Error('sendMessages unavailable'); }
-    await liff.sendMessages([{type:'text',text:message}]);
-    if(status){ status.textContent='已送到 LINE 對話，老易會在那裡接著聊。'; }
-    if(typeof liff.closeWindow==='function'){
-      setTimeout(function(){ try{ liff.closeWindow(); }catch(e){} },700);
-    }
+    await ensureLiffInit();
+    var accessToken=liff.getAccessToken?liff.getAccessToken():null;
+    if(!accessToken){ throw new Error('no access token'); }
+    var res=await fetch(RELAY_URL+'laoyi/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Line-AccessToken':accessToken},
+      body:JSON.stringify({query:trimmed, conversation_id:convIdAtSend||''})
+    });
+    if(!res.ok){ throw new Error('HTTP '+res.status); }
+    var data=await res.json();
+    if(!data || typeof data.answer!=='string' || !data.answer){ throw new Error('bad payload'); }
+    laoyiConvId=data.conversation_id||laoyiConvId;
+    answerText=data.answer;
+    ok=true;
   }catch(e){
-    showAskLaoyiFallback(message,statusId,fallbackId,textId);
-    console.warn('[ask laoyi fallback]',e && e.message ? e.message : e);
+    answerText='老易這頭暫時聽不清，請再說一次，或稍後再試。';
+    console.warn('[laoyi chat]',e && e.message?e.message:e);
+  }
+  laoyiReplaceBubble(typing,answerText);
+  laoyiSetComposerBusy(false);
+  if(ok){
+    laoyiTurnCount++;
+    if(LAOYI_DECISION_RE.test(trimmed)){ laoyiAppendDecisionCta(); }
+    if(laoyiTurnCount>=25 && !laoyiClosingShown){ laoyiShowClosing(); laoyiClosingShown=true; }
   }
 }
 
-function initAskLaoyiPage(){
-  var start=document.getElementById('askLaoyiStart');
-  if(start){
-    start.addEventListener('click',function(){
-      sendAskLaoyiIntent('問老易','askLaoyiStatus','askLaoyiFallback','askLaoyiFallbackText');
-    });
+function laoyiComposerKeydown(e){
+  if(e.key!=='Enter' || e.shiftKey) return;
+  if(e.isComposing || e.keyCode===229) return;
+  e.preventDefault();
+  laoyiSend(laoyiInput?laoyiInput.value:'');
+}
+
+function laoyiLastUserMessage(){
+  if(!laoyiThread) return '';
+  var bubbles=laoyiThread.querySelectorAll('.laoyi-bubble-user');
+  if(!bubbles.length) return '';
+  return bubbles[bubbles.length-1].textContent||'';
+}
+
+function laoyiShowSvcHandoff(){
+  if(laoyiSvcHandoffOpen) return;
+  laoyiSvcHandoffOpen=true;
+  var entry=document.getElementById('laoyiSvcEntry');
+  if(entry){ entry.disabled=true; }
+  laoyiAppendBubble('這是店務，老夫不管帳——書僮就在門外。你這一問，我替你帶到他案上。','bot',{system:true}); // S5
+
+  var lastUserMsg=laoyiLastUserMessage();
+  if(!lastUserMsg){
+    laoyiAppendBubble('你還沒問過問題，先打字問一句，我再原句帶給書僮。','bot',{system:true});
+    if(entry){ entry.disabled=false; }
+    laoyiSvcHandoffOpen=false;
+    return;
   }
-  document.querySelectorAll('[data-ask-laoyi]').forEach(function(button){
-    button.addEventListener('click',function(){
-      sendAskLaoyiIntent(button.getAttribute('data-ask-laoyi'),'askLaoyiStatus','askLaoyiFallback','askLaoyiFallbackText');
-    });
-  });
+  var confirmBox=document.createElement('div');
+  confirmBox.className='laoyi-svc-confirm';
+  var preview=document.createElement('p');
+  preview.className='laoyi-svc-preview';
+  preview.textContent='將原句帶給書僮:「'+lastUserMsg+'」';
+  var btn=document.createElement('button');
+  btn.type='button'; btn.className='sp-btn ask-primary'; btn.textContent='交給書僮';
+  btn.addEventListener('click',function(){ laoyiHandoffToService(lastUserMsg,btn,confirmBox); });
+  confirmBox.appendChild(preview); confirmBox.appendChild(btn);
+  if(laoyiThread){ laoyiThread.appendChild(confirmBox); laoyiThread.scrollTop=laoyiThread.scrollHeight; }
+}
+
+async function laoyiHandoffToService(messageText,btnEl,confirmBoxEl){
+  if(btnEl.disabled) return;
+  btnEl.disabled=true;
+  try{
+    if(typeof liff==='undefined'){ throw new Error('LIFF unavailable'); }
+    await ensureLiffInit();
+    if(!(liff.isInClient && liff.isInClient())){ throw new Error('not in LINE client'); }
+    if(!(liff.isLoggedIn && liff.isLoggedIn())){ throw new Error('not logged in'); }
+    if(typeof liff.sendMessages!=='function'){ throw new Error('sendMessages unavailable'); }
+    await liff.sendMessages([{type:'text',text:messageText}]); // 原句送出,不加工、不冠老易措辭
+    if(confirmBoxEl && confirmBoxEl.parentNode){ confirmBoxEl.parentNode.removeChild(confirmBoxEl); }
+    laoyiAppendBubble('已送到書僮案上。回到聊天室，書僮接著答。','bot',{system:true}); // S6,逐字定稿
+  }catch(e){
+    showAskLaoyiFallback(messageText,'askLaoyiStatus','askLaoyiFallback','askLaoyiFallbackText');
+    btnEl.disabled=false;
+    console.warn('[laoyi handoff fallback]',e && e.message?e.message:e);
+  }
+}
+
+var __laoyiInited=false;
+function initAskLaoyiPage(){
+  if(__laoyiInited) return;
+  __laoyiInited=true;
+
+  laoyiInput=document.getElementById('laoyiInput');
+  laoyiSendBtn=document.getElementById('laoyiSend');
+  laoyiThread=document.getElementById('laoyiThread');
+  if(laoyiSendBtn){ laoyiSendBtn.addEventListener('click',function(){ laoyiSend(laoyiInput?laoyiInput.value:''); }); }
+  if(laoyiInput){ laoyiInput.addEventListener('keydown', laoyiComposerKeydown); }
+  var svcEntry=document.getElementById('laoyiSvcEntry');
+  if(svcEntry){ svcEntry.addEventListener('click', laoyiShowSvcHandoff); }
+
+  var contentTitle=laoyiSanitizeTitle(new URLSearchParams(location.search).get('content_id'));
+  if(contentTitle){
+    laoyiEnterRoom({opener:'content', contentTitle:contentTitle});
+  } else if(laoyiHasSeenHall()){
+    laoyiEnterRoom({opener:'blank'});
+  } else {
+    laoyiShowHall();
+  }
+  var enterBtn=document.getElementById('laoyiHallEnter');
+  if(enterBtn){ enterBtn.addEventListener('click',function(){ laoyiMarkHallSeen(); laoyiEnterRoom({opener:'blank'}); }); }
+  var studyBtn=document.getElementById('laoyiHallStudy');
+  if(studyBtn){ studyBtn.addEventListener('click',function(){ location.href='./index.html?action=study'; }); }
 }
 
 window.addEventListener('popstate',function(e){
