@@ -366,20 +366,21 @@
   ==================================================== */
   .study-view{animation:studyFade .28s ease;}
   @keyframes studyFade{from{opacity:0;}to{opacity:1;}}
-  /* 層1 門面 */
-  .study-intro{font-size:13.5px;line-height:2.05;letter-spacing:.05em;color:var(--rice-deep);opacity:.82;text-align:center;margin:2px 0 0;}
+  /* 層1 門面 —— polish batch(§3-2):門面/標題字級放大,全數 ≥17px(文章內文/層3閱讀頁零改) */
+  .study-cover .lp-header h1{font-size:26px;}
+  .lp-body p.study-intro{font-size:17px;line-height:1.9;letter-spacing:.05em;color:var(--rice-deep);opacity:.82;text-align:center;margin:2px 0 0;}
   .study-intro .si-2{display:block;color:var(--gold-soft);opacity:.95;margin-top:9px;}
   .study-tags{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:28px 0 8px;}
   .study-tag{background:transparent;color:var(--rice);border:1px solid var(--gold);border-radius:20px;
-    padding:8px 18px;font-size:13px;letter-spacing:.12em;cursor:pointer;font-family:inherit;transition:.2s;}
+    padding:8px 18px;font-size:17px;letter-spacing:.12em;cursor:pointer;font-family:inherit;transition:.2s;}
   .study-tag:hover,.study-tag:active{background:var(--gold);color:var(--moss);}
-  .study-tag .st-n{opacity:.55;font-size:11px;margin-left:5px;letter-spacing:0;}
+  .study-tag .st-n{opacity:.55;font-size:17px;margin-left:5px;letter-spacing:0;}
   .study-featured{margin:32px 0 6px;}
-  .study-featured .sf-head{font-size:13px;letter-spacing:.16em;color:var(--gold-lit);text-align:center;margin-bottom:16px;opacity:.9;}
+  .study-featured .sf-head{font-size:17px;letter-spacing:.16em;color:var(--gold-lit);text-align:center;margin-bottom:16px;opacity:.9;}
   .study-feat{display:block;width:100%;text-align:left;background:var(--paper);color:var(--moss);
     border:none;border-radius:4px;padding:15px 18px;margin-bottom:12px;cursor:pointer;font-family:inherit;box-shadow:0 1px 12px rgba(21,32,15,.18);}
-  .study-feat .ff-t{font-size:15px;line-height:1.7;letter-spacing:.03em;margin-bottom:6px;font-weight:600;}
-  .study-feat .ff-y{font-size:12.5px;line-height:1.6;color:var(--moss-soft);opacity:.85;
+  .study-feat .ff-t{font-size:17px;line-height:1.7;letter-spacing:.03em;margin-bottom:6px;font-weight:600;}
+  .study-feat .ff-y{font-size:17px;line-height:1.6;color:var(--moss-soft);opacity:.85;
     display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
   /* 層2 書卷列表 */
   .study-back{display:inline-flex;align-items:center;gap:5px;background:transparent;color:var(--gold-soft);
@@ -415,22 +416,24 @@
   /* ====================================================
      E12 訂閱方案
   ==================================================== */
+  /* polish batch(§3-1):格3 字級統一表 —— 全卡(featured/非featured)同層同級,一律 ≥17px */
+  #page-pay .lp-header .lp-sub{font-size:17px;}
   .pay-sub-active{
     border:1px solid rgba(122,154,114,.3);border-radius:4px;
-    padding:16px 18px;font-size:13px;letter-spacing:.08em;
+    padding:16px 18px;font-size:17px;letter-spacing:.08em;
     color:var(--jade);margin-bottom:20px;background:rgba(122,154,114,.06);
     line-height:1.8;}
   .pay-plan{
     border:1px solid rgba(184,134,11,.22);border-radius:4px;
     padding:20px 20px;margin-bottom:16px;}
-  .pay-plan h3{font-size:15px;letter-spacing:.14em;color:var(--gold-lit);margin-bottom:10px;}
-  .pay-plan p{font-size:13.5px;line-height:2.1;letter-spacing:.05em;color:var(--rice-deep);}
+  .pay-plan h3{font-size:17px;letter-spacing:.14em;color:var(--gold-lit);margin-bottom:10px;}
+  .pay-plan p{font-size:17px;line-height:1.9;letter-spacing:.05em;color:var(--rice-deep);}
   .pay-plan p+p{margin-top:10px;}
-  .pay-plan-featured .pl-copy{
-    font-size:16px;
-    line-height:2;
+  .pay-plan .pl-copy{
+    font-size:17px;
+    line-height:1.9;
   }
-  .pay-plan-featured .pl-copy strong{
+  .pay-plan .pl-copy strong{
     font-size:18px;
     line-height:1.6;
     letter-spacing:.06em;
@@ -446,16 +449,14 @@
   .pay-btn:hover{background:var(--gold);color:#15200f;box-shadow:0 0 30px rgba(184,134,11,.4);}
   .pay-btn[data-placeholder]{opacity:.35;cursor:not-allowed;}
   .pay-btn[data-placeholder]:hover{background:transparent;color:var(--rice);box-shadow:none;}
-  .pay-note{
-    font-size:11.5px;line-height:2.0;letter-spacing:.04em;
+  .lp-body p.pay-note{
+    font-size:17px;line-height:1.9;letter-spacing:.04em;
     color:var(--jade);opacity:.65;margin-top:20px;}
-  /* T7:卡底誠實整備態狀態行 */
+  /* T7:卡底誠實整備態狀態行 —— polish batch(§3-1):與 .pl-copy 同級,不再依 featured 分兩檔 */
   .pc-status{margin-top:16px;padding-top:13px;border-top:1px solid rgba(184,134,11,.15);
-    font-size:12.5px;line-height:1.85;letter-spacing:.04em;color:var(--jade);opacity:.9;}
+    font-size:17px;line-height:1.85;letter-spacing:.04em;color:var(--jade);opacity:.9;}
   .pc-status.pc-ok{color:var(--gold-soft);}
-  .pay-plan-featured .pc-status{
-    font-size:14.5px;
-    line-height:1.9;
+  .pay-plan .pc-status{
     opacity:1;
   }
   .pay-action-label{
@@ -464,7 +465,7 @@
     color:var(--gold-lit);
     white-space:nowrap;
   }
-  .pay-ctx{margin:12px auto 0;max-width:30em;font-size:12.5px;line-height:1.9;letter-spacing:.04em;color:var(--jade);text-align:center;}
+  .pay-ctx{margin:12px auto 0;max-width:30em;font-size:17px;line-height:1.9;letter-spacing:.04em;color:var(--jade);text-align:center;}
   .quota-gate{
     max-width:360px;text-align:center;border:1px solid rgba(184,134,11,.28);
     border-radius:6px;padding:26px 24px;background:rgba(7,11,7,.52);
@@ -608,7 +609,7 @@
         <p class="pl-copy"><strong>初訪(免費)</strong> — 一輩子相贈 <strong>3 枚問卦銅錢</strong>。一枚一問;卦象、解讀都是真的,先進來問問看。</p>
         <div class="pc-status pc-ok">您的 3 枚銅錢已在囊中 —— 到<span class="pay-action-label">〔向天問卦〕</span>便可用。</div>
       </div>
-      <div class="pay-plan pay-plan-featured pay-plan-single">
+      <div class="pay-plan pay-plan-featured pay-plan-single" id="planSingle149">
         <p class="pl-copy"><strong>問一卦|149</strong> — 銅錢用盡,仍有事要問,便來一卦。老易為您讀本卦、變卦、動爻,把這一程攤開看清。</p>
         <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
       </div>
@@ -620,7 +621,7 @@
         <p class="pl-copy">〔讀完若想再往深處走〕同一卦,可再請老易多開幾面 —— <strong>四鏡·深卜 200</strong>,看互卦、序卦、變與不變裡的「轉」。不換卦、不重卜,只把這一卦讀到透。</p>
         <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
       </div>
-      <div class="pay-plan">
+      <div class="pay-plan" id="planFupan1490">
         <p class="pl-copy"><strong>問道·複盤|1490(月)</strong> — 問卦,是決策的前半段;拿了主意、做下去,後半段才開始。訂閱書房,老易陪您把做過的決定回頭複盤——這一程走到了哪,卦象當時所示的「轉」應在何處。複盤不限次,四鏡深卜一併在內;卦記隨時回看,可補記後續、蓋印留痕;逢節氣,老易捎一封信來。決策是一條路,不是一次問答。</p>
         <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
       </div>
@@ -1056,9 +1057,10 @@ async function initPayPage(){
   var _payCtxMap={zero:'囊中銅錢用盡了。要緊的事還在,來的路都在這裡。',deepdive:'方才那一卦,若想再往深處讀——深卜的來法在這裡。',fupan:'想把走過的決定回頭看——問道·複盤的來法在這裡。'};
   var _payCtxEl=document.getElementById('payCtx');
   if(_payCtxEl&&_payCtxMap[_src]){_payCtxEl.textContent=_payCtxMap[_src];_payCtxEl.hidden=false;}
-  if(_src==='deepdive'){
-    var _deepdiveCard=document.getElementById('planDeepdive200');
-    if(_deepdiveCard){ setTimeout(function(){ _deepdiveCard.scrollIntoView({behavior:'smooth',block:'center'}); }, 60); }
+  var _payScrollMap={zero:'planSingle149',deepdive:'planDeepdive200',fupan:'planFupan1490'}; // polish batch(§3-1):連結目標一致性 —— 有語境的入口一律捲到對應卡
+  if(_payScrollMap[_src]){
+    var _targetCard=document.getElementById(_payScrollMap[_src]);
+    if(_targetCard){ setTimeout(function(){ _targetCard.scrollIntoView({behavior:'smooth',block:'center'}); }, 60); }
   }
   try{
     await liff.init({liffId:LIFF_ID});
@@ -1128,7 +1130,7 @@ function attachFupanBannerHandlers(token){
   if(!btn || btn.disabled) return; // 卦例不足的禁用態不綁事件
 
   if(btn.dataset.mode === 'upsell'){
-    btn.addEventListener('click', function(){ window.location.href = './index.html?action=pay'; });
+    btn.addEventListener('click', function(){ window.location.href = './index.html?action=pay&src=fupan'; });
     return;
   }
 
@@ -1232,7 +1234,7 @@ async function initLogPage(){
           +'</div>';
         // log_id 由 Worker /history 補上(S137-R02),包成可點連結進卦記詳情頁(E23,現役已驗證,不重寫)
         if(r.log_id){
-          return '<a class="log-card" href="./log.html?log_id='+encodeURIComponent(r.log_id)+'">'+card+'</a>';
+          return '<a class="log-card" href="./log.html?log_id='+encodeURIComponent(r.log_id)+'&src=log">'+card+'</a>';
         }
         return '<div class="log-card">'+card+'</div>';
       }).join('');
@@ -1604,7 +1606,7 @@ async function ensureEntryGateState(){
 function renderZeroQuotaGate(state){
   var el=document.getElementById('entryGateText');
   if(el) el.innerHTML = '<span style="display:block;margin-bottom:22px;font-size:17px;letter-spacing:.14em;color:var(--gold-lit);">'+ZERO_QUOTA_TEXT+'</span>'
-    +'<a href="./index.html?action=pay" class="gate-door">問一卦 149</a>';
+    +'<a href="./index.html?action=pay&src=zero" class="gate-door">問一卦 149</a>';
   setSceneById('sGate');
 }
 

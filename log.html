@@ -53,7 +53,7 @@
     animation:spin .8s linear infinite;margin:0 auto 16px;
   }
   @keyframes spin{to{transform:rotate(360deg)}}
-  .err-msg{color:#8a5c2e;font-size:14px;}
+  .err-msg{color:#8a5c2e;font-size:17px;line-height:1.9;}
 
   /* ---- DETAIL ---- */
   .detail-wrap{display:none;padding:0 0 48px;}
@@ -127,7 +127,7 @@
     font-family:var(--serif);font-size:17px;line-height:1.9;color:var(--ink);
     font-weight:600;letter-spacing:.04em;
   }
-  .orient-sub{margin-top:6px;font-size:13px;line-height:1.8;color:var(--ink-soft);letter-spacing:.02em;}
+  .orient-sub{margin-top:6px;font-size:17px;line-height:1.9;color:var(--ink-soft);letter-spacing:.02em;}
 
   /* ---- SOUL-02 §4:落款/深卜卡欄題共用(≥17px,不同於內容 .sec-title) ---- */
   .cta-title{font-family:var(--serif);font-size:18px;font-weight:700;color:var(--ink);letter-spacing:.04em;margin-bottom:8px;}
@@ -139,8 +139,7 @@
     border:2px solid var(--gold);border-radius:10px;padding:20px 18px;border-bottom:none;
   }
   .deepen-section .cta-title{color:var(--paper);}
-  .deepen-sub{font-size:13px;color:var(--paper);opacity:.75;line-height:1.8;margin-bottom:12px;}
-  .deepen-bridge{font-size:14px;color:var(--paper);opacity:.88;line-height:1.85;margin-bottom:16px;letter-spacing:.02em;}
+  .deepen-sub{font-size:17px;line-height:1.9;color:var(--paper);opacity:.75;margin-bottom:12px;}
   .deepen-btn{
     display:block;width:100%;background:var(--gold);color:#fff;
     border:none;border-radius:8px;
@@ -148,14 +147,14 @@
     cursor:pointer;transition:.25s;font-weight:600;
   }
   .deepen-btn:hover{opacity:.85;}
-  .deepen-status{font-size:12px;color:var(--paper);opacity:.7;margin-top:10px;min-height:1.4em;}
+  .deepen-status{font-size:17px;color:var(--paper);opacity:.7;margin-top:10px;min-height:1.4em;}
 
   /* ---- E25:卦記蓋印(補後續)· SOUL-02 D3:落款欄=紙面記事風,單一「落款」鈕,舊化石字樣已拆除 ---- */
-  .stamp-sub{font-size:13px;color:var(--ink-soft);line-height:1.7;margin-bottom:14px;}
+  .stamp-sub{font-size:17px;color:var(--ink-soft);line-height:1.9;margin-bottom:14px;}
   .stamp-textarea{
     width:100%;min-height:88px;
     border:1px solid var(--line);border-radius:8px;padding:10px 12px;
-    font-family:var(--sans);font-size:15px;line-height:1.7;color:var(--ink);
+    font-family:var(--sans);font-size:17px;line-height:1.8;color:var(--ink);
     background:#fff;resize:vertical;
   }
   .stamp-confirm{
@@ -328,7 +327,6 @@ function buildDeepdiveCtaHtml(tierInfo) {
     <div class="section deepen-section">
       <div class="cta-title">往裡再讀四面？</div>
       <div class="deepen-sub">同一卦，不重卜、不換卦——互、綜、錯、序，四鏡合看。</div>
-      <div class="deepen-bridge">方才那封信，是這一卦的正面。四鏡，是同一卦的另外四面——加讀 200，連同先前的問一卦，這一卦最多 349，不再多收。</div>
       <button class="deepen-btn" id="deepdiveBtn" type="button" data-mode="${isSubscriber ? "trigger" : "purchase"}">${btnLabel}</button>
       <div class="deepen-status" id="deepdiveStatus"></div>
     </div>`;
@@ -471,7 +469,7 @@ function wireStampHandlers(logId, token) {
   }
 }
 
-function renderDetail(rec, tierInfo, token) {
+function renderDetail(rec, tierInfo, token, face) {
   const wrap = document.getElementById("viewDetail");
 
   const benSym  = guaSymbol(rec.ben_gua  || "");
@@ -485,11 +483,17 @@ function renderDetail(rec, tierInfo, token) {
       <a class="return-btn" href="./index.html?action=log">回到卦記</a>
     </div>`;
 
-  let html = `
-    <div class="orient-block">
-      <div class="orient-main">這封信，已收進您的卦記。</div>
-      <div class="orient-sub">往下可補個後續；想往深處讀，四鏡在頁尾。</div>
-    </div>
+  // SOUL-04b(v3.3 §2/§3):頂 header 依 src 分支 —— 深讀面(letter)無小字,卦記面(log)定向句+小字
+  const headerHtml = face === "letter"
+    ? `<div class="orient-block">
+         <div class="orient-main">這一卦，還能再往裡讀四面。</div>
+       </div>`
+    : `<div class="orient-block">
+         <div class="orient-main">這封信，已收進您的卦記。</div>
+         <div class="orient-sub">往下可補個後續。</div>
+       </div>`;
+
+  const guaHeaderHtml = `
     <div class="gua-header">
       <div class="sym">${benSym}</div>
       <div class="names">${rec.ben_gua || "—"}${rec.bian_gua ? " → " + rec.bian_gua : ""}</div>
@@ -498,8 +502,8 @@ function renderDetail(rec, tierInfo, token) {
       <div class="question-block">${esc(q)}</div>
     </div>`;
 
-  // 本卦 / 變卦資訊
-  html += `<div class="section">
+  // ① 完整解讀(兩面共用):本卦/變卦 + 六味解析或降級內容
+  let readingHtml = `<div class="section">
     <div class="sec-title">卦象</div>
     <div class="gua-pair">
       <div class="gua-box">
@@ -518,89 +522,100 @@ function renderDetail(rec, tierInfo, token) {
 
   // ★ S137-R01:非 divination 類型（deepdive/fupan/mood）先不硬套六味解析
   const entryType = rec.entry_type || "divination";
-  if (entryType !== "divination") {
-    html += `<div class="section">
-      <div class="sec-body" style="color:var(--ink-soft);font-size:14px;text-align:center;padding:20px 0;">
+  const isDivination = entryType === "divination";
+
+  if (!isDivination) {
+    readingHtml += `<div class="section">
+      <div class="sec-body" style="color:var(--ink-soft);font-size:17px;line-height:1.9;text-align:center;padding:20px 0;">
         此類型（${esc(entryType)}）詳情頁尚未支援。
       </div>
     </div>`;
-    html += returnDoorHtml;
-    wrap.innerHTML = html;
-    return;
-  }
+  } else {
+    const parsed = parseReading(rec.output_json);
 
-  const parsed = parseReading(rec.output_json);
-
-  if (!parsed) {
-    // 規則③ 整體 no-match 降級:原文純文字顯示,不假裝有結構
-    if (rec.output_json) {
-      html += `<div class="section">
-        <div class="sec-title">解讀</div>
-        <div class="sec-body">${textToHtml(rec.output_json)}</div>
+    if (!parsed) {
+      // 規則③ 整體 no-match 降級:原文純文字顯示,不假裝有結構
+      if (rec.output_json) {
+        readingHtml += `<div class="section">
+          <div class="sec-title">解讀</div>
+          <div class="sec-body">${textToHtml(rec.output_json)}</div>
+        </div>`;
+      } else {
+        readingHtml += `<div class="section">
+          <div class="sec-body" style="color:var(--ink-soft);font-size:17px;line-height:1.9;text-align:center;padding:20px 0;">
+            解讀尚未生成，請稍後查看。
+          </div>
+        </div>`;
+      }
+    } else if (parsed.type === "sr") {
+      // 紅/黑線標準回應:純文字,不套六味結構
+      readingHtml += `<div class="section">
+        <div class="sec-title">回覆</div>
+        <div class="sec-body">${textToHtml(parsed.sr)}</div>
       </div>`;
     } else {
-      html += `<div class="section">
-        <div class="sec-body" style="color:var(--ink-soft);font-size:14px;text-align:center;padding:20px 0;">
-          解讀尚未生成，請稍後查看。
-        </div>
-      </div>`;
-    }
-  } else if (parsed.type === "sr") {
-    // 紅/黑線標準回應:純文字,不套六味結構
-    html += `<div class="section">
-      <div class="sec-title">回覆</div>
-      <div class="sec-body">${textToHtml(parsed.sr)}</div>
-    </div>`;
-  } else {
-    // 一般信箋(可能含黃燈 GZ 收束)
-    if (parsed.gz) {
-      html += `<div class="section">
-        <div class="sec-title">提醒</div>
-        <div class="sec-body">${textToHtml(parsed.gz)}</div>
-      </div>`;
-    }
-    const labels = ["第一鏡","第二鏡","第三鏡","第四鏡","第五鏡","第六鏡"];
-    parsed.mirrors.forEach((m, i) => {
-      html += `<div class="section">
-        <div class="sec-title">${labels[i] || `J${i+1}`}</div>
-        <div class="sec-body">${textToHtml(m)}</div>
-      </div>`;
-    });
-    if (parsed.zy) {
-      html += `<div class="section">
-        <div class="sec-title">主理人贈言</div>
-        <div class="sec-body" style="font-style:italic;color:var(--gold-soft);">${textToHtml(parsed.zy)}</div>
-      </div>`;
-    }
-    if (parsed.next) {
-      html += `<div class="section">
-        <div class="sec-title">下一步</div>
-        <div class="sec-body">${textToHtml(parsed.next)}</div>
-      </div>`;
+      // 一般信箋(可能含黃燈 GZ 收束)
+      if (parsed.gz) {
+        readingHtml += `<div class="section">
+          <div class="sec-title">提醒</div>
+          <div class="sec-body">${textToHtml(parsed.gz)}</div>
+        </div>`;
+      }
+      const labels = ["第一鏡","第二鏡","第三鏡","第四鏡","第五鏡","第六鏡"];
+      parsed.mirrors.forEach((m, i) => {
+        readingHtml += `<div class="section">
+          <div class="sec-title">${labels[i] || `J${i+1}`}</div>
+          <div class="sec-body">${textToHtml(m)}</div>
+        </div>`;
+      });
+      if (parsed.zy) {
+        readingHtml += `<div class="section">
+          <div class="sec-title">主理人贈言</div>
+          <div class="sec-body" style="font-style:italic;color:var(--gold-soft);">${textToHtml(parsed.zy)}</div>
+        </div>`;
+      }
+      if (parsed.next) {
+        readingHtml += `<div class="section">
+          <div class="sec-title">下一步</div>
+          <div class="sec-body">${textToHtml(parsed.next)}</div>
+        </div>`;
+      }
     }
   }
 
-  // E25:蓋印(補後續)—— 同樣只在 divination 類型呈現
-  html += buildStampSectionHtml(rec);
-
-  // E27:深卜 CTA —— 走到這裡已保證 entryType === "divination"(其他類型在函式前段已早退)
-  html += buildDeepdiveCtaHtml(tierInfo);
-
-  // SOUL-02 D5:屏10 最尾回程門(律8,三扇門缺一即 FAIL)
-  html += returnDoorHtml;
+  let html;
+  if (face === "letter") {
+    // 深讀面(v3.3 §2):header → 卦 → ① 四鏡·深卜卡(置頂、緊接卦) → ② 完整解讀 → ③ 回程門。無落款。
+    html = headerHtml + guaHeaderHtml;
+    if (isDivination) html += buildDeepdiveCtaHtml(tierInfo);
+    html += readingHtml;
+    html += returnDoorHtml;
+  } else {
+    // 卦記面(v3.3 §3):header → 卦 → ① 完整解讀 → ② 落款欄 → ③ 回程門。不推深卜。
+    html = headerHtml + guaHeaderHtml + readingHtml;
+    if (isDivination) html += buildStampSectionHtml(rec);
+    html += returnDoorHtml;
+  }
 
   wrap.innerHTML = html;
 
-  const deepdiveBtn = document.getElementById("deepdiveBtn");
-  if (deepdiveBtn && !deepdiveBtn.disabled) {
-    deepdiveBtn.addEventListener("click", () => handleDeepdiveClick(rec.log_id, token));
+  if (isDivination) {
+    if (face === "letter") {
+      const deepdiveBtn = document.getElementById("deepdiveBtn");
+      if (deepdiveBtn && !deepdiveBtn.disabled) {
+        deepdiveBtn.addEventListener("click", () => handleDeepdiveClick(rec.log_id, token));
+      }
+    } else {
+      wireStampHandlers(rec.log_id, token);
+    }
   }
-  wireStampHandlers(rec.log_id, token);
 }
 
 async function init() {
   const params = new URLSearchParams(window.location.search);
   const logId = params.get("log_id");
+  // SOUL-04b(v3.3 §1):src=letter → 深讀面;src=log 或無參數 → 卦記面(預設)
+  const face = params.get("src") === "letter" ? "letter" : "log";
   if (!logId) {
     show("viewError");
     document.getElementById("errMsg").textContent = "缺少卦記編號，請從卦記列表進入。";
@@ -651,7 +666,7 @@ async function init() {
   }
 
   const tierInfo = await fetchSubscriberTier(token); // E27:失敗不擋主流程,降級處理見 buildDeepdiveCtaHtml
-  renderDetail(data.record, tierInfo, token);
+  renderDetail(data.record, tierInfo, token, face);
   show("viewDetail");
 }
 

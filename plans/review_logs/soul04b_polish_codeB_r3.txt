@@ -1,0 +1,534 @@
+Reading additional input from stdin...
+2026-07-21T00:30:39.553705Z ERROR codex_models_manager::cache: failed to load models cache: missing field `supports_reasoning_summaries` at line 88 column 5
+OpenAI Codex v0.144.6
+--------
+workdir: D:\CBD_Lab_OS\001_mingge\mingge-line
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: low
+reasoning summaries: none
+session id: 019f8214-f8ff-75e3-9d6e-a7464f02b831
+--------
+user
+同一案第三輪。上一輪(第二輪)你已 VERDICT: PASS,三項 BLOCKER 均已封閉。
+
+本輪追加(非你要求,是我自己用瀏覽器實測 computed style 時額外抓到的一個真 bug,主動修正,請一併覆核):
+
+發現:`.pay-note`(格3 付款規則段)與 `.study-intro`(書房門面引言段)雖然我已把各自的 class 選擇器改成 `font-size:17px`,但實測瀏覽器 computed style 仍顯示 `14.5px`。根因:兩者都是 `<p>` 標籤,而檔案已存在一條更早、specificity 更高的規則 `.lp-body p{font-size:14.5px;...}`(index.html:266,ancestor class + element = 0-1-1),蓋過我單純 class 選擇器(0-1-0)。這與 memory 記錄過的 E42 書房閱讀頁同款 cascade 陷阱是同一種錯。
+
+修法:比照專案既有慣例(閱讀頁曾用 `.study-read .sr-body p` 這種「祖先 class + 元素 + (可選)自身 class」提升 specificity 的手法解過同款問題),把兩條規則改寫為:
+- `.pay-note{font-size:17px...}` → `.lp-body p.pay-note{font-size:17px...}`
+- `.study-intro{font-size:17px...}` → `.lp-body p.study-intro{font-size:17px...}`
+兩者 ancestor `.lp-body` 都確實存在(page-pay 的 `.lp-body` 與 page-study 的 `<div class="lp-body" id="studyBody">`),純提升 specificity,未改變其餘屬性、未新增文案。
+
+瀏覽器實測(注入真實 style + 真實 markup,非猜測)修正後 computed font-size 全部確認 ≥17px:
+`.lp-header .lp-sub`=17px,`.pay-plan .pl-copy`=17px,`.pay-plan .pc-status`=17px,`.pay-note`=17px(原14.5px),`.pay-action-label`=17px,`.study-cover .lp-header h1`=26px,`.study-intro`=17px(原14.5px),`.study-tag`=17px,`.study-tag .st-n`=17px,`.study-featured .sf-head`=17px,`.study-feat .ff-t`=17px,`.study-feat .ff-y`=17px。log.html 側 `.deepen-sub`/`.orient-sub`/`.stamp-sub`/`.err-msg`/`.deepen-status`/`.stamp-textarea`/`.sec-body` 亦逐一 computed 確認=17px。
+
+請針對這次追加的 2 行 diff(僅選擇器改寫,無屬性值改變)做最小範圍複核:①範圍守門(是否僅動這兩條規則,無旁生影響)②是否還有其他同款 `.lp-body p` 或類似高 specificity 規則潛在覆蓋到本案動過的其他選擇器(例如 study-feat/study-tag 等是否為 div/button/span 而非 p,不受影響——我已逐一核過都是非 p 標籤,你可反查)③紅線掃描。若無新 BLOCKER 請給最終 VERDICT。
+
+完整目前 diff(git diff,repo 根目錄 D:\CBD_Lab_OS\001_mingge\mingge-line):
+
+diff --git a/index.html b/index.html
+index 0a0cf29..4cae507 100755
+--- a/index.html
++++ b/index.html
+@@ -366,20 +366,21 @@
+   ==================================================== */
+   .study-view{animation:studyFade .28s ease;}
+   @keyframes studyFade{from{opacity:0;}to{opacity:1;}}
+-  /* 層1 門面 */
+-  .study-intro{font-size:13.5px;line-height:2.05;letter-spacing:.05em;color:var(--rice-deep);opacity:.82;text-align:center;margin:2px 0 0;}
++  /* 層1 門面 —— polish batch(§3-2):門面/標題字級放大,全數 ≥17px(文章內文/層3閱讀頁零改) */
++  .study-cover .lp-header h1{font-size:26px;}
++  .lp-body p.study-intro{font-size:17px;line-height:1.9;letter-spacing:.05em;color:var(--rice-deep);opacity:.82;text-align:center;margin:2px 0 0;}
+   .study-intro .si-2{display:block;color:var(--gold-soft);opacity:.95;margin-top:9px;}
+   .study-tags{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:28px 0 8px;}
+   .study-tag{background:transparent;color:var(--rice);border:1px solid var(--gold);border-radius:20px;
+-    padding:8px 18px;font-size:13px;letter-spacing:.12em;cursor:pointer;font-family:inherit;transition:.2s;}
++    padding:8px 18px;font-size:17px;letter-spacing:.12em;cursor:pointer;font-family:inherit;transition:.2s;}
+   .study-tag:hover,.study-tag:active{background:var(--gold);color:var(--moss);}
+-  .study-tag .st-n{opacity:.55;font-size:11px;margin-left:5px;letter-spacing:0;}
++  .study-tag .st-n{opacity:.55;font-size:17px;margin-left:5px;letter-spacing:0;}
+   .study-featured{margin:32px 0 6px;}
+-  .study-featured .sf-head{font-size:13px;letter-spacing:.16em;color:var(--gold-lit);text-align:center;margin-bottom:16px;opacity:.9;}
++  .study-featured .sf-head{font-size:17px;letter-spacing:.16em;color:var(--gold-lit);text-align:center;margin-bottom:16px;opacity:.9;}
+   .study-feat{display:block;width:100%;text-align:left;background:var(--paper);color:var(--moss);
+     border:none;border-radius:4px;padding:15px 18px;margin-bottom:12px;cursor:pointer;font-family:inherit;box-shadow:0 1px 12px rgba(21,32,15,.18);}
+-  .study-feat .ff-t{font-size:15px;line-height:1.7;letter-spacing:.03em;margin-bottom:6px;font-weight:600;}
+-  .study-feat .ff-y{font-size:12.5px;line-height:1.6;color:var(--moss-soft);opacity:.85;
++  .study-feat .ff-t{font-size:17px;line-height:1.7;letter-spacing:.03em;margin-bottom:6px;font-weight:600;}
++  .study-feat .ff-y{font-size:17px;line-height:1.6;color:var(--moss-soft);opacity:.85;
+     display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
+   /* 層2 書卷列表 */
+   .study-back{display:inline-flex;align-items:center;gap:5px;background:transparent;color:var(--gold-soft);
+@@ -415,22 +416,24 @@
+   /* ====================================================
+      E12 訂閱方案
+   ==================================================== */
++  /* polish batch(§3-1):格3 字級統一表 —— 全卡(featured/非featured)同層同級,一律 ≥17px */
++  #page-pay .lp-header .lp-sub{font-size:17px;}
+   .pay-sub-active{
+     border:1px solid rgba(122,154,114,.3);border-radius:4px;
+-    padding:16px 18px;font-size:13px;letter-spacing:.08em;
++    padding:16px 18px;font-size:17px;letter-spacing:.08em;
+     color:var(--jade);margin-bottom:20px;background:rgba(122,154,114,.06);
+     line-height:1.8;}
+   .pay-plan{
+     border:1px solid rgba(184,134,11,.22);border-radius:4px;
+     padding:20px 20px;margin-bottom:16px;}
+-  .pay-plan h3{font-size:15px;letter-spacing:.14em;color:var(--gold-lit);margin-bottom:10px;}
+-  .pay-plan p{font-size:13.5px;line-height:2.1;letter-spacing:.05em;color:var(--rice-deep);}
++  .pay-plan h3{font-size:17px;letter-spacing:.14em;color:var(--gold-lit);margin-bottom:10px;}
++  .pay-plan p{font-size:17px;line-height:1.9;letter-spacing:.05em;color:var(--rice-deep);}
+   .pay-plan p+p{margin-top:10px;}
+-  .pay-plan-featured .pl-copy{
+-    font-size:16px;
+-    line-height:2;
++  .pay-plan .pl-copy{
++    font-size:17px;
++    line-height:1.9;
+   }
+-  .pay-plan-featured .pl-copy strong{
++  .pay-plan .pl-copy strong{
+     font-size:18px;
+     line-height:1.6;
+     letter-spacing:.06em;
+@@ -446,16 +449,14 @@
+   .pay-btn:hover{background:var(--gold);color:#15200f;box-shadow:0 0 30px rgba(184,134,11,.4);}
+   .pay-btn[data-placeholder]{opacity:.35;cursor:not-allowed;}
+   .pay-btn[data-placeholder]:hover{background:transparent;color:var(--rice);box-shadow:none;}
+-  .pay-note{
+-    font-size:11.5px;line-height:2.0;letter-spacing:.04em;
++  .lp-body p.pay-note{
++    font-size:17px;line-height:1.9;letter-spacing:.04em;
+     color:var(--jade);opacity:.65;margin-top:20px;}
+-  /* T7:卡底誠實整備態狀態行 */
++  /* T7:卡底誠實整備態狀態行 —— polish batch(§3-1):與 .pl-copy 同級,不再依 featured 分兩檔 */
+   .pc-status{margin-top:16px;padding-top:13px;border-top:1px solid rgba(184,134,11,.15);
+-    font-size:12.5px;line-height:1.85;letter-spacing:.04em;color:var(--jade);opacity:.9;}
++    font-size:17px;line-height:1.85;letter-spacing:.04em;color:var(--jade);opacity:.9;}
+   .pc-status.pc-ok{color:var(--gold-soft);}
+-  .pay-plan-featured .pc-status{
+-    font-size:14.5px;
+-    line-height:1.9;
++  .pay-plan .pc-status{
+     opacity:1;
+   }
+   .pay-action-label{
+@@ -464,7 +465,7 @@
+     color:var(--gold-lit);
+     white-space:nowrap;
+   }
+-  .pay-ctx{margin:12px auto 0;max-width:30em;font-size:12.5px;line-height:1.9;letter-spacing:.04em;color:var(--jade);text-align:center;}
++  .pay-ctx{margin:12px auto 0;max-width:30em;font-size:17px;line-height:1.9;letter-spacing:.04em;color:var(--jade);text-align:center;}
+   .quota-gate{
+     max-width:360px;text-align:center;border:1px solid rgba(184,134,11,.28);
+     border-radius:6px;padding:26px 24px;background:rgba(7,11,7,.52);
+@@ -608,7 +609,7 @@
+         <p class="pl-copy"><strong>初訪(免費)</strong> — 一輩子相贈 <strong>3 枚問卦銅錢</strong>。一枚一問;卦象、解讀都是真的,先進來問問看。</p>
+         <div class="pc-status pc-ok">您的 3 枚銅錢已在囊中 —— 到<span class="pay-action-label">〔向天問卦〕</span>便可用。</div>
+       </div>
+-      <div class="pay-plan pay-plan-featured pay-plan-single">
++      <div class="pay-plan pay-plan-featured pay-plan-single" id="planSingle149">
+         <p class="pl-copy"><strong>問一卦|149</strong> — 銅錢用盡,仍有事要問,便來一卦。老易為您讀本卦、變卦、動爻,把這一程攤開看清。</p>
+         <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
+       </div>
+@@ -620,7 +621,7 @@
+         <p class="pl-copy">〔讀完若想再往深處走〕同一卦,可再請老易多開幾面 —— <strong>四鏡·深卜 200</strong>,看互卦、序卦、變與不變裡的「轉」。不換卦、不重卜,只把這一卦讀到透。</p>
+         <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
+       </div>
+-      <div class="pay-plan">
++      <div class="pay-plan" id="planFupan1490">
+         <p class="pl-copy"><strong>問道·複盤|1490(月)</strong> — 問卦,是決策的前半段;拿了主意、做下去,後半段才開始。訂閱書房,老易陪您把做過的決定回頭複盤——這一程走到了哪,卦象當時所示的「轉」應在何處。複盤不限次,四鏡深卜一併在內;卦記隨時回看,可補記後續、蓋印留痕;逢節氣,老易捎一封信來。決策是一條路,不是一次問答。</p>
+         <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
+       </div>
+@@ -1056,9 +1057,10 @@ async function initPayPage(){
+   var _payCtxMap={zero:'囊中銅錢用盡了。要緊的事還在,來的路都在這裡。',deepdive:'方才那一卦,若想再往深處讀——深卜的來法在這裡。',fupan:'想把走過的決定回頭看——問道·複盤的來法在這裡。'};
+   var _payCtxEl=document.getElementById('payCtx');
+   if(_payCtxEl&&_payCtxMap[_src]){_payCtxEl.textContent=_payCtxMap[_src];_payCtxEl.hidden=false;}
+-  if(_src==='deepdive'){
+-    var _deepdiveCard=document.getElementById('planDeepdive200');
+-    if(_deepdiveCard){ setTimeout(function(){ _deepdiveCard.scrollIntoView({behavior:'smooth',block:'center'}); }, 60); }
++  var _payScrollMap={zero:'planSingle149',deepdive:'planDeepdive200',fupan:'planFupan1490'}; // polish batch(§3-1):連結目標一致性 —— 有語境的入口一律捲到對應卡
++  if(_payScrollMap[_src]){
++    var _targetCard=document.getElementById(_payScrollMap[_src]);
++    if(_targetCard){ setTimeout(function(){ _targetCard.scrollIntoView({behavior:'smooth',block:'center'}); }, 60); }
+   }
+   try{
+     await liff.init({liffId:LIFF_ID});
+@@ -1128,7 +1130,7 @@ function attachFupanBannerHandlers(token){
+   if(!btn || btn.disabled) return; // 卦例不足的禁用態不綁事件
+ 
+   if(btn.dataset.mode === 'upsell'){
+-    btn.addEventListener('click', function(){ window.location.href = './index.html?action=pay'; });
++    btn.addEventListener('click', function(){ window.location.href = './index.html?action=pay&src=fupan'; });
+     return;
+   }
+ 
+@@ -1232,7 +1234,7 @@ async function initLogPage(){
+           +'</div>';
+         // log_id 由 Worker /history 補上(S137-R02),包成可點連結進卦記詳情頁(E23,現役已驗證,不重寫)
+         if(r.log_id){
+-          return '<a class="log-card" href="./log.html?log_id='+encodeURIComponent(r.log_id)+'">'+card+'</a>';
++          return '<a class="log-card" href="./log.html?log_id='+encodeURIComponent(r.log_id)+'&src=log">'+card+'</a>';
+         }
+         return '<div class="log-card">'+card+'</div>';
+       }).join('');
+@@ -1604,7 +1606,7 @@ async function ensureEntryGateState(){
+ function renderZeroQuotaGate(state){
+   var el=document.getElementById('entryGateText');
+   if(el) el.innerHTML = '<span style="display:block;margin-bottom:22px;font-size:17px;letter-spacing:.14em;color:var(--gold-lit);">'+ZERO_QUOTA_TEXT+'</span>'
+-    +'<a href="./index.html?action=pay" class="gate-door">問一卦 149</a>';
++    +'<a href="./index.html?action=pay&src=zero" class="gate-door">問一卦 149</a>';
+   setSceneById('sGate');
+ }
+ 
+diff --git a/log.html b/log.html
+index 3bd698b..ff69688 100755
+--- a/log.html
++++ b/log.html
+@@ -53,7 +53,7 @@
+     animation:spin .8s linear infinite;margin:0 auto 16px;
+   }
+   @keyframes spin{to{transform:rotate(360deg)}}
+-  .err-msg{color:#8a5c2e;font-size:14px;}
++  .err-msg{color:#8a5c2e;font-size:17px;line-height:1.9;}
+ 
+   /* ---- DETAIL ---- */
+   .detail-wrap{display:none;padding:0 0 48px;}
+@@ -127,7 +127,7 @@
+     font-family:var(--serif);font-size:17px;line-height:1.9;color:var(--ink);
+     font-weight:600;letter-spacing:.04em;
+   }
+-  .orient-sub{margin-top:6px;font-size:13px;line-height:1.8;color:var(--ink-soft);letter-spacing:.02em;}
++  .orient-sub{margin-top:6px;font-size:17px;line-height:1.9;color:var(--ink-soft);letter-spacing:.02em;}
+ 
+   /* ---- SOUL-02 §4:落款/深卜卡欄題共用(≥17px,不同於內容 .sec-title) ---- */
+   .cta-title{font-family:var(--serif);font-size:18px;font-weight:700;color:var(--ink);letter-spacing:.04em;margin-bottom:8px;}
+@@ -139,8 +139,7 @@
+     border:2px solid var(--gold);border-radius:10px;padding:20px 18px;border-bottom:none;
+   }
+   .deepen-section .cta-title{color:var(--paper);}
+-  .deepen-sub{font-size:13px;color:var(--paper);opacity:.75;line-height:1.8;margin-bottom:12px;}
+-  .deepen-bridge{font-size:14px;color:var(--paper);opacity:.88;line-height:1.85;margin-bottom:16px;letter-spacing:.02em;}
++  .deepen-sub{font-size:17px;line-height:1.9;color:var(--paper);opacity:.75;margin-bottom:12px;}
+   .deepen-btn{
+     display:block;width:100%;background:var(--gold);color:#fff;
+     border:none;border-radius:8px;
+@@ -148,14 +147,14 @@
+     cursor:pointer;transition:.25s;font-weight:600;
+   }
+   .deepen-btn:hover{opacity:.85;}
+-  .deepen-status{font-size:12px;color:var(--paper);opacity:.7;margin-top:10px;min-height:1.4em;}
++  .deepen-status{font-size:17px;color:var(--paper);opacity:.7;margin-top:10px;min-height:1.4em;}
+ 
+   /* ---- E25:卦記蓋印(補後續)· SOUL-02 D3:落款欄=紙面記事風,單一「落款」鈕,舊化石字樣已拆除 ---- */
+-  .stamp-sub{font-size:13px;color:var(--ink-soft);line-height:1.7;margin-bottom:14px;}
++  .stamp-sub{font-size:17px;color:var(--ink-soft);line-height:1.9;margin-bottom:14px;}
+   .stamp-textarea{
+     width:100%;min-height:88px;
+     border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+-    font-family:var(--sans);font-size:15px;line-height:1.7;color:var(--ink);
++    font-family:var(--sans);font-size:17px;line-height:1.8;color:var(--ink);
+     background:#fff;resize:vertical;
+   }
+   .stamp-confirm{
+@@ -328,7 +327,6 @@ function buildDeepdiveCtaHtml(tierInfo) {
+     <div class="section deepen-section">
+       <div class="cta-title">往裡再讀四面？</div>
+       <div class="deepen-sub">同一卦，不重卜、不換卦——互、綜、錯、序，四鏡合看。</div>
+-      <div class="deepen-bridge">方才那封信，是這一卦的正面。四鏡，是同一卦的另外四面——加讀 200，連同先前的問一卦，這一卦最多 349，不再多收。</div>
+       <button class="deepen-btn" id="deepdiveBtn" type="button" data-mode="${isSubscriber ? "trigger" : "purchase"}">${btnLabel}</button>
+       <div class="deepen-status" id="deepdiveStatus"></div>
+     </div>`;
+@@ -471,7 +469,7 @@ function wireStampHandlers(logId, token) {
+   }
+ }
+ 
+-function renderDetail(rec, tierInfo, token) {
++function renderDetail(rec, tierInfo, token, face) {
+   const wrap = document.getElementById("viewDetail");
+ 
+   const benSym  = guaSymbol(rec.ben_gua  || "");
+@@ -485,11 +483,17 @@ function renderDetail(rec, tierInfo, token) {
+       <a class="return-btn" href="./index.html?action=log">回到卦記</a>
+     </div>`;
+ 
+-  let html = `
+-    <div class="orient-block">
+-      <div class="orient-main">這封信，已收進您的卦記。</div>
+-      <div class="orient-sub">往下可補個後續；想往深處讀，四鏡在頁尾。</div>
+-    </div>
++  // SOUL-04b(v3.3 §2/§3):頂 header 依 src 分支 —— 深讀面(letter)無小字,卦記面(log)定向句+小字
++  const headerHtml = face === "letter"
++    ? `<div class="orient-block">
++         <div class="orient-main">這一卦，還能再往裡讀四面。</div>
++       </div>`
++    : `<div class="orient-block">
++         <div class="orient-main">這封信，已收進您的卦記。</div>
++         <div class="orient-sub">往下可補個後續。</div>
++       </div>`;
++
++  const guaHeaderHtml = `
+     <div class="gua-header">
+       <div class="sym">${benSym}</div>
+       <div class="names">${rec.ben_gua || "—"}${rec.bian_gua ? " → " + rec.bian_gua : ""}</div>
+@@ -498,8 +502,8 @@ function renderDetail(rec, tierInfo, token) {
+       <div class="question-block">${esc(q)}</div>
+     </div>`;
+ 
+-  // 本卦 / 變卦資訊
+-  html += `<div class="section">
++  // ① 完整解讀(兩面共用):本卦/變卦 + 六味解析或降級內容
++  let readingHtml = `<div class="section">
+     <div class="sec-title">卦象</div>
+     <div class="gua-pair">
+       <div class="gua-box">
+@@ -518,89 +522,100 @@ function renderDetail(rec, tierInfo, token) {
+ 
+   // ★ S137-R01:非 divination 類型（deepdive/fupan/mood）先不硬套六味解析
+   const entryType = rec.entry_type || "divination";
+-  if (entryType !== "divination") {
+-    html += `<div class="section">
+-      <div class="sec-body" style="color:var(--ink-soft);font-size:14px;text-align:center;padding:20px 0;">
++  const isDivination = entryType === "divination";
++
++  if (!isDivination) {
++    readingHtml += `<div class="section">
++      <div class="sec-body" style="color:var(--ink-soft);font-size:17px;line-height:1.9;text-align:center;padding:20px 0;">
+         此類型（${esc(entryType)}）詳情頁尚未支援。
+       </div>
+     </div>`;
+-    html += returnDoorHtml;
+-    wrap.innerHTML = html;
+-    return;
+-  }
+-
+-  const parsed = parseReading(rec.output_json);
+-
+-  if (!parsed) {
+-    // 規則③ 整體 no-match 降級:原文純文字顯示,不假裝有結構
+-    if (rec.output_json) {
+-      html += `<div class="section">
+-        <div class="sec-title">解讀</div>
+-        <div class="sec-body">${textToHtml(rec.output_json)}</div>
+-      </div>`;
+-    } else {
+-      html += `<div class="section">
+-        <div class="sec-body" style="color:var(--ink-soft);font-size:14px;text-align:center;padding:20px 0;">
+-          解讀尚未生成，請稍後查看。
+-        </div>
+-      </div>`;
+-    }
+-  } else if (parsed.type === "sr") {
+-    // 紅/黑線標準回應:純文字,不套六味結構
+-    html += `<div class="section">
+-      <div class="sec-title">回覆</div>
+-      <div class="sec-body">${textToHtml(parsed.sr)}</div>
+-    </div>`;
+   } else {
+-    // 一般信箋(可能含黃燈 GZ 收束)
+-    if (parsed.gz) {
+-      html += `<div class="section">
+-        <div class="sec-title">提醒</div>
+-        <div class="sec-body">${textToHtml(parsed.gz)}</div>
+-      </div>`;
+-    }
+-    const labels = ["第一鏡","第二鏡","第三鏡","第四鏡","第五鏡","第六鏡"];
+-    parsed.mirrors.forEach((m, i) => {
+-      html += `<div class="section">
+-        <div class="sec-title">${labels[i] || `J${i+1}`}</div>
+-        <div class="sec-body">${textToHtml(m)}</div>
+-      </div>`;
+-    });
+-    if (parsed.zy) {
+-      html += `<div class="section">
+-        <div class="sec-title">主理人贈言</div>
+-        <div class="sec-body" style="font-style:italic;color:var(--gold-soft);">${textToHtml(parsed.zy)}</div>
+-      </div>`;
+-    }
+-    if (parsed.next) {
+-      html += `<div class="section">
+-        <div class="sec-title">下一步</div>
+-        <div class="sec-body">${textToHtml(parsed.next)}</div>
++    const parsed = parseReading(rec.output_json);
++
++    if (!parsed) {
++      // 規則③ 整體 no-match 降級:原文純文字顯示,不假裝有結構
++      if (rec.output_json) {
++        readingHtml += `<div class="section">
++          <div class="sec-title">解讀</div>
++          <div class="sec-body">${textToHtml(rec.output_json)}</div>
++        </div>`;
++      } else {
++        readingHtml += `<div class="section">
++          <div class="sec-body" style="color:var(--ink-soft);font-size:17px;line-height:1.9;text-align:center;padding:20px 0;">
++            解讀尚未生成，請稍後查看。
++          </div>
++        </div>`;
++      }
++    } else if (parsed.type === "sr") {
++      // 紅/黑線標準回應:純文字,不套六味結構
++      readingHtml += `<div class="section">
++        <div class="sec-title">回覆</div>
++        <div class="sec-body">${textToHtml(parsed.sr)}</div>
+       </div>`;
++    } else {
++      // 一般信箋(可能含黃燈 GZ 收束)
++      if (parsed.gz) {
++        readingHtml += `<div class="section">
++          <div class="sec-title">提醒</div>
++          <div class="sec-body">${textToHtml(parsed.gz)}</div>
++        </div>`;
++      }
++      const labels = ["第一鏡","第二鏡","第三鏡","第四鏡","第五鏡","第六鏡"];
++      parsed.mirrors.forEach((m, i) => {
++        readingHtml += `<div class="section">
++          <div class="sec-title">${labels[i] || `J${i+1}`}</div>
++          <div class="sec-body">${textToHtml(m)}</div>
++        </div>`;
++      });
++      if (parsed.zy) {
++        readingHtml += `<div class="section">
++          <div class="sec-title">主理人贈言</div>
++          <div class="sec-body" style="font-style:italic;color:var(--gold-soft);">${textToHtml(parsed.zy)}</div>
++        </div>`;
++      }
++      if (parsed.next) {
++        readingHtml += `<div class="section">
++          <div class="sec-title">下一步</div>
++          <div class="sec-body">${textToHtml(parsed.next)}</div>
++        </div>`;
++      }
+     }
+   }
+ 
+-  // E25:蓋印(補後續)—— 同樣只在 divination 類型呈現
+-  html += buildStampSectionHtml(rec);
+-
+-  // E27:深卜 CTA —— 走到這裡已保證 entryType === "divination"(其他類型在函式前段已早退)
+-  html += buildDeepdiveCtaHtml(tierInfo);
+-
+-  // SOUL-02 D5:屏10 最尾回程門(律8,三扇門缺一即 FAIL)
+-  html += returnDoorHtml;
++  let html;
++  if (face === "letter") {
++    // 深讀面(v3.3 §2):header → 卦 → ① 四鏡·深卜卡(置頂、緊接卦) → ② 完整解讀 → ③ 回程門。無落款。
++    html = headerHtml + guaHeaderHtml;
++    if (isDivination) html += buildDeepdiveCtaHtml(tierInfo);
++    html += readingHtml;
++    html += returnDoorHtml;
++  } else {
++    // 卦記面(v3.3 §3):header → 卦 → ① 完整解讀 → ② 落款欄 → ③ 回程門。不推深卜。
++    html = headerHtml + guaHeaderHtml + readingHtml;
++    if (isDivination) html += buildStampSectionHtml(rec);
++    html += returnDoorHtml;
++  }
+ 
+   wrap.innerHTML = html;
+ 
+-  const deepdiveBtn = document.getElementById("deepdiveBtn");
+-  if (deepdiveBtn && !deepdiveBtn.disabled) {
+-    deepdiveBtn.addEventListener("click", () => handleDeepdiveClick(rec.log_id, token));
++  if (isDivination) {
++    if (face === "letter") {
++      const deepdiveBtn = document.getElementById("deepdiveBtn");
++      if (deepdiveBtn && !deepdiveBtn.disabled) {
++        deepdiveBtn.addEventListener("click", () => handleDeepdiveClick(rec.log_id, token));
++      }
++    } else {
++      wireStampHandlers(rec.log_id, token);
++    }
+   }
+-  wireStampHandlers(rec.log_id, token);
+ }
+ 
+ async function init() {
+   const params = new URLSearchParams(window.location.search);
+   const logId = params.get("log_id");
++  // SOUL-04b(v3.3 §1):src=letter → 深讀面;src=log 或無參數 → 卦記面(預設)
++  const face = params.get("src") === "letter" ? "letter" : "log";
+   if (!logId) {
+     show("viewError");
+     document.getElementById("errMsg").textContent = "缺少卦記編號，請從卦記列表進入。";
+@@ -651,7 +666,7 @@ async function init() {
+   }
+ 
+   const tierInfo = await fetchSubscriberTier(token); // E27:失敗不擋主流程,降級處理見 buildDeepdiveCtaHtml
+-  renderDetail(data.record, tierInfo, token);
++  renderDetail(data.record, tierInfo, token, face);
+   show("viewDetail");
+ }
+ 
+warning: Skill descriptions were shortened to fit the 2% skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+codex
+判定：繼續型第三輪；本輪只做追加兩行 selector 的最小複核，不重開第二輪已 PASS 的三項 BLOCKER。
+
+開場自報：①脈絡＝第二輪 PASS，本輪新增 cascade 修正覆核；②上一輪 closeout／萃取卡目前無可用 session 工具可核，且本輪不把常駐檔誤判為新上傳；③專案填充欄在所給母版仍為空白，故不自行虛構歸類／凍結區；④進度以目前 repo diff 為準，不報浮動百分比；⑤合規基準未填，只守事實與紅線；⑥固化登記簿未驗證；⑦此輪是前端 QA／治理複核，非建置變更，跳過 Build_Nodes；⑧未收到新 CEO 裁決卡。接著我會反查實際 worktree、CSS specificity、元素標籤與紅線字串。
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Select-String -Path 'C:\\Users\\ivych\\.codex\\memories\\MEMORY.md' -Pattern 'E42|書房|cascade|第三輪|第二輪|BLOCKER' -Context 2,3 | Select-Object -First 80 | Format-List" in D:\CBD_Lab_OS\001_mingge\mingge-line
+2026-07-21T00:30:56.716645Z ERROR codex_core::exec: exec error: windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\CBD_Lab_OS\001_mingge\mingge-line, log=C:\Users\ivych\.codex\.sandbox\sandbox.2026-07-21.log, error=program not found
+2026-07-21T00:30:56.717082Z ERROR codex_core::tools::router: error=execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\CBD_Lab_OS\\001_mingge\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-21.log, error=program not found" })
+ exited -1 in 0ms:
+execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\CBD_Lab_OS\\001_mingge\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-21.log, error=program not found" })
+codex
+目前唯一本機讀取通道在啟動 Windows sandbox helper 時失敗（缺少 `codex-windows-sandbox-setup.exe`），不是 repo/test 錯誤。我再做一次最小只讀嘗試；若仍失敗，會把「可由所附完整 diff 靜態確認」與「未能獨立讀取 worktree」明確分開，不冒充已驗證。
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff -- index.html log.html' in D:\CBD_Lab_OS\001_mingge\mingge-line
+2026-07-21T00:31:02.641166Z ERROR codex_core::exec: exec error: windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\CBD_Lab_OS\001_mingge\mingge-line, log=C:\Users\ivych\.codex\.sandbox\sandbox.2026-07-21.log, error=program not found
+2026-07-21T00:31:02.641393Z ERROR codex_core::tools::router: error=execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\CBD_Lab_OS\\001_mingge\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-21.log, error=program not found" })
+ exited -1 in 0ms:
+execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\CBD_Lab_OS\\001_mingge\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-21.log, error=program not found" })
+codex
+最終 VERDICT：PASS
+
+針對本輪追加的 2 行 selector 改寫，未發現新 BLOCKER。
+
+- 範圍守門：兩處僅提升 selector specificity：
+  - `.study-intro` → `.lp-body p.study-intro`
+  - `.pay-note` → `.lp-body p.pay-note`
+  未改任何屬性值、markup、文案或行為。匹配範圍反而更窄，無旁生影響。
+
+- Cascade 判定正確：
+  - `.lp-body p`＝`0-1-1`
+  - `.lp-body p.study-intro`／`.lp-body p.pay-note`＝`0-2-1`
+  因此兩者會穩定覆蓋造成 `14.5px` 的通用規則，無須使用 `!important`。
+
+- 同款潛在覆蓋：
+  - `.study-tag`、`.study-feat` 為互動容器，不是 `<p>`。
+  - `.st-n`、`.ff-t`、`.ff-y`、`.sf-head` 為其內部非 `<p>` 元素。
+  - `.pc-status`、`.pay-action-label` 同樣不是 `<p>`。
+  - `.pay-plan p` 與 `.pay-plan .pl-copy` 已有足夠 specificity／後置規則。
+  - 依所附 diff 與 computed-style 實測，未見本案其他目標遭 `.lp-body p` 同類規則壓回 17px 以下。
+
+- 紅線掃描：無新增文案、無結構／功能／路由變更、無 `!important`、無擴大全域 CSS 影響面；純局部 cascade 修復。
+
+唯一驗證邊界：本輪本機 sandbox helper 缺失，無法重新執行 `git diff` 反查 worktree；以上結論依你提供的完整 diff 與瀏覽器 computed-style 證據作出。此環境限制不構成本次兩行修正的程式 BLOCKER。
+tokens used
+36,153
+最終 VERDICT：PASS
+
+針對本輪追加的 2 行 selector 改寫，未發現新 BLOCKER。
+
+- 範圍守門：兩處僅提升 selector specificity：
+  - `.study-intro` → `.lp-body p.study-intro`
+  - `.pay-note` → `.lp-body p.pay-note`
+  未改任何屬性值、markup、文案或行為。匹配範圍反而更窄，無旁生影響。
+
+- Cascade 判定正確：
+  - `.lp-body p`＝`0-1-1`
+  - `.lp-body p.study-intro`／`.lp-body p.pay-note`＝`0-2-1`
+  因此兩者會穩定覆蓋造成 `14.5px` 的通用規則，無須使用 `!important`。
+
+- 同款潛在覆蓋：
+  - `.study-tag`、`.study-feat` 為互動容器，不是 `<p>`。
+  - `.st-n`、`.ff-t`、`.ff-y`、`.sf-head` 為其內部非 `<p>` 元素。
+  - `.pc-status`、`.pay-action-label` 同樣不是 `<p>`。
+  - `.pay-plan p` 與 `.pay-plan .pl-copy` 已有足夠 specificity／後置規則。
+  - 依所附 diff 與 computed-style 實測，未見本案其他目標遭 `.lp-body p` 同類規則壓回 17px 以下。
+
+- 紅線掃描：無新增文案、無結構／功能／路由變更、無 `!important`、無擴大全域 CSS 影響面；純局部 cascade 修復。
+
+唯一驗證邊界：本輪本機 sandbox helper 缺失，無法重新執行 `git diff` 反查 worktree；以上結論依你提供的完整 diff 與瀏覽器 computed-style 證據作出。此環境限制不構成本次兩行修正的程式 BLOCKER。
