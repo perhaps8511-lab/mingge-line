@@ -73,8 +73,8 @@ NODE_OUT=$(node "$(dirname "$0")/_e56_fn_matrix.mjs" "$IDX" 2>&1)
 echo "$NODE_OUT"
 NODE_FAIL=$(echo "$NODE_OUT" | grep -c '^FAIL')
 NODE_PASS=$(echo "$NODE_OUT" | grep -c '^PASS')
-if [ "$NODE_FAIL" -eq 0 ] && [ "$NODE_PASS" -ge 11 ]; then
-  pass "段② JS 純函式矩陣 11/11 case 全過"
+if [ "$NODE_FAIL" -eq 0 ] && [ "$NODE_PASS" -ge 14 ]; then
+  pass "段② JS 純函式矩陣 14/14 case 全過"
 else
   fail "段② JS 純函式矩陣未全過(FAIL=$NODE_FAIL PASS=$NODE_PASS)"
 fi
@@ -156,6 +156,49 @@ if [ "${DIFF_MAKE_TOUCH:-0}" -eq 0 ]; then
 else
   fail "diff 中新增行觸碰 5379670/5202754,逾越禁碰邊界"
 fi
+
+echo ""
+echo "=== 段⑥ S20260721 UAT 修正驗證(F1字級/F2對比/F4 rate limit)==="
+
+# F1:門廳+問答室 CTA(.sp-btn/.ask-secondary)字級提到熟齡基準,範圍限定 .laoyi-view 不外溢書房
+grep -qF '.laoyi-view .sp-btn,.laoyi-view .ask-secondary{font-size:17px;}' "$IDX" \
+  && pass "F1 門廳/問答室 CTA 按鈕字級提至 17px(向老易請教/先逛書房/起一卦皆屬此類)" \
+  || fail "F1 按鈕字級修正缺失"
+
+# F2:對比修正 —— .ask-secondary/.laoyi-svc-link 原色 --moss-soft 在深底(#070b07)實測僅約2.3:1,
+# 改沿用既有 .about-signpost .ask-secondary 的 rice-deep 覆寫手法(同段落已驗證之高對比色)
+grep -qF '.laoyi-view .ask-secondary{color:var(--rice-deep);}' "$IDX" \
+  && pass "F2「先逛書房」/「起一卦」對比修正(moss-soft→rice-deep,深底達 WCAG AA)" \
+  || fail "F2 laoyi-view ask-secondary 對比修正缺失"
+grep -qF ".laoyi-svc-link button{background:none;border:none;color:var(--rice-deep);" "$IDX" \
+  && pass "F2「店務找書僮」對比修正(綠字配綠底→rice-deep)" \
+  || fail "F2 laoyi-svc-link 對比修正缺失"
+if grep -qE "laoyi-svc-link button\{[^}]*color:var\(--moss-soft\)" "$IDX"; then
+  fail "F2 偵測到 .laoyi-svc-link button 仍殘留低對比 --moss-soft"
+fi
+
+# F4:workers.dev 子域無 zone,zone WAF 不適用 → code 層 Workers Rate Limiting API binding
+WRANGLER_TOML="$REPO_ROOT/workers/mingge-relay/wrangler.toml"
+grep -qF '[[ratelimits]]' "$WRANGLER_TOML" && grep -qF 'name = "LAOYI_RATE_LIMITER"' "$WRANGLER_TOML" \
+  && pass "F4 wrangler.toml 已宣告 LAOYI_RATE_LIMITER ratelimit binding" \
+  || fail "F4 wrangler.toml 缺 ratelimit binding 宣告"
+grep -qF 'limit = 20' "$WRANGLER_TOML" && grep -qF 'period = 60' "$WRANGLER_TOML" \
+  && pass "F4 起手值 20 req/60s(對齊卡上「20 req/min」)" \
+  || fail "F4 rate limit 數值不符卡上起手值"
+echo "$ROUTE_BLOCK" | grep -qF 'env.LAOYI_RATE_LIMITER.limit({ key: verifiedUserId })' \
+  && pass "F4 /laoyi/chat 於轉發 Dify 前呼叫 rate limiter,鍵=已驗證 LINE userId" \
+  || fail "F4 /laoyi/chat 未呼叫 rate limiter 或鍵值不符"
+echo "$ROUTE_BLOCK" | grep -qF 'code: "RATE_LIMITED" }, 429' \
+  && pass "F4 超限回 429+穩定 code 欄位(與既有錯誤回應風格一致)" \
+  || fail "F4 超限回應缺失或格式不符"
+# Codex 互審 r1:binding 缺失(部署配置錯誤)不應 fail-open 悄悄放行,應 fail-closed 503;
+# 僅 binding 已就位但 .limit() 呼叫本身出錯(暫時性)才 fail-open
+echo "$ROUTE_BLOCK" | grep -qF 'if (!env.LAOYI_RATE_LIMITER)' && echo "$ROUTE_BLOCK" | grep -qF 'code: "RATE_LIMITER_NOT_CONFIGURED" }, 503' \
+  && pass "F4 binding 缺失 fail-closed 回 503(不讓防護悄悄失效)" \
+  || fail "F4 binding 缺失處理不是 fail-closed"
+echo "$ROUTE_BLOCK" | grep -qF 'failing open' \
+  && pass "F4 binding 已就位但 .limit() 呼叫暫時性出錯時 fail-open(不因限流服務抖動連坐斷聊天)" \
+  || fail "F4 缺少 .limit() 暫時性錯誤的 fail-open 處理"
 
 echo ""
 echo "=== 總結:PASS=$PASS FAIL=$FAIL ==="

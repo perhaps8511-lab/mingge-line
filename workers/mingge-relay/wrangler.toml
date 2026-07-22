@@ -1,3 +1,15 @@
 name = "mingge-relay"
 main = "worker.js"
 compatibility_date = "2024-12-01"
+
+# S20260721 UAT F4:mingge-relay 跑在 workers.dev 子域(無 custom domain/zone),
+# zone-level WAF Rate Limiting Rules 不適用該流量,故改在 code 層用 Workers Rate Limiting API binding。
+# 保護標的=共用 Dify credit(/laoyi/chat 轉發 app-gQwG4),見 worker.js LAOYI_RATE_LIMITER 使用處。
+# 需 wrangler >=4.36.0;period 僅允許 10 或 60 秒。
+[[ratelimits]]
+name = "LAOYI_RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 20
+  period = 60

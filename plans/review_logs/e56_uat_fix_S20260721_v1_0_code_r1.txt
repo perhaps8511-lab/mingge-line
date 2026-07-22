@@ -1,0 +1,294 @@
+Reading prompt from stdin...
+2026-07-22T02:11:30.302799Z ERROR codex_models_manager::cache: failed to load models cache: missing field `supports_reasoning_summaries` at line 88 column 5
+OpenAI Codex v0.144.6
+--------
+workdir: D:\CBD_Lab_OS\001_mingge\mingge-line
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019f8797-a9af-7911-bc05-cc0dd8b7eac2
+--------
+user
+你是資深全端/Cloudflare Workers 架構審稿人,執行「Code 審查(反向模式)」。
+
+背景:repo 為 mingge-line(命格易經 LINE LIFF 專案)。派工卡為
+00B_taskcard/001_taskcard_e56_uat_fix_S20260721_v1_0.md(已在當前 working tree,直接讀取)。
+這張卡是「體感閘機械修正」卡(Perth 真機抓出的 UAT bug),已由 Claude Code 直接施工完成
+(未經事前 plan.md 審查流程 — 因是修正既有 E56 功能而非新功能開發)。目前變更尚未 commit。
+
+請執行:
+1. 讀 00B_taskcard/001_taskcard_e56_uat_fix_S20260721_v1_0.md 的驗收條件與範圍。
+2. 執行 `git diff -- index.html workers/mingge-relay/worker.js workers/mingge-relay/wrangler.toml` 讀實際變更(working tree 未 commit,這就是 live 源)。
+3. 三查:
+   ① 範圍守門 — 任何範圍外變動(尤其老易 prompt/KB、Make webhook 5379670/5202754、對話持久化邏輯)= 攔下不放行。
+   ② 驗收條件逐條對 PASS/FAIL(F1 字級/F2 對比/F3 店務找書僮功能+E57帶話按鈕/F4 rate limit)。
+   ③ 紅線掃描 — token/金鑰/硬編碼 endpoint/TA 文案(S1-S7 話術)變動 = 出現即攔。
+4. 額外技術審查重點:
+   a. index.html 新增的 laoyiResetSvcHandoff() 是否真的堵住「laoyiSvcHandoffOpen 用過一次後常駐入口/自動引路永久卡死」這個舊 bug(檢查三條路徑:早退/成功/失敗是否都呼叫到)。
+   b. 新增的 LAOYI_SVC_CLOSE_RE = /書僮/ 這個關鍵字偵測(測 answerText,老易 prompt 凍結不可改動下的前端啟發式判斷)有沒有明顯的誤觸發(false positive)風險?是否有更穩妥的替代方案在不碰 prompt 前提下可行?
+   c. worker.js 新增的 Workers Rate Limiting API binding(/laoyi/chat,鍵=verifiedUserId,20 req/60s,binding 缺失時 fail-open 並 log warning)這個設計是否合理?fail-open vs fail-closed 的取捨有沒有問題?
+   d. CSS 修正(.laoyi-view .sp-btn/.ask-secondary 字級+對比覆寫、.laoyi-svc-link button 對比覆寫)的 selector scope 是否真的不會外溢到書房頁 .study-signpost 或其他既有頁面?
+   e. wrangler.toml 新增的 [[ratelimits]] 語法是否正確(namespace_id/simple.limit/simple.period)。
+
+輸出格式:條列 PASS 項 / 攔下項(附檔名+行號)/ 給 Claude Code 的修正指令原文(若有攔下項)。
+若整體判定 APPROVED,請在回覆最後一行寫:VERDICT: APPROVED。
+若有 [BLOCKER],請在回覆最後一行寫:VERDICT: BLOCKED,並列出待修清單。
+
+warning: Skill descriptions were shortened to fit the 2% skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+codex
+開場判定：繼續型／建置型。真相源＝本輪未驗證到 Airtable Build_Nodes 連線；我會以派工卡 + 未 commit working-tree diff 作本次 code review 的 live 源，進度不從舊 markdown 推估。上 session 的 closeout／萃取卡狀態目前未能由聊天工具回溯確認；本輪是唯讀審查，不先補寫未知前場產物。專案凍結與紅線以派工卡為準，尤其不碰老易 prompt/KB、兩支 Make webhook、持久化與 S1–S7 文案。收件匣未見新 CEO 裁決卡。
+
+我會使用 `workers-best-practices` skill，因為審查涉及 Workers Rate Limiting binding 與 Wrangler 設定；先讀規範，再逐條對 taskcard 和 live diff。
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$mem='"'C:\\Users\\ivych\\.codex\\memories\\MEMORY.md'; rg -n \"mingge-line|E56|S20260721|rate limit|老易\" "'$mem; Get-Content -Raw '"'C:\\Users\\ivych\\.codex\\skills\\workers-best-practices\\SKILL.md'; Write-Output \"---FILES---\"; Get-Content -Raw '00B_taskcard\\001_taskcard_e56_uat_fix_S20260721_v1_0.md'; Write-Output \"---DIFF---\"; git diff -- index.html workers/mingge-relay/worker.js workers/mingge-relay/wrangler.toml" in D:\CBD_Lab_OS\001_mingge\mingge-line
+2026-07-22T02:11:46.427496Z ERROR codex_core::exec: exec error: windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\CBD_Lab_OS\001_mingge\mingge-line, log=C:\Users\ivych\.codex\.sandbox\sandbox.2026-07-22.log, error=program not found
+2026-07-22T02:11:46.428991Z ERROR codex_core::tools::router: error=execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\CBD_Lab_OS\\001_mingge\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-22.log, error=program not found" })
+ exited -1 in 0ms:
+execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\CBD_Lab_OS\\001_mingge\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-22.log, error=program not found" })
+codex
+本機讀取工具第一次啟動失敗，原因是 Windows sandbox helper 缺失，尚未取得任何檔案內容。我先用不載入 login shell 的方式重試；若仍失敗，這會是無法做證據型審查的實質阻塞。
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -Command "Get-Content -Raw 'C:\\Users\\ivych\\.codex\\skills\\workers-best-practices\\SKILL.md'" in D:\CBD_Lab_OS\001_mingge\mingge-line
+2026-07-22T02:11:52.136968Z ERROR codex_core::exec: exec error: windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\CBD_Lab_OS\001_mingge\mingge-line, log=C:\Users\ivych\.codex\.sandbox\sandbox.2026-07-22.log, error=program not found
+2026-07-22T02:11:52.137191Z ERROR codex_core::tools::router: error=execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\CBD_Lab_OS\\001_mingge\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-22.log, error=program not found" })
+ exited -1 in 0ms:
+execution error: Io(Custom { kind: Other, error: "windows sandbox: orchestrator_helper_launch_failed: setup refresh failed to launch helper: helper=codex-windows-sandbox-setup.exe, cwd=D:\\CBD_Lab_OS\\001_mingge\\mingge-line, log=C:\\Users\\ivych\\.codex\\.sandbox\\sandbox.2026-07-22.log, error=program not found" })
+mcp: node_repl/js started
+mcp: node_repl/js (failed)
+mcp: node_repl/js started
+mcp: node_repl/js (completed)
+mcp: node_repl/js started
+mcp: node_repl/js (completed)
+mcp: node_repl/js started
+mcp: node_repl/js (completed)
+mcp: node_repl/js started
+mcp: node_repl/js (completed)
+codex
+實際 workspace 與指示有一個關鍵不一致：指定的 `00B_taskcard/...e56_uat_fix...md` 不存在；目前只找到 `governance/cards/001_taskcard_e56_laoyi_center_S20260721_v1_1.md`（看起來是原 E56 卡，不是本次 UAT 修正卡）。我仍先讀 live diff 與三個完整檔案，並核對 Cloudflare 官方最新 Rate Limiting/Wrangler 語法；但缺少指定驗收卡時，不能把 F1–F4 宣告為已依卡完整驗收。
+mcp: node_repl/js started
+mcp: node_repl/js (completed)
+web search: 
+web search: site:developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit Wrangler ratelimits namespace_id simple limit period TOML ...
+2026-07-22T02:12:44.683284Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+mcp: node_repl/js started
+mcp: node_repl/js (completed)
+2026-07-22T02:13:10.052586Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+mcp: node_repl/js started
+mcp: node_repl/js (completed)
+2026-07-22T02:13:18.882991Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+mcp: node_repl/js started
+mcp: node_repl/js (completed)
+2026-07-22T02:13:22.562056Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+mcp: node_repl/js started
+mcp: node_repl/js (completed)
+2026-07-22T02:13:26.892278Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+mcp: node_repl/js started
+mcp: node_repl/js (completed)
+2026-07-22T02:13:31.401219Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+mcp: node_repl/js started
+mcp: node_repl/js (completed)
+2026-07-22T02:13:34.799716Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+codex
+整體判定：F1、F2、F4 通過；F3 因偵測條件過寬攔下。另指定的 UAT 修正卡在目前 working tree 找不到，無法完成「逐條依卡驗收」。
+
+PASS 項
+
+- 範圍守門：指定三檔 diff 未修改老易 prompt/KB、Make webhook 5379670/5202754、對話持久化邏輯、金鑰或 S1–S7 定稿話術。
+- F1 字級：老易門廳／問答室的 `.sp-btn`、`.ask-secondary` 已限定為 17px。[index.html](/D:/CBD_Lab_OS/001_mingge/mingge-line/index.html:307)
+- F2 對比：
+  - `.ask-secondary` 改用 `--rice-deep`。[index.html](/D:/CBD_Lab_OS/001_mingge/mingge-line/index.html:308)
+  - 「店務找書僮」也改用 `--rice-deep`。[index.html](/D:/CBD_Lab_OS/001_mingge/mingge-line/index.html:326)
+- CSS scope 正確：
+  - `.laoyi-view` 只存在於老易門廳與問答室，第 760、776 行。
+  - 書房 `.study-signpost` 位於獨立 DOM，第 717 行，不會被 `.laoyi-view ...` selector 命中。
+  - `.laoyi-svc-link button` 也只針對老易入口。
+- F3 手動入口與 E57 帶話流程基本正確。
+- `laoyiResetSvcHandoff()` 確實堵住舊常駐鎖死問題：
+  - 無既有問題的早退路徑有 reset：第 1203 行。
+  - `liff.sendMessages()` 成功路徑有 reset：第 1230 行。
+  - catch/fallback 路徑有 reset：第 1234 行。
+- F4 Rate Limit 接入位置正確：
+  - 僅在 LINE token 驗證取得 `verifiedUserId` 後執行。
+  - key 使用已驗證 userId，不使用 token 或共用 IP。[worker.js](/D:/CBD_Lab_OS/001_mingge/mingge-line/workers/mingge-relay/worker.js:624)
+  - 超額回傳 HTTP 429。
+- Wrangler 語法正確：`[[ratelimits]]`、字串型正整數 `namespace_id`、`simple.limit=20`、`simple.period=60` 都符合 Cloudflare 官方格式。[wrangler.toml](/D:/CBD_Lab_OS/001_mingge/mingge-line/workers/mingge-relay/wrangler.toml:9) [Cloudflare Rate Limiting API](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
+- 靜態檢查：
+  - `git diff --check`：PASS。
+  - `node --check worker.js`：PASS。
+  - E56 function matrix：14 PASS、0 FAIL。
+
+攔下項
+
+- [BLOCKER] F3 有明顯 false positive：[index.html](/D:/CBD_Lab_OS/001_mingge/mingge-line/index.html:1058)
+
+  ```js
+  var LAOYI_SVC_CLOSE_RE=/書僮/;
+  ```
+
+  任何正常答案只要提到「書僮」就會顯示店務交接，例如：
+
+  - 「書僮是誰？」
+  - 「老易和書僮有何不同？」
+  - 引述門廳原句「店務找書僮」
+  - 解釋網站角色分工
+
+  現有測試 case12 只有 4/4 命中，沒有 negative fixtures，因此 14/14 不能證明沒有誤觸發。
+
+- [BLOCKER] 指定派工卡不存在：
+
+  `00B_taskcard/001_taskcard_e56_uat_fix_S20260721_v1_0.md`
+
+  repo 目前只找到原功能卡：
+
+  `governance/cards/001_taskcard_e56_laoyi_center_S20260721_v1_1.md`
+
+  所以本次只能依使用者訊息中的 F1–F4 和原 E56 凍結邊界審查，不能宣稱已讀取、逐條通過指定 UAT 修正卡。
+
+- [注意，提交前處理] working tree 尚有本次指定 diff 外的變更／產物：
+
+  - `tests/_e56_fn_matrix.mjs`
+  - `tests/test_e56_laoyi_center_v1_0.sh`
+  - `.claude/settings.local.json`
+  - `workers/mingge-relay/.wrangler/`
+
+  測試檔可能屬合理範圍；`.claude/settings.local.json` 與 `.wrangler/` 不應誤入 commit。
+
+技術取捨
+
+- 不碰 prompt 前提下，建議以「固定收束句的多特徵」取代單字偵測，例如同時要求答案包含店務邊界與書僮：
+
+  ```js
+  var LAOYI_SVC_CLOSE_RE =
+    /(?:這是店務|店務[^。！？\n]{0,24}(?:不管|找書僮)|不管帳[^。！？\n]{0,24}書僮)/;
+  ```
+
+  更穩妥的是維護一組由真機答案萃出的 exact/near-exact closing patterns，並加入至少 8 個「提到書僮但不是交接」的 negative fixtures。
+
+- Rate Limit binding 本身合理，但 Cloudflare 明確說明其計數是「每個 Cloudflare location」、eventually consistent、偏寬鬆，不能視為全球精準的 20 req/60s 成本帳本。
+- fail-open：
+  - 優點：Rate Limiting 服務或 binding 異常不會令老易聊天全斷。
+  - 缺點：本功能的首要動機是保護共用 Dify credit，異常時恰好失去唯一成本保護。
+  - 建議：若產品優先可用性，現行 fail-open 可接受，但應加結構化告警；若 credit 爆量是硬紅線，`/laoyi/chat` 應 fail-closed 回 503。至少「binding missing」建議 fail-closed，因正式部署缺 binding 屬設定錯誤，不是正常降級。
+
+給 Claude Code 的修正指令原文
+
+```text
+請只修正 E56 UAT F3 前端啟發式與測試，不碰老易 Dify prompt/KB、Make 5379670/5202754、持久化、S1-S7 定稿話術。
+
+1. 將 index.html 的 LAOYI_SVC_CLOSE_RE 從單字 /書僮/ 收窄為「店務邊界語意 + 書僮」的多特徵判斷；不得因一般答案只是提及書僮就顯示 S5／交給書僮按鈕。
+2. 在 tests/_e56_fn_matrix.mjs 加入至少：
+   - 4 個真正店務收束 positive fixtures；
+   - 8 個含「書僮」但不該交接的 negative fixtures，例如「書僮是誰」「老易與書僮有何不同」「文章提到書僮」「請解釋店務找書僮這句話」。
+3. 保留 answerText 判斷、S5 優先於起卦 CTA，以及 laoyiResetSvcHandoff 的早退／成功／失敗三路徑。
+4. 補回缺少的 00B_taskcard/001_taskcard_e56_uat_fix_S20260721_v1_0.md，或回報其正確現役路徑；不得用原 E56 建置卡冒充本次 UAT 修正卡。
+5. 提交時排除 .claude/settings.local.json 與 workers/mingge-relay/.wrangler/。
+6. 回報修正後 git diff --check、node --check worker.js、E56 matrix 的 PASS/FAIL。
+```
+
+待修清單：收窄 F3 偵測並補 negative regression；提供指定 UAT 修正卡；排除本機產物。
+
+VERDICT: BLOCKED
+tokens used
+88,258
+整體判定：F1、F2、F4 通過；F3 因偵測條件過寬攔下。另指定的 UAT 修正卡在目前 working tree 找不到，無法完成「逐條依卡驗收」。
+
+PASS 項
+
+- 範圍守門：指定三檔 diff 未修改老易 prompt/KB、Make webhook 5379670/5202754、對話持久化邏輯、金鑰或 S1–S7 定稿話術。
+- F1 字級：老易門廳／問答室的 `.sp-btn`、`.ask-secondary` 已限定為 17px。[index.html](/D:/CBD_Lab_OS/001_mingge/mingge-line/index.html:307)
+- F2 對比：
+  - `.ask-secondary` 改用 `--rice-deep`。[index.html](/D:/CBD_Lab_OS/001_mingge/mingge-line/index.html:308)
+  - 「店務找書僮」也改用 `--rice-deep`。[index.html](/D:/CBD_Lab_OS/001_mingge/mingge-line/index.html:326)
+- CSS scope 正確：
+  - `.laoyi-view` 只存在於老易門廳與問答室，第 760、776 行。
+  - 書房 `.study-signpost` 位於獨立 DOM，第 717 行，不會被 `.laoyi-view ...` selector 命中。
+  - `.laoyi-svc-link button` 也只針對老易入口。
+- F3 手動入口與 E57 帶話流程基本正確。
+- `laoyiResetSvcHandoff()` 確實堵住舊常駐鎖死問題：
+  - 無既有問題的早退路徑有 reset：第 1203 行。
+  - `liff.sendMessages()` 成功路徑有 reset：第 1230 行。
+  - catch/fallback 路徑有 reset：第 1234 行。
+- F4 Rate Limit 接入位置正確：
+  - 僅在 LINE token 驗證取得 `verifiedUserId` 後執行。
+  - key 使用已驗證 userId，不使用 token 或共用 IP。[worker.js](/D:/CBD_Lab_OS/001_mingge/mingge-line/workers/mingge-relay/worker.js:624)
+  - 超額回傳 HTTP 429。
+- Wrangler 語法正確：`[[ratelimits]]`、字串型正整數 `namespace_id`、`simple.limit=20`、`simple.period=60` 都符合 Cloudflare 官方格式。[wrangler.toml](/D:/CBD_Lab_OS/001_mingge/mingge-line/workers/mingge-relay/wrangler.toml:9) [Cloudflare Rate Limiting API](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
+- 靜態檢查：
+  - `git diff --check`：PASS。
+  - `node --check worker.js`：PASS。
+  - E56 function matrix：14 PASS、0 FAIL。
+
+攔下項
+
+- [BLOCKER] F3 有明顯 false positive：[index.html](/D:/CBD_Lab_OS/001_mingge/mingge-line/index.html:1058)
+
+  ```js
+  var LAOYI_SVC_CLOSE_RE=/書僮/;
+  ```
+
+  任何正常答案只要提到「書僮」就會顯示店務交接，例如：
+
+  - 「書僮是誰？」
+  - 「老易和書僮有何不同？」
+  - 引述門廳原句「店務找書僮」
+  - 解釋網站角色分工
+
+  現有測試 case12 只有 4/4 命中，沒有 negative fixtures，因此 14/14 不能證明沒有誤觸發。
+
+- [BLOCKER] 指定派工卡不存在：
+
+  `00B_taskcard/001_taskcard_e56_uat_fix_S20260721_v1_0.md`
+
+  repo 目前只找到原功能卡：
+
+  `governance/cards/001_taskcard_e56_laoyi_center_S20260721_v1_1.md`
+
+  所以本次只能依使用者訊息中的 F1–F4 和原 E56 凍結邊界審查，不能宣稱已讀取、逐條通過指定 UAT 修正卡。
+
+- [注意，提交前處理] working tree 尚有本次指定 diff 外的變更／產物：
+
+  - `tests/_e56_fn_matrix.mjs`
+  - `tests/test_e56_laoyi_center_v1_0.sh`
+  - `.claude/settings.local.json`
+  - `workers/mingge-relay/.wrangler/`
+
+  測試檔可能屬合理範圍；`.claude/settings.local.json` 與 `.wrangler/` 不應誤入 commit。
+
+技術取捨
+
+- 不碰 prompt 前提下，建議以「固定收束句的多特徵」取代單字偵測，例如同時要求答案包含店務邊界與書僮：
+
+  ```js
+  var LAOYI_SVC_CLOSE_RE =
+    /(?:這是店務|店務[^。！？\n]{0,24}(?:不管|找書僮)|不管帳[^。！？\n]{0,24}書僮)/;
+  ```
+
+  更穩妥的是維護一組由真機答案萃出的 exact/near-exact closing patterns，並加入至少 8 個「提到書僮但不是交接」的 negative fixtures。
+
+- Rate Limit binding 本身合理，但 Cloudflare 明確說明其計數是「每個 Cloudflare location」、eventually consistent、偏寬鬆，不能視為全球精準的 20 req/60s 成本帳本。
+- fail-open：
+  - 優點：Rate Limiting 服務或 binding 異常不會令老易聊天全斷。
+  - 缺點：本功能的首要動機是保護共用 Dify credit，異常時恰好失去唯一成本保護。
+  - 建議：若產品優先可用性，現行 fail-open 可接受，但應加結構化告警；若 credit 爆量是硬紅線，`/laoyi/chat` 應 fail-closed 回 503。至少「binding missing」建議 fail-closed，因正式部署缺 binding 屬設定錯誤，不是正常降級。
+
+給 Claude Code 的修正指令原文
+
+```text
+請只修正 E56 UAT F3 前端啟發式與測試，不碰老易 Dify prompt/KB、Make 5379670/5202754、持久化、S1-S7 定稿話術。
+
+1. 將 index.html 的 LAOYI_SVC_CLOSE_RE 從單字 /書僮/ 收窄為「店務邊界語意 + 書僮」的多特徵判斷；不得因一般答案只是提及書僮就顯示 S5／交給書僮按鈕。
+2. 在 tests/_e56_fn_matrix.mjs 加入至少：
+   - 4 個真正店務收束 positive fixtures；
+   - 8 個含「書僮」但不該交接的 negative fixtures，例如「書僮是誰」「老易與書僮有何不同」「文章提到書僮」「請解釋店務找書僮這句話」。
+3. 保留 answerText 判斷、S5 優先於起卦 CTA，以及 laoyiResetSvcHandoff 的早退／成功／失敗三路徑。
+4. 補回缺少的 00B_taskcard/001_taskcard_e56_uat_fix_S20260721_v1_0.md，或回報其正確現役路徑；不得用原 E56 建置卡冒充本次 UAT 修正卡。
+5. 提交時排除 .claude/settings.local.json 與 workers/mingge-relay/.wrangler/。
+6. 回報修正後 git diff --check、node --check worker.js、E56 matrix 的 PASS/FAIL。
+```
+
+待修清單：收窄 F3 偵測並補 negative regression；提供指定 UAT 修正卡；排除本機產物。
+
+VERDICT: BLOCKED

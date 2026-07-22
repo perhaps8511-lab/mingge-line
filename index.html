@@ -298,8 +298,14 @@
     font-size:13px;line-height:1.7;}
   /* E56:格5 老易兩態(門廳/問答室)—— E47熟齡硬約束:內文≥17px/行高≥1.9,按鈕沿用既有 .sp-btn/.ask-secondary 不縮
      顯隱唯一機制=HTML hidden 屬性(laoyiShowHall/laoyiEnterRoom 只切 .hidden);
-     [hidden] 選擇器具 attribute+class 高特異度,蓋過下方 .laoyi-room{display:flex} 等展示態規則,避免顯隱衝突(code review r2 blocker修正) */
+     [hidden] 選擇器具 attribute+class 高特異度,蓋過下方 .laoyi-room{display:flex} 等展示態規則,避免顯隱衝突(code review r2 blocker修正)
+     S20260721 UAT F1/F2 修正:Perth 真機抓出「沿用既有類別不縮」的假設仍太小/低對比——
+     .sp-btn/.ask-secondary 原字級(14.5px/13.5px)未達熟齡基準,原 .ask-secondary 預設色 --moss-soft
+     在此頁深底(body #070b07)實測對比僅約 2.3:1,遠低於 WCAG AA 4.5:1;比照既有 .about-signpost .ask-secondary
+     的淺色覆寫手法,範圍限定 .laoyi-view(門廳+問答室)不外溢到書房 .study-signpost(淺紙底,原色已達標) */
   .laoyi-hall[hidden],.laoyi-room[hidden]{display:none;}
+  .laoyi-view .sp-btn,.laoyi-view .ask-secondary{font-size:17px;}
+  .laoyi-view .ask-secondary{color:var(--rice-deep);}
   .laoyi-hall .lp-body p{font-size:17px;line-height:1.9;}
   .laoyi-hall-close{margin-top:22px;padding-top:18px;border-top:1px solid rgba(184,134,11,.18);
     font-size:17px;line-height:1.9;letter-spacing:.05em;color:var(--gold-soft);text-align:center;}
@@ -318,7 +324,8 @@
   .laoyi-closing{margin:6px 0 14px;padding:14px;border-top:1px solid rgba(184,134,11,.18);
     display:flex;flex-wrap:wrap;gap:10px;justify-content:center;}
   .laoyi-svc-link{text-align:center;padding:4px 0 10px;}
-  .laoyi-svc-link button{background:none;border:none;color:var(--moss-soft);font-family:inherit;
+  /* S20260721 UAT F2:「店務找書僮」原色 --moss-soft(綠字)配深底=綠字配綠底看不清,改沿用同段落 rice-deep 覆寫 */
+  .laoyi-svc-link button{background:none;border:none;color:var(--rice-deep);font-family:inherit;
     font-size:13.5px;letter-spacing:.08em;text-decoration:underline;text-underline-offset:4px;cursor:pointer;}
   .laoyi-composer{display:flex;gap:10px;align-items:flex-end;padding:10px 0 24px;
     border-top:1px solid rgba(184,134,11,.18);}
@@ -1045,6 +1052,15 @@ var laoyiClosingShown=false;
 var laoyiSending=false;    // 單飛鎖,防連點/連按 Enter 建出兩條 Dify conversation
 var LAOYI_QUERY_MAX=2000;  // 與 worker 端上限同值
 var LAOYI_DECISION_RE=/要不要|該不該|值不值得|該如何選|怎麼決定|該不該做|是否適合|哪個比較好|哪一個好|現在能不能|要選.+還是|.+還是.+[?？]|go\s*or\s*no\s*go/i;
+// S20260721 UAT F3:引擎(app-gQwG4 老易 prompt,凍結不動)收束店務題時,回覆固定會引「書僮」二字
+// (S1 邊界句「占卦是天的事，店務找書僮」已是老易人設固定措辭;真機截圖實測收束句為「請洽詢書僮客服」)。
+// Codex 互審 r1 攔下單字 /書僮/ 過寬(誤觸發如「書僮是誰？」純資訊題);改要求「書僮」與店務/帳務語意詞
+// 40 字內共現(雙向皆可)才判定為收束——比對真機句「請洽詢書僮客服」仍命中(書僮緊接客服),
+// 同時濾掉純粹提及書僮、不含任何店務語境的資訊題。仍是前端啟發式(engine 只回 answer 純文字,
+// 無結構化欄位可判斷),殘留邊緣誤觸發風險(如老易主動說明角色分工時提及兩詞)已知且可接受
+// (參 LAOYI_DECISION_RE 同類先例);使用者仍須手動點兩次(展開confirm+按交給書僮)才會真的送出,
+// 非最壞情況自動誤發訊息,建議上線後由真機回饋監控命中率。
+var LAOYI_SVC_CLOSE_RE=/(?:店務|客服|退費|退款|帳目|付款|訂閱|銅錢)[\s\S]{0,40}書僮|書僮[\s\S]{0,40}(?:店務|客服|退費|退款|帳目|付款|訂閱|銅錢)/;
 var laoyiSvcHandoffOpen=false;
 
 function laoyiShowHall(){
@@ -1149,7 +1165,9 @@ async function laoyiSend(text){
   laoyiSetComposerBusy(false);
   if(ok){
     laoyiTurnCount++;
-    if(LAOYI_DECISION_RE.test(trimmed)){ laoyiAppendDecisionCta(); }
+    // F3:引擎收束店務題時(回覆提及書僮)優先觸發 S5 引路+帶話按鈕,店務收束不疊加起卦CTA
+    if(LAOYI_SVC_CLOSE_RE.test(answerText)){ laoyiShowSvcHandoff(); }
+    else if(LAOYI_DECISION_RE.test(trimmed)){ laoyiAppendDecisionCta(); }
     if(laoyiTurnCount>=25 && !laoyiClosingShown){ laoyiShowClosing(); laoyiClosingShown=true; }
   }
 }
@@ -1168,6 +1186,15 @@ function laoyiLastUserMessage(){
   return bubbles[bubbles.length-1].textContent||'';
 }
 
+// F3 修正:原先 laoyiSvcHandoffOpen/entry.disabled 只在「還沒問過問題」這條早退路徑解鎖,
+// 正常送出成功或失敗回退都沒解鎖——導致同一 session 用過一次後,常駐入口＋自動引路永久按不動。
+// 統一經此函式解鎖,succ/fail/早退三路徑都呼叫,確保下一次店務題仍能再引路、常駐連結仍可再點。
+function laoyiResetSvcHandoff(){
+  laoyiSvcHandoffOpen=false;
+  var entry=document.getElementById('laoyiSvcEntry');
+  if(entry){ entry.disabled=false; }
+}
+
 function laoyiShowSvcHandoff(){
   if(laoyiSvcHandoffOpen) return;
   laoyiSvcHandoffOpen=true;
@@ -1178,8 +1205,7 @@ function laoyiShowSvcHandoff(){
   var lastUserMsg=laoyiLastUserMessage();
   if(!lastUserMsg){
     laoyiAppendBubble('你還沒問過問題，先打字問一句，我再原句帶給書僮。','bot',{system:true});
-    if(entry){ entry.disabled=false; }
-    laoyiSvcHandoffOpen=false;
+    laoyiResetSvcHandoff();
     return;
   }
   var confirmBox=document.createElement('div');
@@ -1206,9 +1232,11 @@ async function laoyiHandoffToService(messageText,btnEl,confirmBoxEl){
     await liff.sendMessages([{type:'text',text:messageText}]); // 原句送出,不加工、不冠老易措辭
     if(confirmBoxEl && confirmBoxEl.parentNode){ confirmBoxEl.parentNode.removeChild(confirmBoxEl); }
     laoyiAppendBubble('已送到書僮案上。回到聊天室，書僮接著答。','bot',{system:true}); // S6,逐字定稿
+    laoyiResetSvcHandoff();
   }catch(e){
     showAskLaoyiFallback(messageText,'askLaoyiStatus','askLaoyiFallback','askLaoyiFallbackText');
     btnEl.disabled=false;
+    laoyiResetSvcHandoff();
     console.warn('[laoyi handoff fallback]',e && e.message?e.message:e);
   }
 }

@@ -11,6 +11,8 @@
 //         寫入 Divination_Log.trace_text + trace_at;/history、/log 白名單追加回傳兩欄。
 // E56: 新增 POST /laoyi/chat(老易學習中心直連 Dify app-gQwG4,stateless,不落任何持久層)
 //         需要 Secret: DIFY_LAOYI_KEY(Perth 貼進 Cloudflare Secrets;缺鑰時路由回 503)
+// S20260721 UAT F4: /laoyi/chat 加 Workers Rate Limiting API binding(LAOYI_RATE_LIMITER,見 wrangler.toml)
+//         per-verified-user 20 req/min,保護共用 Dify credit;workers.dev 子域無 zone,故不走 WAF 儀表板規則
 // ====================================================
 
 const ALLOWED_ORIGIN = "https://perhaps8511-lab.github.io";
@@ -613,6 +615,28 @@ export default {
 
       if (!env.DIFY_LAOYI_KEY) {
         return json({ error: "DIFY_LAOYI_KEY not configured", code: "NOT_CONFIGURED" }, 503);
+      }
+
+      // S20260721 UAT F4:workers.dev 子域無 zone,zone WAF Rate Limiting Rules 不適用,改 code 層擋。
+      // 鍵=已驗證 LINE userId(非原始 token/IP)——同一人换 token 仍算同一額度,且不把 token 值存進限流鍵。
+      // 20 req/min,超過該 60 秒窗口內即回 429(等同「block 60s」:窗口未過前同 key 持續被拒)。
+      // Codex 互審 r1 指出 fail-open 對「binding 缺失」不當:binding 缺失=部署設定錯誤,不是正常降級,
+      // 此時放行等於本卡要保護的 Dify credit 唯一防線直接失效——故拆分兩種失效模式:
+      //   binding 未宣告(部署配置錯誤,理論上不該發生但防禦性檢查)→ fail-closed 回 503,比照
+      //   DIFY_LAOYI_KEY 缺鑰同款處理,逼部署方修正,不讓聊天在「無防護」狀態下悄悄公開。
+      //   binding 已就位但 .limit() 呼叫本身出錯(Cloudflare 端暫時性錯誤)→ fail-open 放行+記警告,
+      //   避免限流服務本身的暫時抖動連坐讓老易聊天全斷。
+      if (!env.LAOYI_RATE_LIMITER) {
+        console.log("Laoyi rate limiter binding missing, refusing request (fail-closed)");
+        return json({ error: "Rate limiter not configured", code: "RATE_LIMITER_NOT_CONFIGURED" }, 503);
+      }
+      try {
+        const { success } = await env.LAOYI_RATE_LIMITER.limit({ key: verifiedUserId });
+        if (!success) {
+          return json({ error: "Too many requests, please slow down", code: "RATE_LIMITED" }, 429);
+        }
+      } catch (e) {
+        console.log("Laoyi rate limiter check failed, failing open", e.message || e);
       }
 
       // blocking 呼叫加 timeout,避免上游卡住無限拖住 Worker/前端 typing 泡泡

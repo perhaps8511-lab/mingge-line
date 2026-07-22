@@ -127,5 +127,66 @@ function report(ok, label) {
   report(usesDeepLink && noSendMessages, 'case11 studySendAskLaoyi 改走 content_id deep link(r2 #3 修正)');
 }
 
+// case12: S20260721 UAT F3 — LAOYI_SVC_CLOSE_RE 偵測引擎收束店務題(書僮 + 店務/帳務語意詞 40 字內共現)
+// Codex 互審 r1 攔下單字 /書僮/ 過寬(誤觸發如純資訊題);修正後需同時證明:
+// (a) 真機實測收束句仍命中(不能為了防誤觸發而漏掉真正的 bug),(b) 純提及書僮的資訊題不再誤觸發。
+{
+  const reMatch = src.match(/var LAOYI_SVC_CLOSE_RE\s*=\s*(\/[\s\S]*?\/[a-z]*);/);
+  if (!reMatch) throw new Error('LAOYI_SVC_CLOSE_RE not found');
+  const re = eval(reMatch[1]);
+  const fixtures = [
+    // positive:真機截圖實測收束句 + S1/S5 定稿邊界句衍生
+    ['請洽詢書僮客服', true],
+    ['這是店務，老夫不管帳——書僮就在門外。', true],
+    ['占卦是天的事，店務找書僮。', true],
+    ['退費的事,請問書僮,老夫不管帳目。', true],
+    // negative:純提及書僮但非店務收束的資訊題/閒聊(舊版單字 /書僮/ 會誤觸發之處)
+    ['書僮是誰？', false],
+    ['老易和書僮有何不同？', false],
+    ['這篇文章裡也提到書僮這個角色。', false],
+    ['書僮平常都在忙些什麼？', false],
+    ['《易經》講的是變與不變', false],
+    ['善為易者不占', false],
+    ['我剛讀完一篇文章,想再問深一點', false],
+    ['要不要接這個工作？', false],
+  ];
+  let hit = 0;
+  fixtures.forEach(([a, expected]) => {
+    const got = re.test(a);
+    if (got === expected) hit++;
+    else console.log('  mismatch: "' + a + '" expected=' + expected + ' got=' + got);
+  });
+  report(hit === fixtures.length, 'case12 LAOYI_SVC_CLOSE_RE fixture ' + fixtures.length + '/' + fixtures.length + ' 命中(實際=' + hit + '/' + fixtures.length + ',含4 positive+8 negative,對應 Codex r1 攔下項)');
+}
+
+// case13: S20260721 UAT F3 — laoyiSend 對「引擎回覆」跑 SVC_CLOSE_RE(非對使用者問句),
+// 命中時觸發 laoyiShowSvcHandoff,且優先於決策題 CTA(else-if,不疊加)
+{
+  const fnSrc = extractFn('laoyiSend');
+  const testsAnswerNotQuestion = /LAOYI_SVC_CLOSE_RE\.test\(answerText\)/.test(fnSrc);
+  const callsHandoff = /LAOYI_SVC_CLOSE_RE\.test\(answerText\)\)\{\s*laoyiShowSvcHandoff\(\);\s*\}/.test(fnSrc);
+  const isPriorToDecision = /LAOYI_SVC_CLOSE_RE\.test\(answerText\)\)\{[\s\S]*?\}\s*else if\(LAOYI_DECISION_RE\.test\(trimmed\)\)/.test(fnSrc);
+  report(testsAnswerNotQuestion && callsHandoff && isPriorToDecision,
+    'case13 F3:引擎收束店務題(answerText 含書僮)自動觸發帶話按鈕,優先於起卦CTA');
+}
+
+// case14: S20260721 UAT F3 — 常駐入口/自動引路不再永久卡死:
+// laoyiResetSvcHandoff 存在且成功/失敗/早退三路徑皆呼叫(舊版只有早退路徑解鎖)
+{
+  const resetFnSrc = extractFn('laoyiResetSvcHandoff');
+  const resetsFlagAndEntry = /laoyiSvcHandoffOpen\s*=\s*false;/.test(resetFnSrc) && /entry\.disabled\s*=\s*false;/.test(resetFnSrc);
+
+  const showFnSrc = extractFn('laoyiShowSvcHandoff');
+  const earlyReturnResets = /先打字問一句[\s\S]*laoyiResetSvcHandoff\(\);/.test(showFnSrc);
+
+  const handoffFnSrc = extractFn('laoyiHandoffToService');
+  // 註:原始檔為 CRLF 換行,且 S6 陳述句後接行內註解 // S6,逐字定稿——比對時容許任意非換行字元(如註解)插在陳述句與下一行之間
+  const successResets = /已送到書僮案上。回到聊天室，書僮接著答。'\s*,\s*'bot'\s*,\s*\{system:true\}\);[^\n]*\n\s*laoyiResetSvcHandoff\(\);/.test(handoffFnSrc);
+  const failureResets = /btnEl\.disabled\s*=\s*false;[^\n]*\n\s*laoyiResetSvcHandoff\(\);/.test(handoffFnSrc);
+
+  report(resetsFlagAndEntry && earlyReturnResets && successResets && failureResets,
+    'case14 F3:laoyiResetSvcHandoff 於早退/成功/失敗三路徑皆解鎖(舊版用過一次後常駐入口永久按不動)');
+}
+
 console.log('---SUMMARY--- pass=' + pass + ' fail=' + fail);
 process.exit(fail === 0 ? 0 : 1);
