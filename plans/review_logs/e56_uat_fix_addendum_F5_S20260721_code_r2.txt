@@ -1,0 +1,99 @@
+2026-07-22T03:53:58.762024Z ERROR codex_models_manager::cache: failed to load models cache: missing field `supports_reasoning_summaries` at line 88 column 5
+OpenAI Codex v0.144.6
+--------
+workdir: D:\CBD_Lab_OS\001_mingge\mingge-line
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019f87f1-75d6-75c2-b5f5-750d3f9d5da7
+--------
+user
+延續上一輪(session id 019f87f0)F5 addendum 反向審查,第 2 輪。
+
+你上輪攔下 1 個 BLOCKER:LAOYI_SVC_TOPIC_RE 把「銅錢|方案|價格|費用」當單字即命中太寬,
+舉例「用銅錢怎麼起卦」「這個方案值不值得做」這類道地學習/決策題會被誤傷。
+
+已修正:index.html 附近的 LAOYI_SVC_TOPIC_RE 宣告處,把「銅錢/方案/價格/費用」這四個雙關/籠統詞
+改成需 15 字內鄰接一個交易動作動詞(退/買/購/付/扣/訂閱/儲值/加值/餘額)才算命中;
+其餘語意明確詞(店務/客服/退費退款退錢/帳目帳單/付款扣款/訂閱/發票收據/信用卡/儲值加值/多少錢)
+維持單字即命中。已在 tests/_e56_fn_matrix.mjs case15/case17 補上你舉例的兩個 negative fixtures
+(「用銅錢怎麼起卦」「這個方案值不值得做」)。
+
+請:
+1. `git diff -- index.html tests/_e56_fn_matrix.mjs tests/test_e56_laoyi_center_v1_0.sh` 讀最新 diff。
+2. 核對:(a) 你舉的兩個反例現在是否真的不再誤觸發;(b) 銅錢正解對照組(「銅錢怎麼退」)是否仍正確觸發;
+   (c) 新的鄰接判斷本身有沒有引入新的誤觸發或漏觸發場景。
+3. 執行 `bash tests/test_e56_laoyi_center_v1_0.sh` 確認全過。
+4. 確認沒有新引入範圍外變動或紅線觸碰。
+
+若無新 BLOCKER,最後一行寫:VERDICT: APPROVED。否則列出並寫:VERDICT: BLOCKED。
+
+2026-07-22T03:54:02.072057Z ERROR codex_models_manager::cache: failed to load models cache: missing field `supports_reasoning_summaries` at line 88 column 5
+codex
+開場自報（繼續型）：承接 session `019f87f0` 的 F5 addendum 第 1 輪；唯一 BLOCKER 是四個模糊詞單字命中過寬。本輪只驗證該修正、既有正解與完整 E56 回歸，不改碼、不碰 prompt／KB、Make、持久化或 S1–S7。真相以目前 working-tree diff 與實跑測試為準；無新 CEO 裁決卡，也不推定 Build_Nodes 狀態。先回查 continuity 記錄，再逐行追 regex 的實際匹配語意。
+mcp: node_repl/js started
+mcp: node_repl/js (completed)
+2026-07-22T03:54:14.499087Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+mcp: node_repl/js started
+mcp: node_repl/js (failed)
+2026-07-22T03:54:26.884453Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+mcp: node_repl/js started
+mcp: node_repl/js (completed)
+2026-07-22T03:54:37.925454Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+codex
+完整 E56 suite 仍是 `PASS=54 FAIL=0`，且上一輪兩個反例現在都不命中、「銅錢怎麼退」仍命中。不過我對新鄰接式補做了未列入 fixture 的硬案例，發現單字動詞 `付／退` 仍會把正常學習語句拉回誤送路徑，另有明顯店務漏判；正在定位精確行號後給最小修正建議。
+mcp: node_repl/js started
+mcp: node_repl/js (completed)
+2026-07-22T03:54:43.818086Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+codex
+發現 1 個新 BLOCKER：
+
+- [index.html:1080](D:/CBD_Lab_OS/001_mingge/mingge-line/index.html:1080)：15 字鄰接方向正確，但交易動詞使用單字 `退|付|扣`，仍會命中非交易語意。實測：
+
+  - `這個方案值得付出代價嗎` → 錯誤 MATCH（`方案…付`）
+  - `用銅錢起卦後退一步看` → 錯誤 MATCH（`銅錢…退`）
+  - `卦要用多少錢幣` → 錯誤 MATCH（直接命中 `多少錢`）
+  - `我要取消目前方案` → 錯誤 NO MATCH，漏掉常見店務場景
+
+建議將鄰接詞改成完整交易詞組，例如 `退費|退款|退錢|購買|付款|扣款|訂閱|儲值|加值|查餘額|餘額不足|取消|解約`，不要使用單字 `退／付／扣／買／購`；`多少錢`也應避免命中「多少錢幣」，可增加後向排除或改用更完整價詢句型。上述四句應補進 case15，並至少把前兩句加入 case17 的雙訊號 negative 情境。
+
+其餘結果：
+
+- 上輪兩個反例現在都不命中：
+  - `用銅錢怎麼起卦` → false
+  - `這個方案值不值得做` → false
+- `銅錢怎麼退` → true，正解對照組保留。
+- `bash tests/test_e56_laoyi_center_v1_0.sh`：`PASS=54 FAIL=0`，函式矩陣 `17/17`。
+- Diff 仍只有 `index.html` 與兩個 E56 測試檔。
+- 未修改 `worker.js`；未發現 Make 5379670／5202754、prompt／KB、持久化或 S1–S7 的新觸碰。
+- `git diff --check` 無 whitespace error，僅 LF→CRLF 提示。
+
+VERDICT: BLOCKED
+tokens used
+101,141
+發現 1 個新 BLOCKER：
+
+- [index.html:1080](D:/CBD_Lab_OS/001_mingge/mingge-line/index.html:1080)：15 字鄰接方向正確，但交易動詞使用單字 `退|付|扣`，仍會命中非交易語意。實測：
+
+  - `這個方案值得付出代價嗎` → 錯誤 MATCH（`方案…付`）
+  - `用銅錢起卦後退一步看` → 錯誤 MATCH（`銅錢…退`）
+  - `卦要用多少錢幣` → 錯誤 MATCH（直接命中 `多少錢`）
+  - `我要取消目前方案` → 錯誤 NO MATCH，漏掉常見店務場景
+
+建議將鄰接詞改成完整交易詞組，例如 `退費|退款|退錢|購買|付款|扣款|訂閱|儲值|加值|查餘額|餘額不足|取消|解約`，不要使用單字 `退／付／扣／買／購`；`多少錢`也應避免命中「多少錢幣」，可增加後向排除或改用更完整價詢句型。上述四句應補進 case15，並至少把前兩句加入 case17 的雙訊號 negative 情境。
+
+其餘結果：
+
+- 上輪兩個反例現在都不命中：
+  - `用銅錢怎麼起卦` → false
+  - `這個方案值不值得做` → false
+- `銅錢怎麼退` → true，正解對照組保留。
+- `bash tests/test_e56_laoyi_center_v1_0.sh`：`PASS=54 FAIL=0`，函式矩陣 `17/17`。
+- Diff 仍只有 `index.html` 與兩個 E56 測試檔。
+- 未修改 `worker.js`；未發現 Make 5379670／5202754、prompt／KB、持久化或 S1–S7 的新觸碰。
+- `git diff --check` 無 whitespace error，僅 LF→CRLF 提示。
+
+VERDICT: BLOCKED

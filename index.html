@@ -1061,6 +1061,26 @@ var LAOYI_DECISION_RE=/要不要|該不該|值不值得|該如何選|怎麼決�
 // (參 LAOYI_DECISION_RE 同類先例);使用者仍須手動點兩次(展開confirm+按交給書僮)才會真的送出,
 // 非最壞情況自動誤發訊息,建議上線後由真機回饋監控命中率。
 var LAOYI_SVC_CLOSE_RE=/(?:店務|客服|退費|退款|帳目|付款|訂閱|銅錢)[\s\S]{0,40}書僮|書僮[\s\S]{0,40}(?:店務|客服|退費|退款|帳目|付款|訂閱|銅錢)/;
+// S20260721 UAT F5(addendum,承 F3):Perth 真機複驗抓出——空手點「店務找書僮」見「先打字問一句」提示後,
+// 接著打學習題(如「我想問謙卦」)也被誤綁進〔交給書僮〕送出,書僮/老易雙重作答。
+// 根因查證:不是字面上的「armed 狀態」變數(程式碼裡沒有這種東西),而是 laoyiShowSvcHandoff()
+// 不論由自動偵測(LAOYI_SVC_CLOSE_RE 命中引擎回覆,可能因防呆用語/邊界句在非店務回覆裡巧合出現而誤判)
+// 或由常駐連結手動點擊觸發,都無條件把 laoyiLastUserMessage() 抓到的「最後一句」直接綁進帶話按鈕——
+// 從未檢查那句話本身是不是真的店務題。銅錢正解能成立,只是巧合「最後一句」剛好就是店務句。
+// 修法:新增 LAOYI_SVC_TOPIC_RE 測「使用者自己那句話」(不是引擎回覆,我方 100% 可控、非 LLM 自由文本),
+// 在 laoyiShowSvcHandoff() 內做成硬性守門——唯有「要綁定的那句話」本身匹配店務/帳務語意詞,
+// 才建立〔交給書僮〕按鈕;否則一律回退到「非店務,老夫仍可為你解」提示,不綁定、不留任何可送出的按鈕。
+// 這個守門對「自動偵測」與「手動點常駐連結」兩條路徑都生效,徹底堵死學習題誤送書僮的可能。
+// Codex 互審(F5 addendum)r1 攔下:「銅錢」「方案」「價格」「費用」單字即命中還是太寬——
+// 「銅錢」在本站脈絡下同時是「問卦銅錢(付費機制)」與「起卦用實體銅錢(易經工具本身)」的雙關字,
+// 「用銅錢怎麼起卦」這種道地學習題會被誤傷;「方案」「價格」「費用」也可能出現在與帳務無關的
+// 一般敘述裡。r2 再攔:改用單字動詞(退/買/購/付/扣)當鄰接判斷還是太寬——中文沒有詞界,
+// 單字「退」會命中「退一步」「退後」、單字「付」會命中「付出代價」等與帳務無關的用法;
+// 「多少錢」也會命中「多少錢幣」(問起卦銅錢數量,非問價)這種學習題。
+// 最終版:鄰接判斷一律改用完整交易詞組(不用任何單字動詞),「銅錢」因是唯一必須靠單字「退」
+// 才能覆蓋真機實測句「銅錢怎麼退」的例外,改用負向前瞻排除「退一步」「退後」這兩個已知誤判慣用語;
+// 「多少錢」加負向前瞻排除後面接「幣/個/枚/顆/文」(問數量/計量單位,非問價)。
+var LAOYI_SVC_TOPIC_RE=/店務|客服|退費|退款|退錢|退還|帳目|帳單|付款|扣款|訂閱|發票|收據|信用卡|儲值|加值|查餘額|餘額不足|多少錢(?!幣|個|枚|顆|文)|銅錢[\s\S]{0,10}退(?!一步|後)|退(?!一步|後)[\s\S]{0,10}銅錢|(?:方案|價格|費用)[\s\S]{0,15}(?:退費|退款|退錢|退還|購買|付款|扣款|訂閱|儲值|加值|查餘額|餘額不足|取消|解約)|(?:退費|退款|退錢|退還|購買|付款|扣款|訂閱|儲值|加值|查餘額|餘額不足|取消|解約)[\s\S]{0,15}(?:方案|價格|費用)/;
 var laoyiSvcHandoffOpen=false;
 
 function laoyiShowHall(){
@@ -1165,8 +1185,10 @@ async function laoyiSend(text){
   laoyiSetComposerBusy(false);
   if(ok){
     laoyiTurnCount++;
-    // F3:引擎收束店務題時(回覆提及書僮)優先觸發 S5 引路+帶話按鈕,店務收束不疊加起卦CTA
-    if(LAOYI_SVC_CLOSE_RE.test(answerText)){ laoyiShowSvcHandoff(); }
+    // F3+F5:引擎收束店務題時(回覆提及書僮)優先觸發 S5 引路+帶話按鈕,店務收束不疊加起卦CTA。
+    // F5 修正:同時要求「使用者這句話本身」也是店務語意(LAOYI_SVC_TOPIC_RE),不能只靠引擎回覆側判斷——
+    // 否則引擎回覆若巧合帶到書僮/邊界字眼,會把當下這句學習題誤綁進帶話按鈕(真機複驗抓出的雙重處理 bug)。
+    if(LAOYI_SVC_TOPIC_RE.test(trimmed) && LAOYI_SVC_CLOSE_RE.test(answerText)){ laoyiShowSvcHandoff(); }
     else if(LAOYI_DECISION_RE.test(trimmed)){ laoyiAppendDecisionCta(); }
     if(laoyiTurnCount>=25 && !laoyiClosingShown){ laoyiShowClosing(); laoyiClosingShown=true; }
   }
@@ -1203,8 +1225,11 @@ function laoyiShowSvcHandoff(){
   laoyiAppendBubble('這是店務，老夫不管帳——書僮就在門外。你這一問，我替你帶到他案上。','bot',{system:true}); // S5
 
   var lastUserMsg=laoyiLastUserMessage();
-  if(!lastUserMsg){
-    laoyiAppendBubble('你還沒問過問題，先打字問一句，我再原句帶給書僮。','bot',{system:true});
+  // F5 硬性守門:不論這裡是被自動偵測或常駐連結手動點擊叫進來,「要綁定的那句話」本身
+  // 必須匹配店務/帳務語意(LAOYI_SVC_TOPIC_RE),否則一律不綁定、不建立可送出的按鈕——
+  // 空手點擊(lastUserMsg 為空)與「最後一句其實是學習題」都落在這個分支,行為一致。
+  if(!lastUserMsg || !LAOYI_SVC_TOPIC_RE.test(lastUserMsg)){
+    laoyiAppendBubble('先打字問一句是什麼事,若真是店務,我再原句帶給書僮。','bot',{system:true});
     laoyiResetSvcHandoff();
     return;
   }

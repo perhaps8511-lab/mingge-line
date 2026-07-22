@@ -73,8 +73,8 @@ NODE_OUT=$(node "$(dirname "$0")/_e56_fn_matrix.mjs" "$IDX" 2>&1)
 echo "$NODE_OUT"
 NODE_FAIL=$(echo "$NODE_OUT" | grep -c '^FAIL')
 NODE_PASS=$(echo "$NODE_OUT" | grep -c '^PASS')
-if [ "$NODE_FAIL" -eq 0 ] && [ "$NODE_PASS" -ge 14 ]; then
-  pass "段② JS 純函式矩陣 14/14 case 全過"
+if [ "$NODE_FAIL" -eq 0 ] && [ "$NODE_PASS" -ge 17 ]; then
+  pass "段② JS 純函式矩陣 17/17 case 全過"
 else
   fail "段② JS 純函式矩陣未全過(FAIL=$NODE_FAIL PASS=$NODE_PASS)"
 fi
@@ -199,6 +199,22 @@ echo "$ROUTE_BLOCK" | grep -qF 'if (!env.LAOYI_RATE_LIMITER)' && echo "$ROUTE_BL
 echo "$ROUTE_BLOCK" | grep -qF 'failing open' \
   && pass "F4 binding 已就位但 .limit() 呼叫暫時性出錯時 fail-open(不因限流服務抖動連坐斷聊天)" \
   || fail "F4 缺少 .limit() 暫時性錯誤的 fail-open 處理"
+
+echo ""
+echo "=== 段⑦ F5 addendum 驗證(空手點店務找書僮→打學習題,不得誤送書僮)==="
+
+grep -qF 'var LAOYI_SVC_TOPIC_RE=' "$IDX" \
+  && pass "F5 新增 LAOYI_SVC_TOPIC_RE(測使用者自己問句,非引擎回覆側)" \
+  || fail "F5 LAOYI_SVC_TOPIC_RE 缺失"
+grep -qF 'if(LAOYI_SVC_TOPIC_RE.test(trimmed) && LAOYI_SVC_CLOSE_RE.test(answerText)){ laoyiShowSvcHandoff(); }' "$IDX" \
+  && pass "F5 自動偵測路徑要求使用者問句+引擎回覆雙訊號皆命中才觸發" \
+  || fail "F5 自動偵測路徑未加使用者問句側守門"
+grep -qF "if(!lastUserMsg || !LAOYI_SVC_TOPIC_RE.test(lastUserMsg)){" "$IDX" \
+  && pass "F5 laoyiShowSvcHandoff 綁定前守門(涵蓋常駐連結手動點擊路徑,非只擋自動偵測)" \
+  || fail "F5 laoyiShowSvcHandoff 缺綁定前守門"
+if grep -qE "if\(!lastUserMsg\)\{" "$IDX"; then
+  fail "F5 偵測到舊版守門殘留(!lastUserMsg 單一條件,未含 TOPIC_RE 檢查)"
+fi
 
 echo ""
 echo "=== 總結:PASS=$PASS FAIL=$FAIL ==="

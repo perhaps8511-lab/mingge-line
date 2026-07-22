@@ -159,15 +159,18 @@ function report(ok, label) {
   report(hit === fixtures.length, 'case12 LAOYI_SVC_CLOSE_RE fixture ' + fixtures.length + '/' + fixtures.length + ' 命中(實際=' + hit + '/' + fixtures.length + ',含4 positive+8 negative,對應 Codex r1 攔下項)');
 }
 
-// case13: S20260721 UAT F3 — laoyiSend 對「引擎回覆」跑 SVC_CLOSE_RE(非對使用者問句),
-// 命中時觸發 laoyiShowSvcHandoff,且優先於決策題 CTA(else-if,不疊加)
+// case13: S20260721 UAT F3+F5 — laoyiSend 對「引擎回覆」跑 SVC_CLOSE_RE、對「使用者問句」跑
+// SVC_TOPIC_RE,兩者皆命中才觸發 laoyiShowSvcHandoff,且優先於決策題 CTA(else-if,不疊加)。
+// F5:單靠 answerText 側判斷會被引擎回覆巧合帶到的邊界字眼誤觸發(真機複驗抓出的學習題誤送書僮 bug),
+// 故此處斷言必須同時要求 trimmed(使用者自己那句話)也匹配 SVC_TOPIC_RE。
 {
   const fnSrc = extractFn('laoyiSend');
   const testsAnswerNotQuestion = /LAOYI_SVC_CLOSE_RE\.test\(answerText\)/.test(fnSrc);
+  const testsUserTopicToo = /LAOYI_SVC_TOPIC_RE\.test\(trimmed\)\s*&&\s*LAOYI_SVC_CLOSE_RE\.test\(answerText\)/.test(fnSrc);
   const callsHandoff = /LAOYI_SVC_CLOSE_RE\.test\(answerText\)\)\{\s*laoyiShowSvcHandoff\(\);\s*\}/.test(fnSrc);
   const isPriorToDecision = /LAOYI_SVC_CLOSE_RE\.test\(answerText\)\)\{[\s\S]*?\}\s*else if\(LAOYI_DECISION_RE\.test\(trimmed\)\)/.test(fnSrc);
-  report(testsAnswerNotQuestion && callsHandoff && isPriorToDecision,
-    'case13 F3:引擎收束店務題(answerText 含書僮)自動觸發帶話按鈕,優先於起卦CTA');
+  report(testsAnswerNotQuestion && testsUserTopicToo && callsHandoff && isPriorToDecision,
+    'case13 F3+F5:自動觸發帶話按鈕須「使用者問句」與「引擎回覆」雙訊號皆命中,優先於起卦CTA');
 }
 
 // case14: S20260721 UAT F3 — 常駐入口/自動引路不再永久卡死:
@@ -186,6 +189,79 @@ function report(ok, label) {
 
   report(resetsFlagAndEntry && earlyReturnResets && successResets && failureResets,
     'case14 F3:laoyiResetSvcHandoff 於早退/成功/失敗三路徑皆解鎖(舊版用過一次後常駐入口永久按不動)');
+}
+
+// case15: S20260721 UAT F5 — LAOYI_SVC_TOPIC_RE 測「使用者自己那句話」(我方100%可控,非LLM輸出),
+// 店務/帳務詞正確命中,學習題(卦名/易經問題)正確不命中——這是堵死誤送書僮的第一道守門。
+{
+  const reMatch = src.match(/var LAOYI_SVC_TOPIC_RE\s*=\s*(\/[\s\S]*?\/[a-z]*);/);
+  if (!reMatch) throw new Error('LAOYI_SVC_TOPIC_RE not found');
+  const re = eval(reMatch[1]);
+  const fixtures = [
+    ['銅錢怎麼退', true],
+    ['退費要怎麼辦', true],
+    ['我想取消訂閱', true],
+    ['這個方案多少錢', true],
+    ['我要取消目前方案', true], // Codex r2 指出漏判的常見店務場景,已補鄰接詞組覆蓋
+    // 真機複驗抓出的實際 bug 觸發句:必須確認學習題不命中
+    ['我想問謙卦', false],
+    ['困卦是什麼意思？', false],
+    ['《易經》講的是變與不變', false],
+    ['善為易者不占', false],
+    ['要不要接這個工作？', false],
+    // Codex 互審(F5 addendum)r1 攔下:「銅錢」「方案」單字即命中太寬,會誤傷這類道地學習/決策題
+    ['用銅錢怎麼起卦', false],
+    ['這個方案值不值得做', false],
+    // Codex 互審(F5 addendum)r2 再攔:單字動詞鄰接判斷仍太寬,這四句是 r2 實測舉的反例
+    ['這個方案值得付出代價嗎', false], // 「付」單字曾誤命中「付出代價」
+    ['用銅錢起卦後退一步看', false],   // 「退」單字曾誤命中「退一步」慣用語
+    ['卦要用多少錢幣', false],         // 「多少錢」曾誤命中「多少錢幣」(問數量非問價)
+  ];
+  let hit = 0;
+  fixtures.forEach(([a, expected]) => {
+    const got = re.test(a);
+    if (got === expected) hit++;
+    else console.log('  mismatch: "' + a + '" expected=' + expected + ' got=' + got);
+  });
+  report(hit === fixtures.length, 'case15 LAOYI_SVC_TOPIC_RE fixture ' + fixtures.length + '/' + fixtures.length + ' 命中(實際=' + hit + '/' + fixtures.length + ')');
+}
+
+// case16: S20260721 UAT F5 — laoyiShowSvcHandoff 的綁定守門:不論空手點擊或「最後一句非店務題」,
+// 都必須落回「不綁定」分支,不得建立可送出的〔交給書僮〕按鈕(舊版只查 !lastUserMsg,漏了後者)
+{
+  const showFnSrc = extractFn('laoyiShowSvcHandoff');
+  const guardsOnTopicToo = /if\(!lastUserMsg\s*\|\|\s*!LAOYI_SVC_TOPIC_RE\.test\(lastUserMsg\)\)\{/.test(showFnSrc);
+  report(guardsOnTopicToo, 'case16 F5:laoyiShowSvcHandoff 綁定前硬性檢查 lastUserMsg 本身是否為店務題(常駐連結手動點擊路徑同樣受保護)');
+}
+
+// case17: S20260721 UAT F5 — 端對端回歸情境模擬(不靠 DOM,純用抽出的兩顆 regex 模擬 laoyiSend 的
+// 判斷邏輯):對照「銅錢正解」(中樞確認行為正確,勿動)與「真機複驗抓出的誤送」情境,
+// 證明修正後前者仍觸發、後者不再觸發。
+{
+  const topicMatch = src.match(/var LAOYI_SVC_TOPIC_RE\s*=\s*(\/[\s\S]*?\/[a-z]*);/);
+  const closeMatch = src.match(/var LAOYI_SVC_CLOSE_RE\s*=\s*(\/[\s\S]*?\/[a-z]*);/);
+  const topicRe = eval(topicMatch[1]);
+  const closeRe = eval(closeMatch[1]);
+  const scenarios = [
+    // [使用者問句, 引擎回覆(可能為真機實測句,或模擬「巧合帶邊界字眼」的誤觸發假設句), 應否觸發帶話]
+    ['銅錢怎麼退', '請洽詢書僮客服', true], // 中樞確認之銅錢正解,勿動
+    ['退費的事要怎麼問', '這是店務，老夫不管帳——書僮就在門外。', true],
+    // 真機複驗抓出的實際 repro:學習題,即便引擎回覆假設性地也巧合帶到店務/書僮字眼,仍不得觸發
+    ['我想問謙卦', '這是店務，老夫不管帳——書僮就在門外。', false],
+    ['我想問謙卦', '謙卦者,謙遜之德也……(與書僮/店務全然無關的正常解卦)', false],
+    // Codex 互審(F5 addendum)r1 攔下的雙關字場景:即便引擎回覆巧合帶到書僮字眼,道地學習題仍不得觸發
+    ['用銅錢怎麼起卦', '這是店務，老夫不管帳——書僮就在門外。', false],
+    // Codex 互審(F5 addendum)r2 再攔的單字動詞誤判場景
+    ['用銅錢起卦後退一步看', '這是店務，老夫不管帳——書僮就在門外。', false],
+    ['這個方案值得付出代價嗎', '這是店務，老夫不管帳——書僮就在門外。', false],
+  ];
+  let hit = 0;
+  scenarios.forEach(([userMsg, answerText, expected]) => {
+    const got = topicRe.test(userMsg) && closeRe.test(answerText);
+    if (got === expected) hit++;
+    else console.log('  mismatch: user="' + userMsg + '" answer="' + answerText + '" expected=' + expected + ' got=' + got);
+  });
+  report(hit === scenarios.length, 'case17 F5 回歸:' + scenarios.length + '案例(2 positive 銅錢/退費正解+5 negative 學習題誤送/雙關字/單字動詞誤判情境)命中=' + hit + '/' + scenarios.length);
 }
 
 console.log('---SUMMARY--- pass=' + pass + ' fail=' + fail);
