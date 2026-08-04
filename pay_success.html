@@ -71,7 +71,24 @@
     <h1>付款已完成</h1>
     <p>收據與開通通知已送至您的 <span class="gold">LINE</span>。<br>請回到 LINE 對話繼續。</p>
     <p style="margin-top:18px;">本視窗可直接關閉。</p>
+    <p class="footer" id="orderDetail" hidden></p>
     <div class="footer">善為易者不占 · 命格</div>
   </main>
+  <script>
+    // 086卡:接回傳參數(訂單號/方案名),無參數時維持現況文案不變。用 textContent 寫入,避免 query string 反射 XSS。
+    (function(){
+      var qs = new URLSearchParams(location.search);
+      var orderId = qs.get('orderId');
+      var plan = qs.get('plan');
+      if(!orderId && !plan) return;
+      var el = document.getElementById('orderDetail');
+      if(!el) return;
+      var parts = [];
+      if(plan) parts.push('方案:' + plan);
+      if(orderId) parts.push('訂單編號:' + orderId);
+      el.textContent = parts.join(' · ');
+      el.hidden = false;
+    })();
+  </script>
 </body>
 </html>

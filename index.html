@@ -224,6 +224,24 @@
   .sending .st3{margin-top:28px;font-size:11.5px;letter-spacing:.1em;color:var(--jade);opacity:.85;display:none;}
   @media (prefers-reduced-motion: reduce){.sending .slines{animation:none;opacity:.9;}}
 
+  /* ====================================================
+     086卡:mock 結帳 overlay(格3付費卡,?paytest=1 顯式觸發才會用到)
+  ==================================================== */
+  .pay-mock-overlay{position:fixed;inset:0;z-index:70;display:none;
+    align-items:center;justify-content:center;text-align:center;
+    background:rgba(7,11,7,.96);padding:40px 24px;}
+  .pay-mock-overlay.show{display:flex;}
+  .pay-mock-card{max-width:320px;width:100%;}
+  .pay-mock-sub{font-size:14px;line-height:2;letter-spacing:.06em;color:var(--rice-deep);margin:12px 0 4px;}
+  .pay-mock-note{font-size:11px;letter-spacing:.08em;color:var(--jade);opacity:.85;margin-bottom:26px;}
+  .pay-mock-actions{display:flex;flex-direction:column;gap:12px;}
+  .pay-mock-btn{font-size:14px;letter-spacing:.14em;padding:13px;border-radius:6px;border:1px solid var(--gold-soft);
+    background:transparent;color:var(--rice);cursor:pointer;}
+  .pay-mock-btn--ok{border-color:var(--gold-lit);color:var(--gold-lit);}
+  .pay-mock-btn--fail{border-color:var(--rice-deep);color:var(--rice-deep);}
+  .pay-mock-btn--cancel{opacity:.7;}
+  .pc-status--test{cursor:pointer;text-decoration:underline dashed;text-underline-offset:3px;}
+
   .foot{position:fixed;bottom:14px;left:0;right:0;text-align:center;z-index:40;
     font-size:9px;letter-spacing:.2em;color:var(--gold-soft);opacity:.38;pointer-events:none;}
 
@@ -635,6 +653,21 @@
     <div class="st3" id="sendHint">可關閉此頁，回到 LINE 對話等候信箋</div>
   </div>
 
+  <!-- 086卡:mock 結帳 overlay。只在 ?paytest=1 + 卡片點擊時由 JS 顯示;預設 hidden,不影響任何現況畫面。 -->
+  <div class="pay-mock-overlay" id="payMockOverlay" hidden>
+    <div class="pay-mock-card">
+      <div class="lp-icon">🧾</div>
+      <h1 id="payMockTitle">模擬付款</h1>
+      <p class="pay-mock-sub" id="payMockSub"></p>
+      <p class="pay-mock-note">此頁僅供 sandbox 測試演練,不涉及真實金流。</p>
+      <div class="pay-mock-actions">
+        <button type="button" class="pay-mock-btn pay-mock-btn--ok" id="payMockOk">成功</button>
+        <button type="button" class="pay-mock-btn pay-mock-btn--fail" id="payMockFail">失敗</button>
+        <button type="button" class="pay-mock-btn pay-mock-btn--cancel" id="payMockCancel">取消</button>
+      </div>
+    </div>
+  </div>
+
   <!-- P-PAY 格3 書房的來法五卡 (E30/E46 · action=pay · S159) -->
   <div class="liff-page" id="page-pay">
     <div class="lp-header">
@@ -654,7 +687,7 @@
         <p class="pl-copy"><strong>問一卦|149</strong> — 銅錢用盡,仍有事要問,便來一卦。老易為您讀本卦、變卦、動爻,把這一程攤開看清。</p>
         <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
       </div>
-      <div class="pay-plan">
+      <div class="pay-plan" id="planPack399">
         <p class="pl-copy"><strong>囊中銅錢|399</strong> — 三枚一包,收在囊中,不催著用。要緊的事不挑日子來;哪天心裡又起了一問,囊中有錢,隨時進門。一枚一問,枚枚都是完整的一卦。</p>
         <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
       </div>
@@ -1311,6 +1344,7 @@ async function initPayPage(){
     var _targetCard=document.getElementById(_payScrollMap[_src]);
     if(_targetCard){ setTimeout(function(){ _targetCard.scrollIntoView({behavior:'smooth',block:'center'}); }, 60); }
   }
+  initPayCheckoutCards(); // 086卡:三態 checkout 點擊掛接(只在 ?paytest=1 時生效)
   try{
     await liff.init({liffId:LIFF_ID});
     if(!liff.isLoggedIn()){return;}
@@ -1324,6 +1358,95 @@ async function initPayPage(){
     }
   }catch(e){console.warn('[pay page]',e);}
 }
+
+/* ====================================================
+   086卡:格3付費卡 checkout 三態點擊 + mock 結帳流
+   ──────────────────────────────────────────────
+   isCheckoutTestViewer()===false(production 預設,無 ?paytest=1)時:
+   本函式不對任何卡片掛 click listener,四卡 DOM/文案/行為與現況逐字相同。
+==================================================== */
+function initPayCheckoutCards(){
+  if(!isCheckoutTestViewer()) return;
+  Object.keys(PAY_PLANS).forEach(function(planKey){
+    var card=document.getElementById(planKey);
+    if(!card) return;
+    var statusEl=card.querySelector('.pc-status');
+    if(!statusEl) return;
+    statusEl.classList.add('pc-status--test');
+    statusEl.addEventListener('click', function(){ onPayCardClick(planKey); });
+  });
+}
+
+function onPayCardClick(planKey){
+  if(CHECKOUT_MODE==='mock'){
+    openPayMock(planKey);
+    return;
+  }
+  var url = CHECKOUT_MODE==='oen_sandbox' ? OEN_SANDBOX_CHECKOUT_URL
+          : CHECKOUT_MODE==='oen_prod' ? OEN_PROD_CHECKOUT_URL : '';
+  if(!url){ console.warn('[pay] checkout url not configured for mode', CHECKOUT_MODE); return; }
+  var plan=PAY_PLANS[planKey];
+  location.href = url + '?' + new URLSearchParams({customId:plan.customId, amount:String(plan.amount)});
+}
+
+var _payMockActivePlan=null;
+function openPayMock(planKey){
+  var plan=PAY_PLANS[planKey];
+  if(!plan) return;
+  _payMockActivePlan=planKey;
+  var titleEl=document.getElementById('payMockTitle');
+  var subEl=document.getElementById('payMockSub');
+  if(subEl) subEl.textContent = plan.name + '(NT$'+plan.amount+')— sandbox 模擬結帳';
+  var overlay=document.getElementById('payMockOverlay');
+  if(overlay) overlay.classList.add('show');
+}
+function closePayMock(){
+  var overlay=document.getElementById('payMockOverlay');
+  if(overlay) overlay.classList.remove('show');
+  _payMockActivePlan=null;
+}
+
+/* 純函式:組出符合 Make 鏈 M1 契約的六欄位 payload(orderId/customId/status/amount/transactionHid/subscriptionId)。
+   欄位名逐字取自 086 卡〇節,禁自創欄位。 */
+function buildPayMockPayload(planKey, result){
+  var plan = PAY_PLANS[planKey];
+  var orderId = 'MOCK-' + (typeof crypto!=='undefined' && crypto.randomUUID ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(16).slice(2)));
+  return {
+    orderId: orderId,
+    customId: plan.customId,
+    status: result === 'success' ? 'success' : 'fail',
+    amount: plan.amount,
+    transactionHid: 'MOCKTX-' + orderId,
+    subscriptionId: plan.subscription ? ('MOCKSUB-' + orderId) : null
+  };
+}
+
+async function payMockConfirm(result){
+  var planKey=_payMockActivePlan;
+  var plan=PAY_PLANS[planKey];
+  if(!plan) return;
+  if(result==='success' || result==='fail'){
+    var payload=buildPayMockPayload(planKey, result);
+    try{
+      await fetch(PAY_RELAY_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    }catch(e){ console.warn('[pay mock] relay POST failed', e); }
+    var target = result==='success' ? 'pay_success.html' : 'pay_failure.html';
+    location.href = target + '?' + new URLSearchParams({orderId:payload.orderId, plan:plan.name, amount:String(plan.amount)});
+  } else {
+    // 取消:TA 中途放棄,比照真實金流閘道不觸發 webhook,只關 overlay
+    closePayMock();
+  }
+}
+(function(){
+  document.addEventListener('DOMContentLoaded', function(){
+    var okBtn=document.getElementById('payMockOk');
+    var failBtn=document.getElementById('payMockFail');
+    var cancelBtn=document.getElementById('payMockCancel');
+    if(okBtn) okBtn.addEventListener('click', function(){ payMockConfirm('success'); });
+    if(failBtn) failBtn.addEventListener('click', function(){ payMockConfirm('fail'); });
+    if(cancelBtn) cancelBtn.addEventListener('click', function(){ payMockConfirm('cancel'); });
+  });
+})();
 
 /* ===== E09 歷史卦例頁 · 卡片版輔助(S138) ===== */
 // 64卦「本卦全稱→King Wen序號」— 逐字取自 mingge_gua64_lookup_v1_0.json(RAG_02實機檔),非虛構/非記憶。
@@ -1768,6 +1891,34 @@ function applyDebugVisibility(){ var d=document.querySelector('.devjson'); if(d)
    前端不持有任何固定密語;認證靠 LINE 簽發的 ID Token(每次即時拿、會過期、不可偽造)。 */
 const RELAY_URL = "https://mingge-relay.perhaps8511.workers.dev/";
 const OA_ADD_FRIEND_URL = "https://lin.ee/pWlYLBe";  // E48 書房分享卡 · OA 加好友短鏈(Perth 2026-07-19 提供)
+
+/* ====================================================
+   格3付費卡 checkout 三態設定(086卡)
+   ──────────────────────────────────────────────
+   CHECKOUT_MODE 三態,改這裡即可切換全部四卡行為,禁在卡片各自寫死連結:
+     'mock'        → 走本機模擬付款(見下方 mock 結帳邏輯),供 sandbox E2E 演練
+     'oen_sandbox' → 跳轉 OEN_SANDBOX_CHECKOUT_URL(尚未取得,留空;取得前此態不可用)
+     'oen_prod'    → 跳轉 OEN_PROD_CHECKOUT_URL(8月中簽約後補,本卡明文擱置)
+==================================================== */
+const CHECKOUT_MODE = 'mock';
+const PAY_RELAY_URL = "https://mingge-pay-relay.perhaps8511.workers.dev/"; // S82 已部署,Perth 2026-08-04 提供
+const OEN_SANDBOX_CHECKOUT_URL = '';  // 待補(repo 內無來源,不阻塞本卡)
+const OEN_PROD_CHECKOUT_URL = '';     // 明文擱置(8月中簽約後)
+
+/* 四張付費卡 → mock payload 對照。single_149/sub_1490 字面值取自 086 卡〇節(Make upsert 已定義);
+   pack399/deepdive200 為暫定值(Make 尚未定義其 tier,見卡片「tier 檢查補洞」擱置項),
+   待 Chat 補正式值後於此處一併更新即可,不需碰其他檔案。 */
+const PAY_PLANS = {
+  planSingle149:   { customId:'single_149',  amount:149,  name:'問一卦|149',         subscription:false },
+  planPack399:     { customId:'pack399',     amount:399,  name:'囊中銅錢|399',        subscription:false }, // 暫定,待 Chat 核對
+  planDeepdive200: { customId:'deepdive200', amount:200,  name:'四鏡·深卜|200',       subscription:false }, // 暫定,待 Chat 核對
+  planFupan1490:   { customId:'sub_1490',    amount:1490, name:'問道·複盤|1490(月)',   subscription:true  }
+};
+
+/* mock 結帳只能由顯式測試參數觸發(?paytest=1);無此參數時格3四卡文案/行為與現況逐字相同。 */
+function isCheckoutTestViewer(){
+  return new URLSearchParams(location.search).get('paytest')==='1';
+}
 
 /* ★ v1.2.3:卦記會話編號(D3 卦記 schema 唯一缺口補件)
    ──────────────────────────────────────────────
