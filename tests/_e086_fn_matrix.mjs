@@ -81,12 +81,18 @@ const M1_FIELDS = ['orderId', 'customId', 'status', 'amount', 'transactionHid', 
   report(shaped && a.orderId !== b.orderId, 'case6 orderId 以 MOCK- 開頭、transactionHid 含同一 orderId、每次呼叫皆唯一');
 }
 
-// case7: PAY_PLANS 四張卡 customId 均為非空字串(399/200 為暫定值,結構仍須完整,供 Chat 之後核對/覆寫)
+// case7: PAY_PLANS 四張卡 customId 均為非空字串(200 仍為暫定值,結構仍須完整,供 Chat 之後核對/覆寫)
 {
   const src2 = payPlansSrc;
-  const ids = ['single_149', 'pack399', 'deepdive200', 'sub_1490'];
+  const ids = ['single_149', 'pack_399', 'deepdive200', 'sub_1490'];
   const allPresent = ids.every((id) => src2.includes("'" + id + "'"));
-  report(allPresent, 'case7 PAY_PLANS 四張卡 customId 皆已填值(399/200 為暫定值,見 index.html 內註記)');
+  report(allPresent, 'case7 PAY_PLANS 四張卡 customId 皆已填值(200 仍為暫定值,見 index.html 內註記)');
+}
+
+// case8: 090 卡明定囊中銅錢 399 的 customId=pack_399,金額與 S159 文案同為 399
+{
+  const p = buildPayMockPayload('planPack399', 'success');
+  report(p.customId === 'pack_399' && p.amount === 399, 'case8 planPack399 → customId=pack_399 amount=399(090 卡精確值)');
 }
 
 console.log('---SUMMARY--- pass=' + pass + ' fail=' + fail);
