@@ -66,8 +66,8 @@ NODE_OUT=$(node "$(dirname "$0")/_e086_fn_matrix.mjs" "$IDX" 2>&1)
 echo "$NODE_OUT"
 NODE_FAIL=$(echo "$NODE_OUT" | grep -c '^FAIL')
 NODE_PASS=$(echo "$NODE_OUT" | grep -c '^PASS')
-if [ "$NODE_FAIL" -eq 0 ] && [ "$NODE_PASS" -ge 8 ]; then
-  pass "段③ JS 純函式矩陣 8/8 case 全過(payload 六欄位契約鎖)"
+if [ "$NODE_FAIL" -eq 0 ] && [ "$NODE_PASS" -ge 9 ]; then
+  pass "段③ JS 純函式矩陣 9/9 case 全過(payload 六欄位契約鎖)"
 else
   fail "段③ JS 純函式矩陣未全過(FAIL=$NODE_FAIL PASS=$NODE_PASS)"
 fi

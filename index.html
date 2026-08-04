@@ -1906,12 +1906,12 @@ const OEN_SANDBOX_CHECKOUT_URL = '';  // 待補(repo 內無來源,不阻塞本�
 const OEN_PROD_CHECKOUT_URL = '';     // 明文擱置(8月中簽約後)
 
 /* 四張付費卡 → mock payload 對照。single_149/sub_1490 字面值取自 086 卡〇節(Make upsert 已定義);
-   pack_399 由 090 卡明定;deepdive200 仍為暫定值(Make 尚未定義其 tier,見卡片「tier 檢查補洞」擱置項),
-   待 Chat 補 deepdive200 正式值後於此處更新即可,不需碰其他檔案。 */
+   pack_399 由 090 卡依 Freeze #27 明定;deepen_200 同依 canonical 命名更正。
+   tier 檢查補洞仍屬另卡,本表只鎖前端 payload 字面值。 */
 const PAY_PLANS = {
   planSingle149:   { customId:'single_149',  amount:149,  name:'問一卦|149',         subscription:false },
   planPack399:     { customId:'pack_399',    amount:399,  name:'囊中銅錢|399',        subscription:false },
-  planDeepdive200: { customId:'deepdive200', amount:200,  name:'四鏡·深卜|200',       subscription:false }, // 暫定,待 Chat 核對
+  planDeepdive200: { customId:'deepen_200',  amount:200,  name:'四鏡·深卜|200',       subscription:false },
   planFupan1490:   { customId:'sub_1490',    amount:1490, name:'問道·複盤|1490(月)',   subscription:true  }
 };
 
