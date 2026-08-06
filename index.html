@@ -684,7 +684,7 @@
         <div class="pc-status pc-ok">您的 3 枚銅錢已在囊中 —— 到<span class="pay-action-label">〔向天問卦〕</span>便可用。</div>
       </div>
       <div class="pay-plan pay-plan-featured pay-plan-single" id="planSingle149">
-        <p class="pl-copy"><strong>問一卦|149</strong> — 銅錢用盡,仍有事要問,便來一卦。老易為您讀本卦、變卦、動爻,把這一程攤開看清。</p>
+        <p class="pl-copy"><strong>問一卦|149</strong> — 心裡又起了一問,便來一卦。老易為您讀本卦、變卦、動爻,把這一程攤開看清。</p>
         <div class="pc-status">付款通道整備中;銅錢尚在,不急。</div>
       </div>
       <div class="pay-plan" id="planPack399">
@@ -1336,7 +1336,7 @@ window.addEventListener('popstate',function(e){
 async function initPayPage(){
   var subActiveEl=document.getElementById('paySubActive');
   var _src=new URLSearchParams(location.search).get('src');
-  var _payCtxMap={zero:'囊中銅錢用盡了。要緊的事還在,來的路都在這裡。',deepdive:'方才那一卦,若想再往深處讀——深卜的來法在這裡。',fupan:'想把走過的決定回頭看——問道·複盤的來法在這裡。'};
+  var _payCtxMap={zero:'下卦已立,要往上建嗎?要緊的事還在,上卦的來法都在這裡。',deepdive:'方才那一卦,若想再往深處讀——深卜的來法在這裡。',fupan:'想把走過的決定回頭看——問道·複盤的來法在這裡。'};
   var _payCtxEl=document.getElementById('payCtx');
   if(_payCtxEl&&_payCtxMap[_src]){_payCtxEl.textContent=_payCtxMap[_src];_payCtxEl.hidden=false;}
   var _payScrollMap={zero:'planSingle149',deepdive:'planDeepdive200',fupan:'planFupan1490'}; // polish batch(§3-1):連結目標一致性 —— 有語境的入口一律捲到對應卡
