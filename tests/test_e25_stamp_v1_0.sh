@@ -361,11 +361,10 @@ import fs from 'node:fs';
 const src = fs.readFileSync('$IDX', 'utf8');
 
 const copyLines = [
-  '補後續 · 蓋金印',
-  '蓋下金印',
-  '已蓋印。這一卦,有了後續。',
-  '金印 · 已補後續',
-  '當時所問的事,後來往哪邊走了 —— 一兩句即可。',
+  '後來怎麼了？記一筆。',
+  '後來，這件事走到了哪裡——記下來，日後回頭看。',
+  '墨印 · 已補後續',
+  '記下了，收在您的卦記裡。往後老易讀您的卦，這一筆也會一併看見。',
 ];
 
 const results = [];
@@ -410,73 +409,60 @@ function extractFn(name) {
   if (!m) throw new Error('extractFn miss: ' + name);
   return m[0];
 }
-function extractLet(name) {
-  const re = new RegExp('let ' + name + ' = .*?;');
-  const m = src.match(re);
-  if (!m) throw new Error('extractLet miss: ' + name);
-  return m[0];
-}
 const code = [
-  extractLet('stampState'),
   extractFn('esc'), extractFn('textToHtml'),
   extractFn('formatTraceAt'),
   extractFn('buildStampBadgeHtml'), extractFn('buildStampSectionHtml'),
-  extractFn('openStampModal'), extractFn('closeStampModal'),
   extractFn('submitStamp'), extractFn('renderStampResult'),
   'globalThis.__formatTraceAt = formatTraceAt;',
   'globalThis.__buildStampBadgeHtml = buildStampBadgeHtml;',
   'globalThis.__buildStampSectionHtml = buildStampSectionHtml;',
-  'globalThis.__openStampModal = openStampModal;',
   'globalThis.__submitStamp = submitStamp;',
-  'globalThis.__setStampState = (s) => { stampState = s; };',
 ].join('\\n\\n');
 
 function makeFakeDom() {
-  const sections = new Map(); // btnId -> section fake el
   function makeSection() {
-    const sec = { _html: '' };
+    const sec = { _html: '', _classes: new Set(), classList: { add(c){ sec._classes.add(c); } } };
     Object.defineProperty(sec, 'innerHTML', {
       get() { return sec._html; },
       set(v) { sec._html = v; },
     });
     return sec;
   }
-  const openBtnSection = makeSection();
+  const stampSection = makeSection();
   const els = {
-    stampOverlay: { _classes: new Set(), classList: { add(c){ this._classes = this._classes || new Set(); els.stampOverlay._classes.add(c); }, remove(c){ els.stampOverlay._classes.delete(c); } } },
     stampTextarea: { value: '', focus(){} },
-    stampConfirmBtn: { disabled: false },
-    stampOpenBtn: { closest(sel) { return sel === '.section' ? openBtnSection : null; } },
+    stampConfirmBtn: { disabled: false, closest(sel) { return sel === '.section' ? stampSection : null; } },
   };
   const doc = { getElementById(id) { return els[id] || null; } };
-  return { doc, els, openBtnSection };
+  return { doc, els, stampSection };
 }
 
 const RELAY_URL = 'https://mingge-relay.test/';
 const results = [];
 
 function buildCtx(fetchImpl) {
-  const { doc, els, openBtnSection } = makeFakeDom();
+  const { doc, els, stampSection } = makeFakeDom();
   const ctx = { console, document: doc, fetch: fetchImpl, RELAY_URL, JSON };
   vm.createContext(ctx);
   vm.runInContext(code, ctx);
-  return { ctx, els, openBtnSection };
+  return { ctx, els, stampSection };
 }
 
-// 未蓋印 → 入口按鈕,無常駐標示
+// 未落款 → inline textarea+按鈕,無常駐標示
 {
   const { ctx } = buildCtx(async () => ({ ok: true, json: async () => ({}) }));
   const noTrace = ctx.__buildStampSectionHtml({});
-  results.push(['no trace_text => shows entry button', noTrace.includes('stampOpenBtn') && noTrace.includes('補後續 · 蓋金印')]);
+  results.push(['no trace_text => shows inline entry', noTrace.includes('stampConfirmBtn') && noTrace.includes('後來怎麼了？記一筆。')]);
   results.push(['no trace_text => no badge', !noTrace.includes('stamp-badge')]);
 }
 
-// 已蓋印 → 常駐標示,無入口按鈕(互斥)
+// 已落款 → 常駐標示,無入口按鈕(互斥)
 {
   const { ctx } = buildCtx(async () => ({ ok: true, json: async () => ({}) }));
   const withTrace = ctx.__buildStampSectionHtml({ trace_text: '後來順利談成了。', trace_at: '2026-07-11T09:00:00.000Z' });
-  results.push(['has trace_text => shows badge', withTrace.includes('stamp-badge') && withTrace.includes('金印 · 已補後續')]);
-  results.push(['has trace_text => no entry button', !withTrace.includes('stampOpenBtn')]);
+  results.push(['has trace_text => shows badge', withTrace.includes('stamp-badge') && withTrace.includes('墨印 · 已補後續')]);
+  results.push(['has trace_text => no entry button', !withTrace.includes('stampConfirmBtn')]);
   results.push(['has trace_text => renders content', withTrace.includes('後來順利談成了。')]);
   results.push(['reload trace_at => Asia/Taipei YYYY/MM/DD HH:mm', withTrace.includes('保存時間｜2026/07/11 17:00')]);
 }
@@ -494,44 +480,39 @@ function buildCtx(fetchImpl) {
 {
   const traceText = '後來去談了,結果不錯。';
   const traceAt = '2026-07-11T09:00:00.000Z';
-  const { ctx, els, openBtnSection } = buildCtx(async () => ({ ok: true, json: async () => ({ trace_text: traceText, trace_at: traceAt }) }));
-  ctx.__setStampState({ logId: 'recAAAAAAAAAAAAAA', token: 'tok' });
+  const { ctx, els, stampSection } = buildCtx(async () => ({ ok: true, json: async () => ({ trace_text: traceText, trace_at: traceAt }) }));
   els.stampTextarea.value = traceText;
-  await ctx.__submitStamp();
-  results.push(['submitStamp success => badge rendered', openBtnSection.innerHTML.includes('金印 · 已補後續')]);
-  results.push(['submitStamp success => toast rendered', openBtnSection.innerHTML.includes('已蓋印。這一卦,有了後續。')]);
-  results.push(['submitStamp success => Taipei time rendered', openBtnSection.innerHTML.includes('保存時間｜2026/07/11 17:00')]);
-  results.push(['submitStamp and reload share identical success card', openBtnSection.innerHTML === ctx.__buildStampBadgeHtml(traceText, traceAt)]);
-  results.push(['submitStamp success => modal closed', !els.stampOverlay._classes.has('open')]);
+  await ctx.__submitStamp('recAAAAAAAAAAAAAA','tok');
+  results.push(['submitStamp success => badge rendered', stampSection.innerHTML.includes('墨印 · 已補後續')]);
+  results.push(['submitStamp success => toast rendered', stampSection.innerHTML.includes('記下了，收在您的卦記裡。')]);
+  results.push(['submitStamp success => Taipei time rendered', stampSection.innerHTML.includes('保存時間｜2026/07/11 17:00')]);
+  results.push(['submitStamp and reload share identical success card', stampSection.innerHTML === ctx.__buildStampBadgeHtml(traceText, traceAt)]);
 }
 
 // submitStamp fetch reject(network down)→ 保留入口按鈕、按鈕重新啟用,不寫入常駐態
 {
-  const { ctx, els, openBtnSection } = buildCtx(async () => { throw new Error('network down'); });
-  ctx.__setStampState({ logId: 'recAAAAAAAAAAAAAA', token: 'tok' });
+  const { ctx, els, stampSection } = buildCtx(async () => { throw new Error('network down'); });
   els.stampTextarea.value = '後來去談了。';
-  await ctx.__submitStamp();
-  results.push(['submitStamp network error => no badge written', openBtnSection.innerHTML === '']);
+  await ctx.__submitStamp('recAAAAAAAAAAAAAA','tok');
+  results.push(['submitStamp network error => no badge written', stampSection.innerHTML === '']);
   results.push(['submitStamp network error => confirm button re-enabled', els.stampConfirmBtn.disabled === false]);
 }
 
 // submitStamp 非 200 → 同上,保留入口、重新啟用
 {
-  const { ctx, els, openBtnSection } = buildCtx(async () => ({ ok: false, status: 502 }));
-  ctx.__setStampState({ logId: 'recAAAAAAAAAAAAAA', token: 'tok' });
+  const { ctx, els, stampSection } = buildCtx(async () => ({ ok: false, status: 502 }));
   els.stampTextarea.value = '後來去談了。';
-  await ctx.__submitStamp();
-  results.push(['submitStamp non-200 => no badge written', openBtnSection.innerHTML === '']);
+  await ctx.__submitStamp('recAAAAAAAAAAAAAA','tok');
+  results.push(['submitStamp non-200 => no badge written', stampSection.innerHTML === '']);
   results.push(['submitStamp non-200 => confirm button re-enabled', els.stampConfirmBtn.disabled === false]);
 }
 
 // submitStamp 回 200 但契約不合(缺 trace_text 字串)→ 視為失敗,不寫常駐態
 {
-  const { ctx, els, openBtnSection } = buildCtx(async () => ({ ok: true, json: async () => ({ traced: true }) }));
-  ctx.__setStampState({ logId: 'recAAAAAAAAAAAAAA', token: 'tok' });
+  const { ctx, els, stampSection } = buildCtx(async () => ({ ok: true, json: async () => ({ traced: true }) }));
   els.stampTextarea.value = '後來去談了。';
-  await ctx.__submitStamp();
-  results.push(['submitStamp bad contract => no badge written', openBtnSection.innerHTML === '']);
+  await ctx.__submitStamp('recAAAAAAAAAAAAAA','tok');
+  results.push(['submitStamp bad contract => no badge written', stampSection.innerHTML === '']);
   results.push(['submitStamp bad contract => confirm button re-enabled', els.stampConfirmBtn.disabled === false]);
 }
 

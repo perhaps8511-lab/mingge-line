@@ -22,7 +22,7 @@ else
   echo "[FAIL] 問老易 route alias 缺失"; ((FAIL++))
 fi
 
-for NEEDLE in 'id="askLaoyiStart"' 'data-ask-laoyi=' 'id="studyAskLaoyi"' 'id="studyAskFallback"' '拿這篇問老易' '向天問卦'; do
+for NEEDLE in 'id="laoyiHall"' 'id="laoyiRoom"' 'id="studyAskLaoyi"' 'id="studyAskFallback"' '拿這篇問老易' '向天問卦'; do
   if grep -q "$NEEDLE" "$IDX"; then
     echo "[PASS] DOM 包含 $NEEDLE"; ((PASS++))
   else
@@ -33,11 +33,11 @@ done
 echo ""
 echo "=== 免費路徑與 quota 邊界 ==="
 
-ASK_BLOCK=$(awk '/async function sendAskLaoyiIntent/{flag=1} flag{print} /^}/{if(flag){exit}}' "$IDX")
-if echo "$ASK_BLOCK" | grep -q 'liff.sendMessages' && ! echo "$ASK_BLOCK" | grep -qE 'fetch\(|RELAY_URL|method:.*POST'; then
-  echo "[PASS] 問老易只用 LIFF sendMessages，不呼叫 Worker/quota POST"; ((PASS++))
+ASK_BLOCK=$(awk '/^function studySendAskLaoyi/{flag=1} flag{print} /^}/{if(flag){exit}}' "$IDX")
+if echo "$ASK_BLOCK" | grep -q "action=ask&content_id=" && ! echo "$ASK_BLOCK" | grep -qE 'fetch\(|RELAY_URL|method:.*POST|sendMessages'; then
+  echo "[PASS] 書房問老易走格5 content_id deep link，不呼叫 Worker/quota POST"; ((PASS++))
 else
-  echo "[FAIL] 問老易傳送路徑不符免費邊界"; ((FAIL++))
+  echo "[FAIL] 書房問老易 deep-link 免費邊界不符"; ((FAIL++))
 fi
 
 if grep -q "fetch(RELAY_URL+'study',{method:'GET'})" "$IDX"; then
@@ -46,10 +46,10 @@ else
   echo "[FAIL] 易經書房 GET /study 契約缺失"; ((FAIL++))
 fi
 
-if grep -q "showAskLaoyiFallback(message,statusId,fallbackId,textId)" "$IDX" && grep -q 'readonly></textarea>' "$IDX"; then
-  echo "[PASS] 非 LINE／送訊失敗有可複製文字 fallback"; ((PASS++))
+if grep -q "function laoyiOpeningLine" "$IDX" && grep -q "contentTitle=laoyiSanitizeTitle(new URLSearchParams(location.search).get('content_id'))" "$IDX"; then
+  echo "[PASS] content_id 由格5入口消費並生成文章開場"; ((PASS++))
 else
-  echo "[FAIL] 問老易 fallback 缺失"; ((FAIL++))
+  echo "[FAIL] content_id 消費或格5文章開場缺失"; ((FAIL++))
 fi
 
 MOCK_OUT=$(node - "$IDX" <<'NODE'
@@ -58,54 +58,39 @@ const vm=require('vm');
 const source=fs.readFileSync(process.argv[2],'utf8');
 const scriptMatches=[...source.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
 for(const match of scriptMatches){ if(match[1].trim()) new vm.Script(match[1]); }
-const start=source.indexOf('function resetAskLaoyiFeedback');
-const end=source.indexOf("window.addEventListener('popstate'",start);
-if(start<0||end<0) throw new Error('ask helpers not found');
-const helpers=source.slice(start,end);
-
-function makeElements(){
-  return {
-    status:{textContent:''},
-    fallback:{hidden:true},
-    text:{value:'',focus(){},select(){}}
-  };
+function extractFn(name){
+  const m=source.match(new RegExp('function '+name+'\\([^)]*\\)\\{[\\s\\S]*?\\n\\}'));
+  if(!m) throw new Error('function missing: '+name);
+  return m[0];
 }
-async function run(liff){
-  const els=makeElements();
-  const ids={s:els.status,f:els.fallback,t:els.text};
-  const ctx={
-    LIFF_ID:'mock-liff',liff,
-    document:{getElementById:id=>ids[id]||null,querySelectorAll:()=>[]},
-    navigator:{clipboard:{writeText:async()=>{}}},
-    setTimeout:()=>0,
-    console:{warn(){}},
-  };
-  vm.createContext(ctx);
-  vm.runInContext(helpers+'\nthis.__send=sendAskLaoyiIntent;',ctx);
-  await ctx.__send('問老易','s','f','t');
-  await Promise.resolve();
-  return els;
-}
-
-(async()=>{
-  let sent=null;
-  const success=await run({
-    init:async()=>{},isInClient:()=>true,isLoggedIn:()=>true,
-    sendMessages:async messages=>{sent=messages;},closeWindow(){}
-  });
-  if(!sent||sent[0].text!=='問老易'||!success.fallback.hidden) throw new Error('success path failed');
-  const fallback=await run({
-    init:async()=>{},isInClient:()=>false,isLoggedIn:()=>true,sendMessages:async()=>{}
-  });
-  if(fallback.fallback.hidden||fallback.text.value!=='問老易') throw new Error('fallback path failed');
-  console.log('success + fallback mock passed');
-})().catch(e=>{console.error(e);process.exit(1);});
+const code=[
+  extractFn('studySendAskLaoyi'),
+  extractFn('laoyiSanitizeTitle'),
+  extractFn('laoyiOpeningLine'),
+  'this.__send=studySendAskLaoyi;this.__sanitize=laoyiSanitizeTitle;this.__opening=laoyiOpeningLine;'
+].join('\n');
+const ctx={
+  studyState:{articles:[{title:'等他來問，火候才對'}]},
+  LAOYI_TITLE_MAX:200,
+  location:{href:''},
+  encodeURIComponent,
+};
+vm.createContext(ctx);
+vm.runInContext(code,ctx);
+ctx.__send(0,{disabled:false});
+const target=new URL(ctx.location.href,'https://example.test/');
+if(target.searchParams.get('action')!=='ask') throw new Error('action=ask missing');
+const title=ctx.__sanitize(target.searchParams.get('content_id'));
+if(title!=='等他來問，火候才對') throw new Error('content_id round-trip failed');
+const opening=ctx.__opening({opener:'content',contentTitle:title});
+if(opening!=='你帶來的是〈等他來問，火候才對〉。文中何處讓你停下了？') throw new Error('destination opening mismatch');
+console.log('study deep link + content_id opening passed');
 NODE
 )
 if [ $? -eq 0 ]; then
-  echo "[PASS] 真實 JS 語法、LIFF 成功送訊與非 LINE fallback mock 皆通過"; ((PASS++))
+  echo "[PASS] 真實 JS 語法、study deep link 與格5文章開場 mock 皆通過"; ((PASS++))
 else
-  echo "[FAIL] LIFF isolated mock 失敗: $MOCK_OUT"; ((FAIL++))
+  echo "[FAIL] study deep-link isolated mock 失敗: $MOCK_OUT"; ((FAIL++))
 fi
 
 if grep -q "await fetch(RELAY_URL,{" "$IDX" && grep -q "method:'POST'" "$IDX" && grep -q "if(blockEntryIfNeeded(gateState)) return;" "$IDX"; then

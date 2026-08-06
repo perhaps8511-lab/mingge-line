@@ -138,12 +138,13 @@ else
   echo "[FAIL] V2b 找不到分享鈕綁定"; ((FAIL++))
 fi
 
-# liffReady 旗標防護慣例一致性(對抗 E09 同頁雙重初始化搶跑)
+# 共享 promise cache 防護(對抗 E09 同頁雙重初始化搶跑)
 if grep -q "async function studyShareArticle" "$IDX" && \
-   awk '/async function studyShareArticle/{flag=1} flag{print} /^}/{if(flag)exit}' "$IDX" | grep -q "if(!liffReady){ await liff.init({liffId:LIFF_ID}); liffReady=true; }"; then
-  echo "[PASS] V2c studyShareArticle 用 liffReady 旗標防護(同既有 recoverLiffToken 慣例)"; ((PASS++))
+   awk '/async function studyShareArticle/{flag=1} flag{print} /^}/{if(flag)exit}' "$IDX" | grep -q "await ensureLiffInit();" && \
+   grep -q "function ensureLiffInit" "$IDX"; then
+  echo "[PASS] V2c studyShareArticle 使用共享 ensureLiffInit() promise cache"; ((PASS++))
 else
-  echo "[FAIL] V2c studyShareArticle 缺 liffReady 旗標防護"; ((FAIL++))
+  echo "[FAIL] V2c studyShareArticle 缺共享 ensureLiffInit() 防護"; ((FAIL++))
 fi
 
 # fallback 用 location.href,不用 window.open(避免 await 後脫離使用者手勢鏈被靜默擋下)
@@ -174,10 +175,12 @@ fi
 
 echo ""
 echo "=== V4: 版本指紋同步 ==="
-if grep -qF '<title>命格 · 進場儀式 v1.6.0</title>' "$IDX" && grep -qF 'v1.6.0(E48/E52 書房分享卡+讀卦隨筆)' "$IDX"; then
-  echo "[PASS] title/foot 版本指紋皆已 bump 至 v1.6.0"; ((PASS++))
+TITLE_VERSION=$(sed -n 's/.*<title>命格 · 進場儀式 \(v[0-9][0-9.]*\)<\/title>.*/\1/p' "$IDX" | head -1)
+FOOT_VERSION=$(sed -n 's/.*進場儀式 \(v[0-9][0-9.]*\)(.*/\1/p' "$IDX" | head -1)
+if [ "$TITLE_VERSION" = "v1.6.1" ] && [ "$FOOT_VERSION" = "$TITLE_VERSION" ]; then
+  echo "[PASS] title/foot 版本指紋同步為 $TITLE_VERSION"; ((PASS++))
 else
-  echo "[FAIL] 版本指紋未同步"; ((FAIL++))
+  echo "[FAIL] 版本指紋未同步或非現行 v1.6.1(title=$TITLE_VERSION foot=$FOOT_VERSION)"; ((FAIL++))
 fi
 
 echo ""
