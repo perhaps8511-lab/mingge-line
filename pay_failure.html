@@ -65,7 +65,24 @@
     <div class="seal">—</div>
     <h1>付款未完成</h1>
     <p>本次交易未成立,<span class="gold">未扣款</span>。<br>請回到 LINE 重新取得付款連結,<br>或於 LINE 對話中告知我們協助處理。</p>
+    <p class="footer" id="orderDetail" hidden></p>
     <div class="footer">善為易者不占 · 命格</div>
   </main>
+  <script>
+    // 086卡:接回傳參數(訂單號/方案名),無參數時維持現況文案不變。用 textContent 寫入,避免 query string 反射 XSS。
+    (function(){
+      var qs = new URLSearchParams(location.search);
+      var orderId = qs.get('orderId');
+      var plan = qs.get('plan');
+      if(!orderId && !plan) return;
+      var el = document.getElementById('orderDetail');
+      if(!el) return;
+      var parts = [];
+      if(plan) parts.push('方案:' + plan);
+      if(orderId) parts.push('訂單編號:' + orderId);
+      el.textContent = parts.join(' · ');
+      el.hidden = false;
+    })();
+  </script>
 </body>
 </html>

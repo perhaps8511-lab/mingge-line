@@ -42,9 +42,9 @@ else
   ((FAIL++))
 fi
 
-# 1d. gate-door links to action=pay
-if grep -q 'href="./index.html?action=pay" class="gate-door"' "$INDEX"; then
-  echo "[PASS] gate-door links to action=pay"
+# 1d. gate-door links to action=pay&src=zero(M-090 現行入口)
+if grep -q 'href="./index.html?action=pay&src=zero" class="gate-door"' "$INDEX"; then
+  echo "[PASS] gate-door links to action=pay&src=zero"
   ((PASS++))
 else
   echo "[FAIL] gate-door link missing or wrong"
@@ -72,6 +72,42 @@ done
 if [ $FORBIDDEN_FOUND -eq 0 ]; then
   echo "[PASS] ZERO_QUOTA 常數無禁詞(1490/訂閱/複盤/用盡/用完)"
   ((PASS++))
+fi
+
+# 1g. M-092 payCtx zero A 案逐字鎖定
+if grep -Fq "zero:'下卦已立,要往上建嗎?要緊的事還在,上卦的來法都在這裡。'" "$INDEX"; then
+  echo "[PASS] payCtx zero = M-092 A 案逐字"
+  ((PASS++))
+else
+  echo "[FAIL] payCtx zero M-092 A 案缺失或錯字"
+  ((FAIL++))
+fi
+
+# 1h. M-092 149 卡 A 案逐字鎖定
+if grep -Fq '<strong>問一卦|149</strong> — 心裡又起了一問,便來一卦。老易為您讀本卦、變卦、動爻,把這一程攤開看清。' "$INDEX"; then
+  echo "[PASS] 149 卡 = M-092 A 案逐字"
+  ((PASS++))
+else
+  echo "[FAIL] 149 卡 M-092 A 案缺失或錯字"
+  ((FAIL++))
+fi
+
+# 1i. M-092 舊句負斷言
+OLD_ZERO_COUNT=$(grep -F -c '囊中銅錢用盡' "$INDEX" || true)
+OLD_149_COUNT=$(grep -F -c '銅錢用盡' "$INDEX" || true)
+if [ "$OLD_ZERO_COUNT" -eq 0 ]; then
+  echo "[PASS] 囊中銅錢用盡 = 0"
+  ((PASS++))
+else
+  echo "[FAIL] 囊中銅錢用盡 = $OLD_ZERO_COUNT"
+  ((FAIL++))
+fi
+if [ "$OLD_149_COUNT" -eq 0 ]; then
+  echo "[PASS] 銅錢用盡 = 0"
+  ((PASS++))
+else
+  echo "[FAIL] 銅錢用盡 = $OLD_149_COUNT"
+  ((FAIL++))
 fi
 
 echo ""
