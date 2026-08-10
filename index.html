@@ -1926,7 +1926,24 @@ const PAY_PLANS = {
 
 /* mock 結帳只能由顯式測試參數觸發(?paytest=1);無此參數時格3四卡文案/行為與現況逐字相同。 */
 function isCheckoutTestViewer(){
-  return new URLSearchParams(location.search).get('paytest')==='1';
+  var params=new URLSearchParams(location.search);
+  var matched=params.get('paytest')==='1';
+  if(!matched){
+    var state=params.get('liff.state');
+    if(state){
+      try{
+        var decoded=decodeURIComponent(state);
+        var queryAt=decoded.indexOf('?');
+        var query=queryAt>=0?decoded.slice(queryAt+1):decoded;
+        matched=new URLSearchParams(query.split('#')[0]).get('paytest')==='1';
+      }catch(_){}
+    }
+  }
+  if(matched){
+    try{sessionStorage.setItem('mg_paytest','1');}catch(_){}
+    return true;
+  }
+  try{return sessionStorage.getItem('mg_paytest')==='1';}catch(_){return false;}
 }
 
 /* ★ v1.2.3:卦記會話編號(D3 卦記 schema 唯一缺口補件)
