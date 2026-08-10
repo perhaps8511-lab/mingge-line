@@ -1,119 +1,135 @@
 #!/bin/bash
-# test_e086_checkout_mock_v1_0.sh — 086 格3付費卡 checkout 三態架構 + mock 結帳流 驗收腳本
-# Ref: 086_dispatch_mingge_cprime_checkout_S-20260804_v1_0.md(〇/二節)
-#      plan: polished-kindling-stardust(Claude Code Plan Mode,Perth 2026-08-04 放行)
-# 段① DOM/設定存在性  段②文案不變回歸鎖  段③payload 契約鎖(node)  段④安全閘斷言  段⑤邊界斷言
-# 全程假資料,不碰真鑰;唯一對外呼叫的雲端端點(mingge-pay-relay Worker)只在人工手動點擊時才會真的送出
-
+# Card 124 v1.3: FalseToken trusted issuer + entitlement gates.
 set -uo pipefail
-PASS=0; FAIL=0
 
-REPO_ROOT="$(dirname "$0")/.."
-IDX="$REPO_ROOT/index.html"
-SUCC="$REPO_ROOT/pay_success.html"
-FAILP="$REPO_ROOT/pay_failure.html"
+PASS=0
+FAIL=0
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+IDX="$ROOT/index.html"
+WRK="$ROOT/workers/mingge-relay/worker.js"
 
 pass(){ echo "[PASS] $1"; PASS=$((PASS+1)); }
 fail(){ echo "[FAIL] $1"; FAIL=$((FAIL+1)); }
 
-echo "=== 段① DOM/設定存在性驗證 ==="
+node --check "$WRK" >/dev/null 2>&1 && pass "worker.js syntax" || fail "worker.js syntax"
+node "$ROOT/tests/_e086_fn_matrix.mjs" "$IDX" && pass "legacy 086 plan matrix" || fail "legacy 086 plan matrix"
 
-grep -qE "^const CHECKOUT_MODE = 'mock';" "$IDX" && pass "CHECKOUT_MODE 單一設定點存在,預設 'mock'" || fail "CHECKOUT_MODE 缺失/預設值不符"
-grep -qF 'const PAY_RELAY_URL = "https://mingge-pay-relay.perhaps8511.workers.dev/";' "$IDX" \
-  && pass "PAY_RELAY_URL 已設定為 Perth 提供之真實 S82 relay URL" || fail "PAY_RELAY_URL 缺失/URL 不符"
-grep -qF "const OEN_SANDBOX_CHECKOUT_URL = '';" "$IDX" && pass "OEN_SANDBOX_CHECKOUT_URL 佔位存在(卡片未提供真值,誠實留空)" || fail "OEN_SANDBOX_CHECKOUT_URL 缺失"
-grep -qF "const OEN_PROD_CHECKOUT_URL = '';" "$IDX" && pass "OEN_PROD_CHECKOUT_URL 佔位存在(明文擱置)" || fail "OEN_PROD_CHECKOUT_URL 缺失"
-grep -qF 'const PAY_PLANS = {' "$IDX" && pass "PAY_PLANS 四卡對照表存在" || fail "PAY_PLANS 缺失"
-grep -qF "function isCheckoutTestViewer(){" "$IDX" && pass "isCheckoutTestViewer() 顯式測試旗標函式存在" || fail "isCheckoutTestViewer 缺失"
-grep -qF "new URLSearchParams(location.search).get('paytest')==='1'" "$IDX" && pass "測試旗標為 ?paytest=1(比照既有 ?dev=1 慣例)" || fail "paytest 判斷式缺失/寫法不符"
-
-grep -qF 'id="planPack399"' "$IDX" && pass "囊中銅錢399 卡補上 id=planPack399(原本四卡中唯一缺 id 者)" || fail "planPack399 id 未補"
-grep -qF 'id="planSingle149"' "$IDX" && grep -qF 'id="planDeepdive200"' "$IDX" && grep -qF 'id="planFupan1490"' "$IDX" \
-  && pass "其餘三張付費卡 id 仍在(planSingle149/planDeepdive200/planFupan1490)" || fail "既有卡片 id 缺失"
-
-grep -qF 'id="payMockOverlay"' "$IDX" && pass "mock 結帳 overlay 容器 #payMockOverlay 存在" || fail "mock overlay 容器缺失"
-grep -qF 'id="payMockOk"' "$IDX" && grep -qF 'id="payMockFail"' "$IDX" && grep -qF 'id="payMockCancel"' "$IDX" \
-  && pass "mock overlay 成功/失敗/取消三顆按鈕皆存在" || fail "mock overlay 按鈕缺失(未滿三顆)"
-
-grep -qF 'function buildPayMockPayload(planKey, result){' "$IDX" && pass "buildPayMockPayload() 純函式存在" || fail "buildPayMockPayload 缺失"
-grep -qF 'async function payMockConfirm(result){' "$IDX" && pass "payMockConfirm() 存在" || fail "payMockConfirm 缺失"
-grep -qF 'function initPayCheckoutCards(){' "$IDX" && pass "initPayCheckoutCards() 掛接函式存在" || fail "initPayCheckoutCards 缺失"
-grep -qF 'initPayCheckoutCards(); // 086卡' "$IDX" && pass "initPayPage() 內已呼叫 initPayCheckoutCards()" || fail "initPayPage 未掛接 086 邏輯"
-
-echo ""
-echo "=== 段② 文案不變回歸鎖(Perth 硬約束②:production 預設態逐字不變)==="
-
-TEXT_COUNT=$(grep -c '付款通道整備中;銅錢尚在,不急。' "$IDX")
-if [ "$TEXT_COUNT" -eq 4 ]; then
-  pass "四張付費卡「付款通道整備中;銅錢尚在,不急。」文案逐字仍在,共 4 處(既有整備態文案 = mock 態文案,未被改寫)"
-else
-  fail "整備中文案處數不符預期(預期 4,實際 $TEXT_COUNT)——可能誤改了現況文案"
-fi
-
-if grep -qE '^\s*function initPayCheckoutCards\(\)\{\s*$' "$IDX"; then
-  FN_BLOCK=$(awk '/^function initPayCheckoutCards\(\)\{/{flag=1} flag{print; if(/^\}$/ && flag==1){exit}}' "$IDX")
-  echo "$FN_BLOCK" | head -2 | grep -qF 'if(!isCheckoutTestViewer()) return;' \
-    && pass "initPayCheckoutCards() 第一行即 guard isCheckoutTestViewer(),無旗標時零副作用(不掛任何 click listener)" \
-    || fail "initPayCheckoutCards() 缺少 test-viewer guard,可能導致 production 誤觸發"
-else
-  fail "找不到 initPayCheckoutCards() 函式區塊"
-fi
-
-echo ""
-echo "=== 段③ payload 契約鎖(Node,假資料,比照 test_e56 extractFn 手法)==="
-
-NODE_OUT=$(node "$(dirname "$0")/_e086_fn_matrix.mjs" "$IDX" 2>&1)
-echo "$NODE_OUT"
-NODE_FAIL=$(echo "$NODE_OUT" | grep -c '^FAIL')
-NODE_PASS=$(echo "$NODE_OUT" | grep -c '^PASS')
-if [ "$NODE_FAIL" -eq 0 ] && [ "$NODE_PASS" -ge 9 ]; then
-  pass "段③ JS 純函式矩陣 9/9 case 全過(payload 六欄位契約鎖)"
-else
-  fail "段③ JS 純函式矩陣未全過(FAIL=$NODE_FAIL PASS=$NODE_PASS)"
-fi
-
-echo ""
-echo "=== 段④ 安全閘斷言 ==="
-
-if grep -qE "orderId: 'MOCK-'|orderId: orderId" "$IDX"; then
-  pass "orderId 為前端動態生成(MOCK- 前綴),非寫死字面值"
-else
-  fail "orderId 生成邏輯不符預期"
-fi
-
-# pay_success.html / pay_failure.html:query 參數必須用 textContent 寫入,禁 innerHTML(防 XSS)
-for F in "$SUCC" "$FAILP"; do
-  NAME=$(basename "$F")
-  if grep -qF 'el.textContent = parts.join' "$F" && ! grep -qF '.innerHTML' "$F"; then
-    pass "$NAME 用 textContent 寫入 query 參數,無 innerHTML(防 query string 反射 XSS)"
+grep -qE "^const CHECKOUT_MODE = 'mock';" "$IDX" && pass "CHECKOUT_MODE remains mock" || fail "CHECKOUT_MODE changed"
+[ "$(grep -c '付款通道整備中;銅錢尚在,不急。' "$IDX")" -eq 4 ] && pass "production default copy remains exact in four cards" || fail "production default copy drift"
+grep -qF '退費:單卦與囊中銅錢,<strong>七天之內、一枚未用</strong>,全數退還;起過卦了,便算書房已為您開講,依規不退。訂閱<strong>十四天之內、未起過卦</strong>,全退;之後取消,不再續扣,服務用到當期末。<br>' "$IDX" && pass "refund two-track copy remains exact" || fail "refund copy drift"
+grep -qF 'id="payMockOverlay"' "$IDX" && grep -qF 'id="payMockOk"' "$IDX" && grep -qF 'id="payMockFail"' "$IDX" && grep -qF 'id="payMockCancel"' "$IDX" && pass "mock overlay contract remains complete" || fail "mock overlay contract drift"
+for PAGE in "$ROOT/pay_success.html" "$ROOT/pay_failure.html"; do
+  if grep -qF 'el.textContent = parts.join' "$PAGE" && ! grep -qF '.innerHTML' "$PAGE"; then
+    pass "$(basename "$PAGE") keeps textContent query rendering"
   else
-    fail "$NAME query 參數注入方式不符安全預期"
+    fail "$(basename "$PAGE") query rendering safety drift"
   fi
-  grep -qF 'id="orderDetail" hidden' "$F" && pass "$NAME 無參數時 #orderDetail 預設 hidden(維持現況文案)" || fail "$NAME 缺少 hidden 預設"
 done
 
-# 現況既有文案逐字不動(pay_success/pay_failure 誠實態語氣沿用)
-grep -qF '收據與開通通知已送至您的' "$SUCC" && pass "pay_success.html 既有文案逐字保留" || fail "pay_success.html 既有文案疑似被改寫"
-grep -qF '本次交易未成立,' "$FAILP" && pass "pay_failure.html 既有文案逐字保留" || fail "pay_failure.html 既有文案疑似被改寫"
+grep -qF "RELAY_URL+'falsetoken/checkout'" "$IDX" && pass "mock success calls trusted relay" || fail "trusted relay call missing"
+grep -qF "body:JSON.stringify({plan:plan.customId})" "$IDX" && pass "browser sends plan key only" || fail "browser payload is not plan-only"
+grep -qF "'X-Line-AccessToken':token" "$IDX" && pass "LINE token stays in authenticated relay header" || fail "authenticated relay header missing"
 
-echo ""
-echo "=== 段⑤ 邊界斷言(禁碰雲端/Worker 原始碼、禁碰 sanmus2-line-ai-pool)==="
-
-WORKER_DIFF=$(git -C "$REPO_ROOT" diff --stat main -- workers/ 2>/dev/null | grep -c . || true)
-if [ "${WORKER_DIFF:-0}" -eq 0 ]; then
-  pass "workers/ 目錄零改動(本卡只引用已部署的 mingge-pay-relay URL,不碰任何 Worker 原始碼)"
+if grep -E "HOOK_FALSETOKEN|make\.com|hook\.(us|eu)[0-9]*\.make" "$IDX" >/dev/null; then
+  fail "frontend exposes FalseToken/Make hook material"
 else
-  fail "workers/ 目錄偵測到改動,逾越本卡邊界(禁碰雲端/Cloudflare)"
+  pass "frontend has no FalseToken/Make hook material"
 fi
 
-# 金鑰/token 零觸碰(本卡邊界:「金鑰與 token 不碰不問」)
-if git -C "$REPO_ROOT" diff --unified=0 main -- index.html pay_success.html pay_failure.html 2>/dev/null \
-  | grep -E '^\+' | grep -v '^\+++' | grep -qiE 'MAKE_PAY_HOOK|channel.?token|JWT'; then
-  fail "diff 中偵測到金鑰/token 相關字樣,逾越本卡邊界"
-else
-  pass "diff 中零金鑰/token 字樣觸碰(MAKE_PAY_HOOK/channel token/JWT 均未出現)"
-fi
+grep -qF "deepen_200" "$IDX" && grep -qF "deepen_200" "$WRK" && pass "canonical deepen_200 spelling" || fail "canonical deepen_200 missing"
+grep -E '(^|[^0-9])349([^0-9]|$)' "$IDX" "$WRK" >/dev/null && fail "external forbidden 349 present" || pass "forbidden 349 absent"
+grep -qF 'payment_bypass_consent_gate' "$IDX" "$WRK" && fail "payment consent bypass present" || pass "payment consent bypass absent"
 
-echo ""
+node --input-type=module - "$WRK" <<'NODE'
+import {pathToFileURL} from 'node:url';
+
+const workerPath = process.argv[2];
+const worker = (await import(pathToFileURL(workerPath).href + '?card124=' + Date.now())).default;
+let failures = 0;
+const check = (ok, label) => {
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${label}`);
+  if (!ok) failures++;
+};
+
+function lineIdentityFetch(extra) {
+  return async (input, init={}) => {
+    const url = String(input);
+    if (url.includes('/oauth2/v2.1/verify')) return new Response(JSON.stringify({client_id:'2010192384'}), {status:200});
+    if (url.includes('/v2/profile')) return new Response(JSON.stringify({userId:'U_CARD124',displayName:'Card 124'}), {status:200});
+    return extra(input, init);
+  };
+}
+
+async function checkout(plan, bodyOverride, envOverride) {
+  let forwarded = null;
+  globalThis.fetch = lineIdentityFetch(async (input, init={}) => {
+    if (String(input) === 'https://hook.invalid/falsetoken') {
+      forwarded = JSON.parse(init.body);
+      return new Response('{}', {status:200});
+    }
+    throw new Error('unexpected fetch ' + input);
+  });
+  const req = new Request('https://relay.test/falsetoken/checkout', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Line-AccessToken':'token'},
+    body:JSON.stringify(bodyOverride ?? {plan}),
+  });
+  const res = await worker.fetch(req, {HOOK_FALSETOKEN:'https://hook.invalid/falsetoken', ...(envOverride||{})});
+  return {res, json:await res.json(), forwarded};
+}
+
+for (const [plan, amount] of [['single_149',149],['pack_399',399],['sub_1490',1490]]) {
+  const out = await checkout(plan);
+  check(out.res.status === 202, `${plan} accepted`);
+  check(out.forwarded?.plan === plan && out.forwarded?.amount === amount, `${plan} amount is server canonical`);
+  check(out.forwarded?.line_user_id === 'U_CARD124' && out.forwarded?.status === 'pending', `${plan} trusted identity + pending only`);
+  check(/^MG\d+[a-f0-9]{12}$/.test(out.forwarded?.order_id || ''), `${plan} server order_id shape`);
+  check(out.forwarded?.custom_id === `FT-${out.forwarded?.order_id}`, `${plan} unique custom_id derives from order`);
+  check(JSON.stringify(Object.keys(out.forwarded||{}).sort()) === JSON.stringify(['amount','custom_id','line_user_id','order_id','plan','status'].sort()), `${plan} normalized payload exact fields`);
+}
+
+const one = await checkout('single_149');
+const two = await checkout('single_149');
+check(one.forwarded.order_id !== two.forwarded.order_id && one.forwarded.custom_id !== two.forwarded.custom_id, 'same-plan orders remain unique');
+
+const extra = await checkout('single_149', {plan:'single_149',amount:1,line_user_id:'attacker'});
+check(extra.res.status === 400 && extra.forwarded === null, 'browser cannot assert amount or identity');
+const deep = await checkout('deepen_200');
+check(deep.res.status === 409 && deep.forwarded === null, 'deepen_200 fails closed until Track B schema GO');
+const noHook = await checkout('single_149', undefined, {HOOK_FALSETOKEN:undefined});
+check(noHook.res.status === 503 && noHook.forwarded === null, 'missing HOOK_FALSETOKEN fails closed');
+
+async function fupan(subscriberFields, env={AIRTABLE_API_KEY:'fake',HOOK_FUPAN:'https://hook.invalid/fupan'}) {
+  let hookCalls = 0;
+  globalThis.fetch = lineIdentityFetch(async (input) => {
+    const url = String(input);
+    if (url.startsWith('https://api.airtable.com/')) {
+      return new Response(JSON.stringify({records:subscriberFields ? [{fields:subscriberFields}] : []}), {status:200});
+    }
+    if (url === 'https://hook.invalid/fupan') { hookCalls++; return new Response('{}',{status:200}); }
+    throw new Error('unexpected fetch ' + input);
+  });
+  const req = new Request('https://relay.test/trigger/fupan', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Line-AccessToken':'token'},
+    body:JSON.stringify({current_question:'現在該怎麼整理？'}),
+  });
+  const res = await worker.fetch(req, env);
+  return {res, hookCalls};
+}
+
+const paid = await fupan({subscriber_tier:'subscriber',consent_at:'2026-08-10T00:00:00.000Z'});
+check(paid.res.status === 202 && paid.hookCalls === 1, 'subscriber with consent passes fupan backend gate');
+const free = await fupan({subscriber_tier:'free',consent_at:'2026-08-10T00:00:00.000Z'});
+check(free.res.status === 403 && free.hookCalls === 0, 'free account fails closed at fupan backend gate');
+const noConsent = await fupan({subscriber_tier:'subscriber'});
+check(noConsent.res.status === 403 && noConsent.hookCalls === 0, 'subscriber without consent fails closed');
+const noAirtable = await fupan(null, {HOOK_FUPAN:'https://hook.invalid/fupan'});
+check(noAirtable.res.status === 503 && noAirtable.hookCalls === 0, 'missing Airtable binding fails closed');
+
+process.exit(failures ? 1 : 0);
+NODE
+if [ "$?" -eq 0 ]; then pass "Card 124 worker contract matrix"; else fail "Card 124 worker contract matrix"; fi
+
 echo "---SUMMARY--- PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

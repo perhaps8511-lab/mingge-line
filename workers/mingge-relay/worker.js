@@ -25,6 +25,12 @@ const AT_SHUFANG     = "tblbzhwwmBDfAKQAs";
 const TRACE_MAX_BODY_BYTES = 4096;
 const LAOYI_CONV_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 const LAOYI_UPSTREAM_TIMEOUT_MS = 30000;
+const FALSE_TOKEN_PLANS = Object.freeze({
+  single_149: { amount: 149 },
+  pack_399:   { amount: 399 },
+  deepen_200: { amount: 200, schemaHold: true },
+  sub_1490:   { amount: 1490 },
+});
 
 export default {
   async fetch(request, env) {
@@ -406,6 +412,79 @@ export default {
 
     // S140(E27):深卜/複盤薄代理層 —— 前端只打這裡,Worker 驗完身分才轉發 Make webhook,
     // webhook URL 全程留在 Worker 端 Secrets,不進前端原始碼(S37 binding)。
+    if (request.method === "POST" && url.pathname === "/falsetoken/checkout") {
+      const contentType = request.headers.get("Content-Type") || "";
+      if (!contentType.toLowerCase().includes("application/json")) {
+        return json({ error: "Bad JSON body" }, 400);
+      }
+
+      let payload;
+      try {
+        payload = await request.json();
+      } catch (e) {
+        return json({ error: "Bad JSON body" }, 400);
+      }
+
+      const accessToken = request.headers.get("X-Line-AccessToken");
+      if (!accessToken) {
+        return json({ error: "Missing access token" }, 401);
+      }
+
+      let verifiedUserId;
+      try {
+        ({ userId: verifiedUserId } = await resolveUserId(accessToken, LINE_CHANNEL_ID));
+      } catch (e) {
+        console.log("FalseToken access token validation failed", e.message || e);
+        return json({ error: "Invalid access token" }, 401);
+      }
+
+      const payloadIsObject = payload && typeof payload === "object" && !Array.isArray(payload);
+      const payloadKeys = payloadIsObject ? Object.keys(payload) : [];
+      if (payloadKeys.length !== 1 || payloadKeys[0] !== "plan") {
+        return json({ error: "Unexpected field in payload" }, 400);
+      }
+
+      const plan = typeof payload.plan === "string" ? payload.plan : "";
+      const planContract = FALSE_TOKEN_PLANS[plan];
+      if (!planContract) {
+        return json({ error: "Invalid plan" }, 400);
+      }
+      if (planContract.schemaHold) {
+        return json({ error: "deepen_200 entitlement binding not configured" }, 409);
+      }
+      if (!env.HOOK_FALSETOKEN) {
+        return json({ error: "HOOK_FALSETOKEN not configured" }, 503);
+      }
+
+      const randomPart = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+      const orderId = `MG${Date.now()}${randomPart}`;
+      const hookPayload = {
+        order_id: orderId,
+        custom_id: `FT-${orderId}`,
+        line_user_id: verifiedUserId,
+        plan,
+        amount: planContract.amount,
+        status: "pending",
+      };
+
+      try {
+        const hookRes = await fetch(env.HOOK_FALSETOKEN, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(hookPayload),
+        });
+        if (!hookRes.ok) {
+          console.log("FalseToken webhook forward failed", hookRes.status);
+          return json({ error: "Webhook forward failed" }, 502);
+        }
+      } catch (e) {
+        console.log("FalseToken webhook forward failed", e.message || e);
+        return json({ error: "Webhook forward failed" }, 502);
+      }
+
+      return json({ accepted: true, order_id: orderId }, 202);
+    }
+
     if (request.method === "POST" && url.pathname === "/trigger/deepdive") {
       const contentType = request.headers.get("Content-Type") || "";
       if (!contentType.toLowerCase().includes("application/json")) {
@@ -547,6 +626,11 @@ export default {
 
       if (!env.HOOK_FUPAN) {
         return json({ error: "HOOK_FUPAN not configured" }, 503);
+      }
+
+      const subscriberGate = await readSubscriberGate(env, verifiedUserId);
+      if (!subscriberGate.allow) {
+        return json({ error: "Subscriber entitlement required" }, subscriberGate.status || 403);
       }
 
       const hookPayload = {
@@ -849,6 +933,31 @@ async function readQuotaGate(env, lineUserId) {
   }
 
   return { allow: false };
+}
+
+async function readSubscriberGate(env, lineUserId) {
+  if (!env.AIRTABLE_API_KEY) {
+    return { allow: false, status: 503 };
+  }
+
+  let subResult;
+  try {
+    subResult = await airtableFetch(env.AIRTABLE_API_KEY, AT_BASE, AT_SUBS, {
+      filterByFormula: `AND({line_user_id}="${lineUserId}",NOT({record_type}="compliance_evidence"))`,
+      fields: ["subscriber_tier", "consent_at", "record_type"],
+      maxRecords: 1,
+    });
+  } catch (e) {
+    console.log("Subscriber gate Airtable read failed", e.message || e);
+    return { allow: false, status: 503 };
+  }
+
+  const subRec = (subResult.records || [])[0];
+  const sub = subRec ? (subRec.fields || {}) : {};
+  return {
+    allow: sub.subscriber_tier === "subscriber" && !!sub.consent_at && sub.record_type !== "compliance_evidence",
+    status: 403,
+  };
 }
 
 function json(data, status) {

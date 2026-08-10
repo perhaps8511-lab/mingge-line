@@ -1425,13 +1425,22 @@ async function payMockConfirm(result){
   var planKey=_payMockActivePlan;
   var plan=PAY_PLANS[planKey];
   if(!plan) return;
-  if(result==='success' || result==='fail'){
-    var payload=buildPayMockPayload(planKey, result);
+  if(result==='success'){
+    var token=liff.getAccessToken?liff.getAccessToken():null;
+    if(!token){ console.warn('[pay mock] LINE access token unavailable'); return; }
     try{
-      await fetch(PAY_RELAY_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
-    }catch(e){ console.warn('[pay mock] relay POST failed', e); }
-    var target = result==='success' ? 'pay_success.html' : 'pay_failure.html';
-    location.href = target + '?' + new URLSearchParams({orderId:payload.orderId, plan:plan.name, amount:String(plan.amount)});
+      var resp=await fetch(RELAY_URL+'falsetoken/checkout', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Line-AccessToken':token},
+        body:JSON.stringify({plan:plan.customId})
+      });
+      if(!resp.ok){ console.warn('[pay mock] trusted checkout rejected', resp.status); return; }
+      var data=await resp.json();
+      location.href='pay_success.html?'+new URLSearchParams({orderId:data.order_id,plan:plan.name,amount:String(plan.amount)});
+    }catch(e){ console.warn('[pay mock] trusted checkout failed', e); }
+  } else if(result==='fail'){
+    var payload=buildPayMockPayload(planKey, result);
+    location.href='pay_failure.html?'+new URLSearchParams({orderId:payload.orderId,plan:plan.name,amount:String(plan.amount)});
   } else {
     // 取消:TA 中途放棄,比照真實金流閘道不觸發 webhook,只關 overlay
     closePayMock();
