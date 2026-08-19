@@ -15,7 +15,7 @@ node --check "$WRK" >/dev/null 2>&1 && pass "worker.js syntax" || fail "worker.j
 node "$ROOT/tests/_e086_fn_matrix.mjs" "$IDX" && pass "legacy 086 plan matrix" || fail "legacy 086 plan matrix"
 
 grep -qE "^const CHECKOUT_MODE = 'mock';" "$IDX" && pass "CHECKOUT_MODE remains mock" || fail "CHECKOUT_MODE changed"
-[ "$(grep -c '付款通道整備中;銅錢尚在,不急。' "$IDX")" -eq 4 ] && pass "production default copy remains exact in four cards" || fail "production default copy drift"
+[ "$(grep -c '付款通道整備中,眼下還付不了款;開通到哪一步了,問一聲「書僮客服」便知。' "$IDX")" -eq 3 ] && pass "R302-d fail-honest copy exact in three plan cards" || fail "fail-honest copy drift"
 grep -qF '退費:單卦與囊中銅錢,<strong>七天之內、一枚未用</strong>,全數退還;起過卦了,便算書房已為您開講,依規不退。訂閱<strong>十四天之內、未起過卦</strong>,全退;之後取消,不再續扣,服務用到當期末。<br>' "$IDX" && pass "refund two-track copy remains exact" || fail "refund copy drift"
 grep -qF 'id="payMockOverlay"' "$IDX" && grep -qF 'id="payMockOk"' "$IDX" && grep -qF 'id="payMockFail"' "$IDX" && grep -qF 'id="payMockCancel"' "$IDX" && pass "mock overlay contract remains complete" || fail "mock overlay contract drift"
 for PAGE in "$ROOT/pay_success.html" "$ROOT/pay_failure.html"; do
