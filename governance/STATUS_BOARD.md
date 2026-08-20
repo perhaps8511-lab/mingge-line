@@ -55,3 +55,27 @@
 - 2026-08-20 07:09 +08:00：WP-MINGGE-RM03-INTENT-SPLIT-01 fresh-context review defect 已修正：offer click／Enter／Space 現會加入獨立 `.pc-status--activated` 可見強調態並聚焦既有 fail-honest 下一步；`node tests/test_rm03_intent_split_v1_0.mjs` 15/15 PASS（含新增 R302-c/R302-d behavior 斷言），byte-master 六句仍 6/6 exact（verifier 總結果仍僅既有 protected-region 粒度誤報 1 FAIL）；未 commit／未 push／未 deploy（Codex；證據 `index.html:521`, `index.html:1364`, `tests/test_rm03_intent_split_v1_0.mjs:22`）。
 - 2026-08-20：WP-MINGGE-RM03-INTENT-SPLIT-01 v2.8 BK6–BK9 修正完成：返回鍵句 7／頁尾次要樣式、初訪免費卡還原、深卜 200 live bytes 還原、1490 卡粗體邊界修正；`test_rm03_intent_split_v1_0.mjs` 21/21 PASS，byte-master 6/6 落地 PASS（verifier 仍僅既有 BK5-A／protected constant 粒度誤報 1 FAIL）；未 commit／未 push／未 deploy（Codex）。
 - 2026-08-20：WP-MINGGE-RM03-INTENT-SPLIT-01 第二輪 fresh-context 互審：BK6–BK9 本體全數 PASS，containment 第二道（`git diff origin/main -- index.html`，Claude Code 逐行核對）78 行全部可溯源；抓到卡 §2.2 R302-b 舊措辭與 §0.15 打架（卡文件本身，非程式碼缺陷）。Cowork 已同步 §2.2 措辭至 v2.9，並將 `check_rm03_copy_bytes.mjs` 升版 v2.0（七句＋399 分層檢查＋句6 去標籤比對＋BK7/8/9 還原斷言）內嵌卡 §0.10。Claude Code 從卡逐字擷取（非手打）覆蓋 `tests/check_rm03_copy_bytes.mjs`，`node tests/check_rm03_copy_bytes.mjs index.html` 獨立重跑 `ALL PASS`（A/B/C/D 四段共 30 項全過，含 BK7/BK8/BK9 還原檢查、399 分層檢查）；未 commit／未 push／未 deploy（Claude Code）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B G1 PASS——無 `artifactmock=1` 時保留 byte-master 句 5，mock 初始化只受新 flag 控制（Codex；`index.html:723`, `index.html:1384`；`test_rm03b_artifact_mock_v1_0.mjs`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B G1b PASS——列表、詳情、mock checkout 頂端與每張商品卡皆使用 exact 全形線 badge（Codex；`index.html:725`, `index.html:730`, `index.html:1436`, `index.html:1487`, `index.html:1510`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B G1c PASS——資料檔落 exact 防化石 `_warning`，render title 未寫入資料 title 欄（Codex；`data/artifacts_placeholder.json:2`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B G2 PASS——獨立 `artifactCheckoutAllowed()` 只允許全 `VERIFIED`；本批 `PLACEHOLDER` 選購只呼叫既有 `openPayMock()`，成功／失敗 payload 動作隱藏（Codex；`index.html:1416`, `index.html:1481`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B G3 PASS——`2nF8b4vJ` 以 `DELISTED` 留檔並在 render filter 排除（Codex；`data/artifacts_placeholder.json:35`, `index.html:1506`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B D1 PASS——詳情頁五槽依卡片 exact 順序建立（Codex；`data/artifacts_placeholder.json:11`, `index.html:1414`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B D2 PASS——五槽空值保留並顯示 exact `這一項尚未取得`（Codex；`index.html:1451`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B D3 PASS——兩商品圖使用 ID 對應 `1080x0` 大圖來源，無 `800x0` thumbnail（Codex；`index.html:1421`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B D4 PASS——artifact markup／render code／JSON 的八個 redline 詞皆零出現（Codex；`tests/test_rm03b_artifact_mock_v1_0.mjs:34`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B D5 PASS——artifact markup／render code／JSON 的「獨一無二」零出現（Codex；`tests/test_rm03b_artifact_mock_v1_0.mjs:35`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B P1 PASS——兩筆呈現資料皆為 `6000_14999`，artifact 呈現層無「入門系列」（Codex；`data/artifacts_placeholder.json:9`, `data/artifacts_placeholder.json:24`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B P2 PASS——主力帶在列表與詳情均顯示 6 個月（Codex；`index.html:1459`, `index.html:1520`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B P3 PASS——Pinkoi 值只標「示範價」；兩筆 `price_mingge_twd` 均為 null（Codex；`index.html:1456`, `data/artifacts_placeholder.json:8`, `data/artifacts_placeholder.json:23`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B T1 PASS——`#payIntentMingge`／`#payIntentRelic` 皆明定 17px（Codex；`index.html:532`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B T2 PASS——龍宮舍利分支主要文字繼承明定 17px（Codex；`index.html:532`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B T3 PASS——`.pc-status` line-height 由 1.85 調為 1.9（Codex；`index.html:516`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B T4 PASS——`#pay*Back` 未升為 17px，維持既有次要樣式（Codex；`tests/test_rm03b_artifact_mock_v1_0.mjs:44`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B N-01／N-03 PASS——無卦象導 SKU；首屏仍零價格；既有 RM03 suite 21/21 PASS（Codex；`node tests/test_rm03b_artifact_mock_v1_0.mjs` 22/22；`node tests/test_rm03_intent_split_v1_0.mjs` 21/21）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B byte/protected regression PASS——byte-master verifier `ALL PASS`，E086 function matrix 9/9 PASS，inline script syntax與 `git diff --check` PASS（Codex）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B 指定 shell regression NOT_RUN／B1——兩支 Bash 均於腳本啟動前被 Windows sandbox `CreateFileMapping ... Win32 error 5` 擋下，exit 256；未宣稱 PASS，待 dispatcher unrestricted shell 補跑（Codex；`test_zero_quota_gate.sh`, `test_e086_checkout_mock_v1_0.sh`）。
+- 2026-08-20 12:00 +08:00：WP-MINGGE-RM03B 防化石收官——`mock_copy_status: NON_CANONICAL_THROWAWAY`；真品上架須整檔捨棄重寫，不得沿用 mock 文案；未 commit／未 push／未 deploy（Codex；`governance/plans/WP-MINGGE-RM03B-ARTIFACT-MOCK_plan_v1_0.md`, `data/artifacts_placeholder.json:2`）。
+- 2026-08-20：WP-MINGGE-RM03B review defect 修正——列表與詳情的 `6000_14999` 內部 price-band key 改以人類可讀標籤顯示為 `主力｜6 個月`，未改動資料 key（Codex）。
+- 2026-08-20：WP-MINGGE-RM03B G1 persistence defect 修正——`isArtifactMockViewer()` 改為只讀當次 URL／`liff.state`，不再寫入或回讀 `sessionStorage`；新增 prior-match/no-flag regression（Codex）。
+- 2026-08-20：WP-MINGGE-RM03B G1 persistence regression 補強——同一 VM context 先以 `?artifactmock=1` 驗證 true，再移除 flag 驗證 false；test-only，未改 production function（Codex）。
