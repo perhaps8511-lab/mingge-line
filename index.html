@@ -513,7 +513,7 @@
     color:var(--jade);opacity:.65;margin-top:20px;}
   /* T7:卡底誠實整備態狀態行 —— polish batch(§3-1):與 .pl-copy 同級,不再依 featured 分兩檔 */
   .pc-status{margin-top:16px;padding-top:13px;border-top:1px solid rgba(184,134,11,.15);
-    font-size:17px;line-height:1.85;letter-spacing:.04em;color:var(--jade);opacity:.9;}
+    font-size:17px;line-height:1.9;letter-spacing:.04em;color:var(--jade);opacity:.9;}
   .pc-status.pc-ok{color:var(--gold-soft);}
   .pay-plan .pc-status{
     opacity:1;
@@ -529,6 +529,8 @@
     color:var(--gold-lit);
     white-space:nowrap;
   }
+  #payIntentMingge,#payIntentRelic,#payRelicBranch{font-size:17px;}
+  #payRelicBranch{line-height:1.9;}
   .pay-ctx{margin:12px auto 0;max-width:30em;font-size:17px;line-height:1.9;letter-spacing:.04em;color:var(--jade);text-align:center;}
   .quota-gate{
     max-width:360px;text-align:center;border:1px solid rgba(184,134,11,.28);
@@ -718,7 +720,18 @@
         <button type="button" class="pay-back-link" id="payMinggeBack">回首屏,換一邊看看</button>
       </div>
       <div id="payRelicBranch" hidden>
-        <p>龍宮舍利尚未開放。每一件都是實品,來源、材質、已知與未知,整理清楚了才上架;您若想先認識信物文化,「易經書房」裡有得讀。</p>
+        <p id="payRelicLiveMessage">龍宮舍利尚未開放。每一件都是實品,來源、材質、已知與未知,整理清楚了才上架;您若想先認識信物文化,「易經書房」裡有得讀。</p>
+        <div id="artifactMockList" hidden>
+          <div>示意畫面｜非售品｜資料為佔位</div>
+          <h2>商品列表</h2>
+          <div id="artifactMockCards"></div>
+        </div>
+        <div id="artifactMockDetail" hidden>
+          <div>示意畫面｜非售品｜資料為佔位</div>
+          <h2>商品詳情</h2>
+          <div id="artifactMockDetailBody"></div>
+          <button type="button" class="pay-back-link" id="artifactMockListBack">商品列表</button>
+        </div>
         <button type="button" class="pay-back-link" id="payRelicBack">回首屏,換一邊看看</button>
       </div>
     </div>
@@ -1368,6 +1381,7 @@ async function initPayPage(){
   document.getElementById('payIntentRelic').addEventListener('click',function(){_showPayView('relic');});
   document.getElementById('payMinggeBack').addEventListener('click',function(){_showPayView('split');});
   document.getElementById('payRelicBack').addEventListener('click',function(){_showPayView('split');});
+  if(isArtifactMockViewer()){ initArtifactMock(); }
   ['planSingle149','planDeepdive200','planFupan1490'].forEach(function(id){
     var card=document.getElementById(id);
     function showPending(){var status=card.querySelector('.pc-status');status.classList.add('pc-status--activated');status.focus();}
@@ -1393,6 +1407,132 @@ async function initPayPage(){
       subActiveEl.style.display='';
     }
   }catch(e){console.warn('[pay page]',e);}
+}
+
+var _artifactMockItems=[];
+var _artifactMockTitles={XTVSSPvA:'【示範】龍宮舍利手鍊 A',agmh9hhJ:'【示範】龍宮舍利手鍊 B'};
+var _artifactMockSlotLabels=['這是什麼物','我們知道什麼','我們不知道什麼','適合情境','不承諾什麼'];
+
+var _artifactPriceBandLabels={'6000_14999':'主力'};
+
+function artifactMockBandLabel(band){
+  return _artifactPriceBandLabels[band]||band;
+}
+
+function artifactCheckoutAllowed(items){
+  return items.every(function(i){return i.data_state==='VERIFIED';});
+}
+
+function artifactMockImageUrl(id){
+  return 'https://cdn01.pinkoi.com/product/'+encodeURIComponent(id)+'/0/1/1080x0.jpg';
+}
+
+function artifactMockPrice(value){
+  return 'NT$'+Number(value).toLocaleString('en-US');
+}
+
+function showArtifactMockList(){
+  document.getElementById('artifactMockList').hidden=false;
+  document.getElementById('artifactMockDetail').hidden=true;
+}
+
+function showArtifactMockDetail(item){
+  var body=document.getElementById('artifactMockDetailBody');
+  body.replaceChildren();
+  var badge=document.createElement('div');
+  badge.textContent='示意畫面｜非售品｜資料為佔位';
+  body.appendChild(badge);
+  var title=document.createElement('h3');
+  title.textContent=_artifactMockTitles[item.id];
+  body.appendChild(title);
+  var image=document.createElement('img');
+  image.src=artifactMockImageUrl(item.id);
+  image.alt=_artifactMockTitles[item.id];
+  body.appendChild(image);
+  _artifactMockSlotLabels.forEach(function(label){
+    var section=document.createElement('section');
+    var heading=document.createElement('h4');
+    heading.textContent=label;
+    var value=document.createElement('p');
+    value.textContent=item.detail_slots[label]||'這一項尚未取得';
+    section.append(heading,value);
+    body.appendChild(section);
+  });
+  var price=document.createElement('p');
+  price.textContent='示範價 '+artifactMockPrice(item.price_pinkoi_twd);
+  body.appendChild(price);
+  var band=document.createElement('p');
+  band.textContent=artifactMockBandLabel(item.price_band)+'｜6 個月';
+  body.appendChild(band);
+  var buy=document.createElement('button');
+  buy.type='button';
+  buy.className='gate-door';
+  buy.textContent='選購';
+  buy.addEventListener('click',function(){ openArtifactMockCheckout(item); });
+  body.appendChild(buy);
+  document.getElementById('artifactMockList').hidden=true;
+  document.getElementById('artifactMockDetail').hidden=false;
+}
+
+function restoreArtifactMockCheckout(){
+  var checkoutBadge=document.getElementById('artifactMockCheckoutBadge');
+  if(checkoutBadge) checkoutBadge.hidden=true;
+  document.getElementById('payMockTitle').textContent='模擬付款';
+  document.getElementById('payMockSub').textContent='';
+  document.getElementById('payMockOk').hidden=false;
+  document.getElementById('payMockFail').hidden=false;
+}
+
+function openArtifactMockCheckout(item){
+  if(artifactCheckoutAllowed([item])) return;
+  openPayMock('planSingle149');
+  var checkoutBadge=document.getElementById('artifactMockCheckoutBadge');
+  if(!checkoutBadge){
+    checkoutBadge=document.createElement('div');
+    checkoutBadge.id='artifactMockCheckoutBadge';
+    checkoutBadge.textContent='示意畫面｜非售品｜資料為佔位';
+    document.querySelector('.pay-mock-card').prepend(checkoutBadge);
+  }
+  checkoutBadge.hidden=false;
+  document.getElementById('payMockTitle').textContent=_artifactMockTitles[item.id];
+  document.getElementById('payMockSub').textContent='示範價 '+artifactMockPrice(item.price_pinkoi_twd);
+  document.getElementById('payMockOk').hidden=true;
+  document.getElementById('payMockFail').hidden=true;
+}
+
+async function initArtifactMock(){
+  document.getElementById('payRelicLiveMessage').hidden=true;
+  showArtifactMockList();
+  document.getElementById('artifactMockListBack').addEventListener('click',showArtifactMockList);
+  document.getElementById('payMockCancel').addEventListener('click',restoreArtifactMockCheckout);
+  try{
+    var response=await fetch('./data/artifacts_placeholder.json');
+    if(!response.ok) return;
+    var payload=await response.json();
+    _artifactMockItems=payload.items.filter(function(item){return item.data_state!=='DELISTED';});
+    var cards=document.getElementById('artifactMockCards');
+    _artifactMockItems.forEach(function(item){
+      var card=document.createElement('article');
+      var badge=document.createElement('div');
+      badge.textContent='示意畫面｜非售品｜資料為佔位';
+      var title=document.createElement('h3');
+      title.textContent=_artifactMockTitles[item.id];
+      var image=document.createElement('img');
+      image.src=artifactMockImageUrl(item.id);
+      image.alt=_artifactMockTitles[item.id];
+      var price=document.createElement('p');
+      price.textContent='示範價 '+artifactMockPrice(item.price_pinkoi_twd);
+      var band=document.createElement('p');
+      band.textContent=artifactMockBandLabel(item.price_band)+'｜6 個月';
+      var detail=document.createElement('button');
+      detail.type='button';
+      detail.className='gate-door';
+      detail.textContent='商品詳情';
+      detail.addEventListener('click',function(){showArtifactMockDetail(item);});
+      card.append(badge,title,image,price,band,detail);
+      cards.appendChild(card);
+    });
+  }catch(error){console.warn('[artifact mock]',error);}
 }
 
 /* ====================================================
@@ -1980,6 +2120,21 @@ function isCheckoutTestViewer(){
     return true;
   }
   try{return sessionStorage.getItem('mg_paytest')==='1';}catch(_){return false;}
+}
+
+function isArtifactMockViewer(){
+  var params=new URLSearchParams(location.search);
+  if(params.get('artifactmock')==='1') return true;
+  var state=params.get('liff.state');
+  if(state){
+    try{
+      var decoded=decodeURIComponent(state);
+      var queryAt=decoded.indexOf('?');
+      var query=queryAt>=0?decoded.slice(queryAt+1):decoded;
+      return new URLSearchParams(query.split('#')[0]).get('artifactmock')==='1';
+    }catch(_){}
+  }
+  return false;
 }
 
 /* ★ v1.2.3:卦記會話編號(D3 卦記 schema 唯一缺口補件)
