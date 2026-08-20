@@ -79,3 +79,5 @@
 - 2026-08-20：WP-MINGGE-RM03B review defect 修正——列表與詳情的 `6000_14999` 內部 price-band key 改以人類可讀標籤顯示為 `主力｜6 個月`，未改動資料 key（Codex）。
 - 2026-08-20：WP-MINGGE-RM03B G1 persistence defect 修正——`isArtifactMockViewer()` 改為只讀當次 URL／`liff.state`，不再寫入或回讀 `sessionStorage`；新增 prior-match/no-flag regression（Codex）。
 - 2026-08-20：WP-MINGGE-RM03B G1 persistence regression 補強——同一 VM context 先以 `?artifactmock=1` 驗證 true，再移除 flag 驗證 false；test-only，未改 production function（Codex）。
+- 2026-08-20：WP-MINGGE-RM03C-RELIC-A11Y-01 落地——BK15 `.pay-back-link` 由 `--moss`/13px 改為 `--jade`/17px（對比 1.73:1 → 6.31:1，WCAG AA PASS）；BK16 新增 `#payRelicBranch p{font-size:17px;line-height:1.9;}` 使 BK10 之 17px 對句5真正生效（原被 `.lp-body p` 直接宣告勝出而失效）。純樣式，TA 文案零變動（byte-master `ALL PASS`）。新增回歸 `tests/test_bk15_bk16_relic_a11y_v1_0.mjs` 8/8 PASS，且對修復前版本 5 FAIL 反向驗證通過（Cowork PM；`index.html:534,554,556`）。
+- 2026-08-20：治理方法論新增第四道閘——TA 可見面變更必須以真實瀏覽器 walkthrough 量測 computed style（字級/行高/對比）並確認語意無撞義；由 Cowork(PM) 執行，不得轉嫁為 Owner 手動 UAT。任何「提高字級／改顏色」類修補須附機械斷言證明生效（BK10 未附故默默失效）（Cowork PM；`governance/cards/WP-MINGGE-RM03C-RELIC-A11Y-01_record_v1_0.md` §五）。
