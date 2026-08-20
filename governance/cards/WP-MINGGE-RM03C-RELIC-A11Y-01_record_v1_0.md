@@ -1,4 +1,4 @@
-# WP-MINGGE-RM03C-RELIC-A11Y-01｜紀錄卡 v1.0
+# WP-MINGGE-RM03C-RELIC-A11Y-01｜紀錄卡 v1.1
 
 ```yaml
 wp_id: WP-MINGGE-RM03C-RELIC-A11Y-01
@@ -7,7 +7,7 @@ admitted_by: Owner (Perth, 2026-08-20,「依你的建議，現在修」)
 baseline_ref: perhaps8511-lab/mingge-line @ 08b4622 (main, PR #12 merged)
 primary_surface_ref: MG-RM-03
 writer: Cowork(PM) 直接施作 —— 純樣式、零 TA 文案、零邏輯
-reviewer: 待 fresh-context 複核
+reviewer: fresh-context 複核已執行(2026-08-20) — 判 MERGE WITH FIXES，三項全中，已於 v1.1 修正
 authorized_write_set:
   - index.html   # 僅 <style> 區塊，3 行
   - tests/test_bk15_bk16_relic_a11y_v1_0.mjs   # 新檔
@@ -84,4 +84,92 @@ BK10 未附，故默默失效。本卡之 `test_bk15_bk16_relic_a11y_v1_0.mjs` �
 - Chat 收口蓋章 + Airtable NRE 留痕（RM03/RM03B 亦同，尚未補）
 - BK17（藏主期間標籤缺失、「半年藏主」→「6 個月」用詞漂移、與 1490(6 個月) 撞義）→ Chat 貨物，另案
 
-*— WP-MINGGE-RM03C-RELIC-A11Y-01 · 2026-08-20 · Cowork(PM) —*
+---
+
+# 🔴 v1.1 訂正 — v1.0 的頭條數字是錯的
+
+fresh-context 複核席(writer≠reviewer)對 commit `1677da4` 提出三項，**經 PM 以像素取樣獨立複驗，三項全部成立**。
+
+## 訂正一｜背景色量錯，`--jade` 其實 FAIL AA
+
+v1.0 宣稱背景 = `#070b07`、`--jade` 對比 **6.31:1 AA PASS**。**錯。**
+
+`#070b07` 是 `body`/`.cosmos` 的**宣告值**，是 `getComputedStyle(body).backgroundColor` 的回傳值 ——
+但 `.cosmos .glow`(140vmax radial-gradient) 與 `.cosmos .glow2`(60vmax，opacity 動畫 .5→.85)
+疊在其上，**合成後的實際像素遠亮於宣告值**。
+
+對 production 截圖【按鈕所在座標】取樣像素(x 690-880 / y 340-352 與 382-394，取較亮者=最差情境)：
+
+| 量法 | 背景 | `--jade` 對比 | 判定 |
+|---|---|---|---|
+| v1.0：宣告值 | `rgb(7,11,7)` | 6.31:1 | ❌ 假的 |
+| v1.1：**合成像素** | **`rgb(52,57,34)`** | **3.81:1** | **FAIL AA** |
+
+修前 `--moss` 對合成背景僅 **1.05:1**(v1.0 說 1.73:1 也偏樂觀) —— 病情比 v1.0 診斷的更重。
+
+**最諷刺處**：v1.0 §五自訂「第四道閘：用真實瀏覽器量 computed style」，
+而 PM 正是**用錯誤的方法執行了自己剛訂的規矩** —— computed style 給的是宣告值，不是合成像素。
+
+**修法**：改用 `--rice-deep`(#ece5d6)。對合成背景 **9.54:1**；渲染畫面實際取樣 **12.42:1**。
+Owner 於 2026-08-20 在四個 token 中選定此案(另三案：`--line` 7.74、`--gold-lit` 6.57、`--gold-soft` 4.61 餘裕過薄)。
+
+## 訂正二｜測試把錯誤背景硬寫進去，會永遠認證這個失敗
+
+`test_bk15_bk16_relic_a11y_v1_0.mjs` v1.0 的 `BACKDROP='#070b07'` 是**載重性錯誤**：
+它印出「6.31:1 AA PASS」，而實際渲染是 3.81:1(FAIL)。
+**一道認證了不合格修法的閘，比沒有閘更危險。**
+
+v2.0 修正：`BACKDROP='#343922'`(實測像素)，並新增
+① 明列 `--moss`/`--moss-soft`/`--moss-2`/`--jade` 為已知不合格 token；
+② `opacity` 稀釋偵測；
+③ 反陷阱斷言，禁止把判準換回宣告值；
+④ `GLOW_GUARD` — glow 層若被移除則強制回來重新取樣。
+
+## 訂正三｜`#payRelicBranch p` 範圍過寬，並非「僅句5」
+
+`#artifactMockList` / `#artifactMockDetail` 是 `#payRelicBranch` 的子元素，
+renderer 於 `index.html` L1457/1462/1465/1524/1526 以 `createElement('p')` 動態產生
+價格、價帶與五個 detail slot —— **全部被 v1.0 的規則掃到**，
+由 14.5px/lh 2.3 悄悄變成 17px/lh 1.9。這是未申報的 RM03B mock 面視覺變更。
+
+**修法**：收窄為 `#payRelicLiveMessage{font-size:17px;line-height:1.9;}`，只命中句5。
+
+## v1.1 落地 diff（在 `1677da4` 之上）
+
+```
+-  #payRelicBranch p{font-size:17px;line-height:1.9;}
++  #payRelicLiveMessage{font-size:17px;line-height:1.9;}
+-    display:block;margin:18px auto 0;background:transparent;color:var(--jade);
++    display:block;margin:18px auto 0;background:transparent;color:var(--rice-deep);
+```
+
+## v1.1 驗證
+
+| 項 | 結果 |
+|---|---|
+| 測試 v2.0 | **13/13 PASS** |
+| 測試 v2.0 對 `1677da4`（v1.0 修法） | **5 FAIL** ← 抓得到自己上一版的錯 |
+| 渲染像素實測對比 | **12.42:1** |
+| byte-master / RM03 / RM03B | ALL PASS / 21-21 / 23-23 |
+| 真實 diff | `index.html` 2 增 2 刪 |
+
+## 🔴 方法論訂正 — 第四道閘的執行方式(v1.0 寫得不夠精確，導致自己踩雷)
+
+> 量對比色**必須取樣渲染後的合成像素**，
+> **不得**使用 `getComputedStyle(el).backgroundColor` —— 那是宣告值，
+> 會忽略疊在其上的 gradient / overlay / 動畫層。
+> 作法：截圖 → 對「該元素實際座標」取樣像素眾數 → 取最差(最亮背景)情境計算。
+
+延伸：**任何把數字寫死進測試的常數，必須註明它的取得方法**，
+且該方法本身要能被質疑。v1.0 的註解寫「production 量得」，聽起來像實測，
+實際上量的是宣告值 —— 註解為真但誤導，複核席才是抓到它的唯一防線。
+
+## 🔴 CRLF 危害升級：不是一次性，是每次 git 操作都復發
+
+Claude Code 為驗證而執行 `git stash` / `stash pop` 後，`index.html` 由 `w/lf` 變回 `w/crlf`(2,566 處)。
+→ **每一次 checkout/stash/merge 都會重新汙染工作目錄。**
+本輪 PM 的編輯腳本因內建 `assert CRLF==0` 而中止，未寫入錯誤內容(守衛生效)。
+**未決**：repo 仍無 `.gitattributes`。永久解需獨立一張卡(全樹 renormalize，會與在途分支衝突)，
+在此之前，**每次動 `index.html` 前必先正規化，且永遠禁止 `git add -A`**。
+
+*— v1.1 · 2026-08-20 · Cowork(PM)，經 fresh-context 複核訂正 —*
