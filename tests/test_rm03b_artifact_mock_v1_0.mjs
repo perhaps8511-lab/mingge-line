@@ -44,7 +44,7 @@ check('D4',redlines.every(word=>!artifactMarkup.includes(word)&&!artifactBlock.i
 check('D5',!artifactMarkup.includes('獨一無二')&&!artifactBlock.includes('獨一無二')&&!JSON.stringify(data).includes('獨一無二'),'artifact rendered sources contain zero banned uniqueness claim');
 
 check('P1',renderedItems.length===2&&renderedItems.every(item=>item.price_band==='6000_14999')&&!artifactMarkup.includes('入門系列')&&!artifactBlock.includes('入門系列'),'both visible items use main price band; no entry-series wording');
-check('P2',artifactBlock.includes("'6000_14999':'主力'")&&artifactBlock.includes("artifactMockBandLabel(item.price_band)+'｜6 個月'")&&!artifactBlock.includes("item.price_band+'｜6 個月'") ,'main band renders as 主力｜6 個月 in list and detail');
+check('P2',artifactBlock.includes("'6000_14999':'半年藏主'")&&artifactBlock.includes("'15000_plus':'兩年藏主'")&&(artifactBlock.match(/artifactMockHolderTerm\(item\.price_band\)/g)||[]).length===2&&!artifactBlock.includes('主力')&&!artifactBlock.includes('｜6 個月')&&!artifactBlock.includes('_artifactPriceBandLabels'),'holder term renders as 半年藏主/兩年藏主 in list and detail; price-band label and the bare 6 個月 are gone (BK17)');
 check('P3',renderedItems.every(item=>item.price_mingge_twd===null)&&artifactBlock.includes("'示範價 '")&&!artifactBlock.includes('命格定價'),'null Mingge prices and explicit demo-price rendering');
 
 check('T1',/#payIntentMingge,#payIntentRelic,#payRelicBranch\{font-size:17px;\}/.test(html),'intent controls are 17px');

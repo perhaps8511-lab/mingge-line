@@ -715,7 +715,7 @@
         </div>
         <p class="pay-note">
           付款在書房外頭辦(點下方連結),書房裡不收錢 —— 這是規矩。<br>
-          退費:單卦與囊中銅錢,<strong>七天之內、一枚未用</strong>,全數退還;起過卦了,便算書房已為您開講,依規不退。訂閱<strong>十四天之內、未起過卦</strong>,全退;之後取消,不再續扣,服務用到當期末。<br>
+          退費:單卦與囊中銅錢,<strong>七天之內、一枚未用</strong>,全數退還;起過卦了,便算書房已為您開講,依規不退。問道·複盤一次付清六個月,到期即止、不自動續扣;<strong>十四天之內、未起過卦</strong>,全退;起了卦或過了十四天,依規不退,書房陪您到期滿。<br>
           —— 不催您、不限時、不打折。書房的價錢,就是書房的價錢。
         </p>
         <button type="button" class="pay-back-link" id="payMinggeBack">回首屏,換一邊看看</button>
@@ -1414,10 +1414,10 @@ var _artifactMockItems=[];
 var _artifactMockTitles={XTVSSPvA:'【示範】龍宮舍利手鍊 A',agmh9hhJ:'【示範】龍宮舍利手鍊 B'};
 var _artifactMockSlotLabels=['這是什麼物','我們知道什麼','我們不知道什麼','適合情境','不承諾什麼'];
 
-var _artifactPriceBandLabels={'6000_14999':'主力'};
+var _artifactHolderTermLabels={'6000_14999':'半年藏主','15000_plus':'兩年藏主'};
 
-function artifactMockBandLabel(band){
-  return _artifactPriceBandLabels[band]||band;
+function artifactMockHolderTerm(band){
+  return _artifactHolderTermLabels[band]||'這一項尚未取得';
 }
 
 function artifactCheckoutAllowed(items){
@@ -1463,7 +1463,7 @@ function showArtifactMockDetail(item){
   price.textContent='示範價 '+artifactMockPrice(item.price_pinkoi_twd);
   body.appendChild(price);
   var band=document.createElement('p');
-  band.textContent=artifactMockBandLabel(item.price_band)+'｜6 個月';
+  band.textContent=artifactMockHolderTerm(item.price_band);
   body.appendChild(band);
   var buy=document.createElement('button');
   buy.type='button';
@@ -1524,7 +1524,7 @@ async function initArtifactMock(){
       var price=document.createElement('p');
       price.textContent='示範價 '+artifactMockPrice(item.price_pinkoi_twd);
       var band=document.createElement('p');
-      band.textContent=artifactMockBandLabel(item.price_band)+'｜6 個月';
+      band.textContent=artifactMockHolderTerm(item.price_band);
       var detail=document.createElement('button');
       detail.type='button';
       detail.className='gate-door';
