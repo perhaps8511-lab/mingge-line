@@ -547,6 +547,11 @@
     font-weight:600;
   }
   .gate-door:hover{background:var(--gold);color:#15200f;box-shadow:0 0 30px rgba(184,134,11,.4);}
+  .pay-back-link{
+    display:block;margin:18px auto 0;background:transparent;color:var(--moss);
+    border:0;border-bottom:1px solid rgba(184,134,11,.42);padding:8px 4px;
+    font-family:inherit;font-size:13px;letter-spacing:.12em;cursor:pointer;}
+  .pay-back-link:hover{color:var(--rice);border-bottom-color:var(--gold);}
   .entry-gift{
     border:1px solid rgba(184,134,11,.22);border-radius:4px;
     padding:14px 16px;margin-bottom:12px;color:var(--gold-lit);
@@ -689,17 +694,20 @@
         <button type="button" class="gate-door" id="payIntentRelic">龍宮舍利|且先看看</button>
       </div>
       <div id="payMinggeBranch" hidden>
-        <button type="button" class="gate-door" id="payMinggeBack">您今天想看哪一邊？</button>
+      <div class="pay-plan pay-plan-featured pay-plan-free">
+        <p class="pl-copy"><strong>初訪(免費)</strong> — 一輩子相贈 <strong>3 枚問卦銅錢</strong>。一枚一問;卦象、解讀都是真的,先進來問問看。</p>
+        <div class="pc-status pc-ok">您的 3 枚銅錢已在囊中 —— 到<span class="pay-action-label">〔向天問卦〕</span>便可用。</div>
+      </div>
         <div class="pay-plan pay-plan-featured pay-plan-single" id="planSingle149" role="button" tabindex="0">
           <p class="pl-copy"><strong>問一卦|149</strong> — 心裡又起了一問,便來一卦。老易為您讀本卦、變卦、動爻,把這一程攤開看清。</p>
           <div class="pc-status" tabindex="-1">付款通道整備中,眼下還付不了款;開通到哪一步了,問一聲「書僮客服」便知。</div>
         </div>
         <div class="pay-plan" id="planDeepdive200" role="button" tabindex="0">
-          <p class="pl-copy">〔讀完若想再往深處走〕同一卦,可再請老易多開幾面 —— <strong>四鏡·深卜 +200</strong>,看互卦、序卦、變與不變裡的「轉」。不換卦、不重卜,只把這一卦讀到透。</p>
+          <p class="pl-copy">〔讀完若想再往深處走〕同一卦,可再請老易多開幾面 —— <strong>四鏡·深卜 200</strong>,看互卦、序卦、變與不變裡的「轉」。不換卦、不重卜,只把這一卦讀到透。</p>
           <div class="pc-status" tabindex="-1">付款通道整備中,眼下還付不了款;開通到哪一步了,問一聲「書僮客服」便知。</div>
         </div>
         <div class="pay-plan" id="planFupan1490" role="button" tabindex="0">
-          <p class="pl-copy"><strong>問道·複盤|1490(6 個月) — 問卦,是決策的前半段;拿了主意、做下去,後半段才開始。半年書房,老易陪您把做過的決定回頭複盤——這一程走到了哪,卦象當時所示的「轉」應在何處。複盤不限次,四鏡深卜一併在內;卦記隨時回看,可補記後續、蓋印留痕;逢節氣,老易捎一封信來。決策是一條路,不是一次問答。</strong></p>
+          <p class="pl-copy"><strong>問道·複盤|1490(6 個月)</strong> — 問卦,是決策的前半段;拿了主意、做下去,後半段才開始。半年書房,老易陪您把做過的決定回頭複盤——這一程走到了哪,卦象當時所示的「轉」應在何處。複盤不限次,四鏡深卜一併在內;卦記隨時回看,可補記後續、蓋印留痕;逢節氣,老易捎一封信來。決策是一條路,不是一次問答。</p>
           <div class="pc-status" tabindex="-1">付款通道整備中,眼下還付不了款;開通到哪一步了,問一聲「書僮客服」便知。</div>
         </div>
         <p class="pay-note">
@@ -707,10 +715,11 @@
           退費:單卦與囊中銅錢,<strong>七天之內、一枚未用</strong>,全數退還;起過卦了,便算書房已為您開講,依規不退。訂閱<strong>十四天之內、未起過卦</strong>,全退;之後取消,不再續扣,服務用到當期末。<br>
           —— 不催您、不限時、不打折。書房的價錢,就是書房的價錢。
         </p>
+        <button type="button" class="pay-back-link" id="payMinggeBack">回首屏,換一邊看看</button>
       </div>
       <div id="payRelicBranch" hidden>
-        <button type="button" class="gate-door" id="payRelicBack">您今天想看哪一邊？</button>
         <p>龍宮舍利尚未開放。每一件都是實品,來源、材質、已知與未知,整理清楚了才上架;您若想先認識信物文化,「易經書房」裡有得讀。</p>
+        <button type="button" class="pay-back-link" id="payRelicBack">回首屏,換一邊看看</button>
       </div>
     </div>
   </div>
