@@ -1745,7 +1745,7 @@ async function initLogPage(){
     var sub=data.subscriber;
     var giftEl=document.getElementById('entryGift');
     if(sub&&sub.tier==='subscriber'){
-      statusEl.textContent='訂閱中，書房為您常開。';
+      statusEl.textContent='問道·複盤在期,書房為您常開。';
       if(giftEl){ giftEl.hidden=true; }
     }else{
       var coins=quotaCreditsFromSub(sub);

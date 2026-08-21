@@ -1,4 +1,4 @@
-# WP-MINGGE-RM03D-CHAT-COPY-LAND｜紀錄卡 v1.0
+# WP-MINGGE-RM03D-CHAT-COPY-LAND｜紀錄卡 v1.1
 
 ```yaml
 wp_id: WP-MINGGE-RM03D-CHAT-COPY-LAND
@@ -89,4 +89,45 @@ Chat 明示不進本 WP。→ 觸發 `pk-retention-gate`「改裁決必回掃」
 - Chat 收口蓋章 + Airtable NRE 留痕
 - `index.html:1747`「訂閱中」替換字串（Chat）
 
-*— WP-MINGGE-RM03D-CHAT-COPY-LAND v1.0 · 2026-08-21 · Cowork(PM) —*
+---
+
+# v1.1 增補｜件1-b：L1748「訂閱中」跨格矛盾（Chat 裁定：現在改）
+
+## Chat 裁決原文
+
+> 裁定：現在改，不等 PAY-ALIGN。理由一句：L1747 是 live TA 可見的**機制描述**，格③甲版落地後兩格互斥，
+> **矛盾本身就是 fail-honest 破口**——文案層現在清；`tier==='subscriber'` 語意 flag、`PAY_PLANS` 旗標、
+> L1406 死碼那句（帶 `expires_at`，同屬續扣語意）則照 Owner 裁決原文歸 PAY-ALIGN 卡統一對正，本次不碰。
+
+## 落地
+
+```
+- statusEl.textContent='訂閱中，書房為您常開。';
++ statusEl.textContent='問道·複盤在期,書房為您常開。';
+```
+
+**新字串未經手打** —— 直接由 Chat 提供之 hex 序列解碼寫入：
+`e5 95 8f e9 81 93 c2 b7 e8 a4 87 e7 9b a4 e5 9c a8 e6 9c 9f 2c e6 9b b8 e6 88 bf e7 82 ba e6 82 a8 e5 b8 b8 e9 96 8b e3 80 82`
+
+PM 驗證：
+- Chat 之 hex 自證解碼 === 其文字宣稱 ✓
+- `·` = **U+00B7**；`,` = **U+002C 半形**（修正現行全形「，」之既有 codepoint 漂移）；`。` = U+3002 ✓
+- 落地後全檔該字串恰 **1 處**，sha256 `dba43239…07f5` 與 Chat 交付相同 ✓
+- JS 單引號內文無 `'`，無跳脫風險 ✓
+- 無測試斷言舊字串 ✓
+
+## 語意（Chat 說明，PM 覆核）
+
+「在期」= 六個月期間內之**事實陳述**，非機制承諾；點名產品（問道·複盤）與格③卡面字面掛鉤；
+零訂閱／續扣語意；期滿自然失真值，**由 `tier` 條件控制，不由文案承諾** —— 符合 fail-honest。
+
+## 邊界（Chat 定，PM 覆核通過）
+
+全檔「訂閱」8 處：本次只動 L1748；甲版落地自清退費段那處；
+其餘（**L1407 死碼**帶 `expires_at`、`PAY_PLANS` 旗標、雜項）= PAY-ALIGN 卡清單。
+
+PM 覆核：落地後全檔「訂閱中」**僅剩 L1407** 一處，即該死碼（打不存在的 `/subscription` 路由，`resp.ok` 恆偽故永不顯示）。與 Chat 邊界描述一致。
+
+**建議 PAY-ALIGN 卡收一條驗收**：呈現層「訂閱」字樣清零（常數／註解不在此限，依該卡自定）。
+
+*— v1.1 · 2026-08-21 · Cowork(PM) —*

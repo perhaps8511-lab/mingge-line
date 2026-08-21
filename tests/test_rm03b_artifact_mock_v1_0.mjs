@@ -44,7 +44,21 @@ check('D4',redlines.every(word=>!artifactMarkup.includes(word)&&!artifactBlock.i
 check('D5',!artifactMarkup.includes('獨一無二')&&!artifactBlock.includes('獨一無二')&&!JSON.stringify(data).includes('獨一無二'),'artifact rendered sources contain zero banned uniqueness claim');
 
 check('P1',renderedItems.length===2&&renderedItems.every(item=>item.price_band==='6000_14999')&&!artifactMarkup.includes('入門系列')&&!artifactBlock.includes('入門系列'),'both visible items use main price band; no entry-series wording');
-check('P2',artifactBlock.includes("'6000_14999':'半年藏主'")&&artifactBlock.includes("'15000_plus':'兩年藏主'")&&(artifactBlock.match(/artifactMockHolderTerm\(item\.price_band\)/g)||[]).length===2&&!artifactBlock.includes('主力')&&!artifactBlock.includes('｜6 個月')&&!artifactBlock.includes('_artifactPriceBandLabels'),'holder term renders as 半年藏主/兩年藏主 in list and detail; price-band label and the bare 6 個月 are gone (BK17)');
+check('P2',(function(){
+  // BK17 藏主期間 —— 突變體硬化(依 2026-08-20 治理判例:閘必須以突變體驗證)
+  // M1 fallback 改回 ||band / M2 刪 append / M3 附加 raw key,三者皆須變紅。
+  var fnBody=(artifactBlock.match(/function artifactMockHolderTerm\(band\)\{[\s\S]*?\n\}/)||[''])[0];
+  var m1=/\|\|'這一項尚未取得'/.test(fnBody) && !/\|\|band/.test(fnBody);          // M1
+  var m2=artifactBlock.includes('body.appendChild(band);') &&
+         /card\.append\([^)]*\bband\b[^)]*\)/.test(artifactBlock);                  // M2:詳情 append + 列表 append
+  var exact=(artifactBlock.match(/band\.textContent=artifactMockHolderTerm\(item\.price_band\);/g)||[]).length===2 &&
+            !/artifactMockHolderTerm\(item\.price_band\)\s*\+/.test(artifactBlock); // M3:賦值恰為函式回傳,不得串接
+  var map=artifactBlock.includes("'6000_14999':'半年藏主'") && artifactBlock.includes("'15000_plus':'兩年藏主'");
+  var gone=!artifactBlock.includes('主力') && !artifactBlock.includes('｜6 個月') &&
+           !artifactBlock.includes('_artifactPriceBandLabels') && !/artifactMockBandLabel/.test(artifactBlock);
+  var noRawKey=!/\+\s*item\.price_band/.test(artifactBlock) && !/item\.price_band\s*\+/.test(artifactBlock); // raw key 不得進 textContent
+  return m1&&m2&&exact&&map&&gone&&noRawKey;
+})(),'holder term: fail-honest fallback scoped in fn (M1), band appended in both views (M2), assignment is exactly the fn return with no concat (M3), price-band label and raw keys never reach TA (BK17)');
 check('P3',renderedItems.every(item=>item.price_mingge_twd===null)&&artifactBlock.includes("'示範價 '")&&!artifactBlock.includes('命格定價'),'null Mingge prices and explicit demo-price rendering');
 
 check('T1',/#payIntentMingge,#payIntentRelic,#payRelicBranch\{font-size:17px;\}/.test(html),'intent controls are 17px');
