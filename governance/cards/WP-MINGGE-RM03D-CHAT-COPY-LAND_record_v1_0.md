@@ -1,4 +1,4 @@
-# WP-MINGGE-RM03D-CHAT-COPY-LAND｜紀錄卡 v1.1
+# WP-MINGGE-RM03D-CHAT-COPY-LAND｜紀錄卡 v1.2
 
 ```yaml
 wp_id: WP-MINGGE-RM03D-CHAT-COPY-LAND
@@ -131,3 +131,69 @@ PM 覆核：落地後全檔「訂閱中」**僅剩 L1407** 一處，即該死碼
 **建議 PAY-ALIGN 卡收一條驗收**：呈現層「訂閱」字樣清零（常數／註解不在此限，依該卡自定）。
 
 *— v1.1 · 2026-08-21 · Cowork(PM) —*
+
+
+---
+
+# 🔴 v1.2｜件1 退費段 **HOLD**（Chat 第三道閘裁定，錨 `recngPOGnyVomTmoe`）
+
+## Chat 裁定
+
+四點全數成立。**判 = 不改字串、不交付現行甲版：L717 落地 HOLD。**
+
+**根因（Chat 驗過）**：`Entitlement Contract v1.1 §6` 明列 refund/cancel、基礎問卦 entitlement、
+深卜 included count、expiration **皆為 offer contract 待定項**。
+→ ①（14 天實質為零天）與 ④（觸發詞未限定範圍）**不是文案缺陷，是在為尚未定義的政策寫承諾**。
+S159 原句同病，只是舊時代沒人掀。
+
+**無實害窗口**：付款軌未開，無人能成交；舊句多掛幾天零風險，**不迭代消費者權益文字**。
+
+**分割**：L1748「問道·複盤在期,書房為您常開。」不涉退費，**照原 byte-master 落地，不受 HOLD**。
+
+**甲版字串凍結不作廢**（承 `recvPdxwu4i4CSLtx` 之**執行暫緩，非推翻**）。
+offer contract 定案後 Chat 出 v2，已登四項修訂：
+① 條件前置呈現 ② 刪「書房陪您到期滿」 ③ 刪第二個「依規」 ④ 觸發詞按 offer contract 限定。
+
+**Sequencing 新增**：**未來新退費文字上線不得早於 A11Y P0（`.pay-note` 2.36:1）落地。**
+
+**Offer contract** = PAY-ALIGN admission 前置 **Owner 供料項**（最小四欄），掛卡，非急件。
+
+## PM 執行
+
+回退兩處，恢復為 `origin/main` 原文：
+
+| 檔 | 動作 | 驗證 |
+|---|---|---|
+| `index.html` 退費段 | 甲版 → 原 S159 句 | 剩餘 diff 僅件2(4 行)+L1748(1 行) |
+| `tests/test_e086_checkout_mock_v1_0.sh` L19 | 逐字鎖回退 | **與 `origin/main` 逐位元組完全一致** |
+
+**保留**：件2 藏主期間、L1748、P2 突變體硬化、13/0 訂正、PAY-ALIGN 補登。
+
+**未 merge，main 全程乾淨，零上線影響。**
+
+## 🔴 PM 程序錯誤（本卡最重要的一條）
+
+**我在第三道閘完成前就落地並 commit 了合規文案。**
+
+我對件1 做的是 **byte 檢查**（sha256／codepoint／house-style）—— 那驗的是「有沒有貼錯字」。
+**「這段話對消費者說了什麼」的語意複核，是在 commit 之後才由 fresh-context 複核席做的。**
+四點全部成立，等於我把一段有問題的合規承諾先寫進了版控。
+
+若當時 PR 已開已 merge，這就是**上線的消費者權益文字迭代**——正是 Chat 判 HOLD 要避免的事。
+
+> **新增判例（合規文案專用）**：
+> 涉消費者權益之文案（退費／保固／個資／服務承諾），
+> **byte 檢查不得作為落地依據**。落地前必須先過「消費者視角語意複核」，
+> 且該複核須由 **writer 以外的席位**執行。順序是：語意複核 → 落地 → byte 檢查，
+> **不是**落地 → byte 檢查 → 語意複核。
+>
+> 一般 TA 文案（非權益類）維持現行順序。
+
+## 追加登記
+
+- **offer contract 最小四欄**（Owner 供料）= PAY-ALIGN admission 前置：
+  refund/cancel 規則、基礎問卦 entitlement、深卜 included count、expiration。
+- **Sequencing 硬約束**：新退費文字上線 **不得早於** A11Y P0 落地。
+- 甲版字串（sha256 `8ac0e3d3…9e12`）凍結保存，供 v2 起草對照，**不得直接使用**。
+
+*— v1.2 · 2026-08-21 · Cowork(PM) —*
