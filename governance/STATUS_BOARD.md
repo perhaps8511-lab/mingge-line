@@ -89,3 +89,5 @@
 - 2026-08-20：🔴 選項表本身有錯——v1.1 給 Owner 的四個候選 token 中，`--gold-soft` 標為 4.61:1「剛好過線」，取嚴後實為 **4.29:1 FAIL AA**。若 Owner 選了它，修正後的閘會再次認證不合格修法。教訓：候選方案表必須以最差情境計算（Cowork PM）。
 - 2026-08-20：🔴 格③另有六處未揭露 AA 失敗，登記後繼 `WP-MINGGE-A11Y-CONTRAST-SWEEP-01`（未建卡）——對 `#393e22`：`.pc-status`（誠實整備態狀態行，沿 T7 判例）3.55:1／`.lp-body p.pay-note`（jade@op.65）**2.36:1**／`.pay-ctx` 3.55:1／`.pay-sub-active` 3.55:1／`.pc-status.pc-ok` 4.29:1／`#page-pay .lp-header .lp-sub` 4.29:1。本卡不修：涵蓋格③大部分次要文字，改動實質改變視覺調性，需 Owner 拍板（Cowork PM；`index.html:477,481-485,511-513,515-517,535`）。
 - 2026-08-20：治理方法論再訂正——「證明修法有效」≠「證明閘有效」。測試對修復前版本會紅，只證明它抓得到已知舊錯，不證明擋得住新錯。閘必須以**突變體測試**驗證：注入該閘聲稱要防的每一類錯誤並確認變紅。且**閘不得禁止規格**——若正確做法會讓閘變紅，錯的是閘（Cowork PM；`governance/cards/WP-MINGGE-RM03C-RELIC-A11Y-01_record_v1_0.md` v1.2 §六）。
+- 2026-08-21／22：Make 側工作補登——T22／T23／T24／T15／T20／T33／T36、G7 五條；03B 已停用。此批先前未進 `STATUS_BOARD`，本次補帳；本條不追加未提供的 execution ID、測試結果或 live 狀態。
+- 2026-08-22：`MINGGE_OFFER_CONTRACT_v1_1_20260822.md` 已落 repo；同批公開 `MINGGE_ARTIFACT_SCHEMA_PUBLIC_v0_1_20260822.md`。兩檔為 Owner-provided canon exact copy，SHA-256 依 WP-MINGGE-CANON-PUBLISH-01 驗證。
