@@ -83,7 +83,7 @@ if (lpUnderSpec) {
   ok(true, `.lp-body p 已 >= 17px(${lpfs}px)符合規格 §0,本閘讓路,覆寫非必要(v2.0 的 m4:閘不得禁止規格)`);
 }
 ok(!/#payRelicBranch\s+p\s*\{/.test(html),
-   '不得使用 `#payRelicBranch p`(會誤中 #artifactMockList/#artifactMockDetail 內 renderer 動態 <p>)');
+   '不得使用 `#payRelicBranch p`(會誤中 #artifactList/#artifactDetail 內 renderer 動態 <p>)');
 
 console.log('已知不合格 token(對合成背景)');
 const bad = ['moss','moss-soft','moss-2','jade'].map(n=>[n,token(n)]).filter(([,h])=>h)

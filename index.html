@@ -147,6 +147,10 @@
   .core.pressing{transform:scale(.96);transition:transform .25s ease, box-shadow 3s ease-out;/* T3視覺B:光點約3秒轉亮 */
     box-shadow:0 0 90px rgba(216,188,94,.6), inset 0 0 36px rgba(0,0,0,.4);}
   .core.pressing::before{animation:coreGlowUp 3s ease-out forwards;}/* T3視覺B:轉亮後恆定,不閃(原脈動改一次性漸亮) */
+  /* R1:光環繞滿一圈 → 明確可見的「可以放開了」狀態(純視覺指引,不改變起卦語意) */
+  .core.ready{box-shadow:0 0 110px rgba(216,188,94,.78), inset 0 0 30px rgba(0,0,0,.35);}
+  .core.ready .label{color:var(--gold-lit);opacity:1;}
+  .prog.ready .br{stroke-width:3.6;filter:drop-shadow(0 0 14px rgba(216,188,94,1));}
   @keyframes coreGlowUp{from{opacity:.45;transform:scale(1)}to{opacity:1;transform:scale(1.12)}}
   .core .label{position:relative;z-index:2;font-size:16px;letter-spacing:.16em;text-indent:.16em;
     color:var(--rice);opacity:.95;text-align:center;line-height:1.85;transition:.3s;font-weight:600;}
@@ -530,6 +534,10 @@
     white-space:nowrap;
   }
   #payIntentMingge,#payIntentRelic,#payRelicBranch{font-size:17px;}
+  /* R3-02:能力尚未開放時的誠實註記 —— 與 .pc-status 同一組視覺(字級/行高/色),
+     不縮小、不淡化:誠實整備態不得比它所限縮的承諾更難讀。 */
+  .lp-body p.pay-gate-note{font-size:17px;line-height:1.9;letter-spacing:.04em;
+    color:var(--gold-soft);opacity:1;margin:10px 0 0;}
   #payRelicBranch{line-height:1.9;}
   #payRelicLiveMessage{font-size:17px;line-height:1.9;}
   .pay-ctx{margin:12px auto 0;max-width:30em;font-size:17px;line-height:1.9;letter-spacing:.04em;color:var(--jade);text-align:center;}
@@ -613,8 +621,8 @@
   <!-- S2 長按起卦 -->
   <div class="scene" id="s2">
     <div class="qi">
-      <div class="guide" id="guide">按住光點，心中默念你想問的事<br>念畢放開，卦自成</div>
-      <div class="guide-permit" id="guidePermit">不必久按,念畢即放</div>
+      <div class="guide" id="guide">按住光點，心中默念你想問的事<br>等金色光環繞滿一圈，再放開起卦</div>
+      <div class="guide-permit" id="guidePermit">光環繞滿一圈之前放開,卦不會成</div>
       <div class="oracle">
         <div class="glyphring" id="glyphring"></div>
         <div class="ring64" id="ring64"></div>
@@ -624,7 +632,7 @@
           <circle class="br" id="progBar" cx="100" cy="100" r="96"></circle>
         </svg>
         <div class="core" id="core">
-          <div class="label" id="coreLabel">按住凝神<br>念畢放開</div>
+          <div class="label" id="coreLabel">按住光點<br>等光環繞滿</div>
         </div>
       </div>
       <div class="breathe-txt" id="breatheTxt"></div>
@@ -693,8 +701,8 @@
       <div class="pay-sub-active" id="paySubActive" style="display:none"></div>
       <div id="payIntentSplit">
         <h2>您今天想看哪一邊？</h2>
-        <button type="button" class="gate-door" id="payIntentMingge">命格|書房的來法</button>
-        <button type="button" class="gate-door" id="payIntentRelic">龍宮舍利|且先看看</button>
+        <button type="button" class="gate-door" id="payIntentMingge">繼續使用命格</button>
+        <button type="button" class="gate-door" id="payIntentRelic">看看龍宮舍利</button>
       </div>
       <div id="payMinggeBranch" hidden>
       <div class="pay-plan pay-plan-featured pay-plan-free">
@@ -702,16 +710,17 @@
         <div class="pc-status pc-ok">您的 3 枚銅錢已在囊中 —— 到<span class="pay-action-label">〔向天問卦〕</span>便可用。</div>
       </div>
         <div class="pay-plan pay-plan-featured pay-plan-single" id="planSingle149" role="button" tabindex="0">
-          <p class="pl-copy"><strong>問一卦|149</strong> — 心裡又起了一問,便來一卦。老易為您讀本卦、變卦、動爻,把這一程攤開看清。</p>
+          <p class="pl-copy"><strong>向天問卦|149</strong> — 問一件現在掛心的事,正式起一卦;解讀與卦記都會留下,之後可以回看、補記後續。</p>
           <div class="pc-status" tabindex="-1">付款通道整備中,眼下還付不了款;開通到哪一步了,問一聲「書僮客服」便知。</div>
         </div>
         <div class="pay-plan" id="planDeepdive200" role="button" tabindex="0">
-          <p class="pl-copy">〔讀完若想再往深處走〕同一卦,可再請老易多開幾面 —— <strong>四鏡·深卜 200</strong>,看互卦、序卦、變與不變裡的「轉」。不換卦、不重卜,只把這一卦讀到透。</p>
+          <p class="pl-copy"><strong>四鏡·深卜|+200</strong> — 不重新起卦,從互卦、綜卦、錯卦、序卦再看同一件事;結果留在原來的卦記裡。</p>
           <div class="pc-status" tabindex="-1">付款通道整備中,眼下還付不了款;開通到哪一步了,問一聲「書僮客服」便知。</div>
         </div>
         <div class="pay-plan" id="planFupan1490" role="button" tabindex="0">
-          <p class="pl-copy"><strong>問道·複盤|1490(6 個月)</strong> — 問卦,是決策的前半段;拿了主意、做下去,後半段才開始。半年書房,老易陪您把做過的決定回頭複盤——這一程走到了哪,卦象當時所示的「轉」應在何處。複盤不限次,四鏡深卜一併在內;卦記隨時回看,可補記後續、蓋印留痕;逢節氣,老易捎一封信來。決策是一條路,不是一次問答。</p>
+          <p class="pl-copy"><strong>問道·複盤|1490(6 個月)</strong> — 半年內,新的事都可以問;自己的每一筆卦記都能往下深看。累積三筆後可跨卦複盤;卦記、後續與蓋印到期後仍在。</p>
           <div class="pc-status" tabindex="-1">付款通道整備中,眼下還付不了款;開通到哪一步了,問一聲「書僮客服」便知。</div>
+          <p class="pay-gate-note">跨卦複盤仍在整備中,尚未開放使用;方案內容以實際開通為準。</p>
         </div>
         <p class="pay-note">
           付款在書房外頭辦(點下方連結),書房裡不收錢 —— 這是規矩。<br>
@@ -722,16 +731,13 @@
       </div>
       <div id="payRelicBranch" hidden>
         <p id="payRelicLiveMessage">龍宮舍利尚未開放。每一件都是實品,來源、材質、已知與未知,整理清楚了才上架;您若想先認識信物文化,「易經書房」裡有得讀。</p>
-        <div id="artifactMockList" hidden>
-          <div>示意畫面｜非售品｜資料為佔位</div>
-          <h2>商品列表</h2>
-          <div id="artifactMockCards"></div>
+        <div id="artifactList" hidden>
+          <h2>已整理好的龍宮舍利</h2>
+          <div id="artifactCards"></div>
         </div>
-        <div id="artifactMockDetail" hidden>
-          <div>示意畫面｜非售品｜資料為佔位</div>
-          <h2>商品詳情</h2>
-          <div id="artifactMockDetailBody"></div>
-          <button type="button" class="pay-back-link" id="artifactMockListBack">商品列表</button>
+        <div id="artifactDetail" hidden>
+          <div id="artifactDetailBody"></div>
+          <button type="button" class="pay-back-link" id="artifactListBack">回列表</button>
         </div>
         <button type="button" class="pay-back-link" id="payRelicBack">回首屏,換一邊看看</button>
       </div>
@@ -1382,7 +1388,7 @@ async function initPayPage(){
   document.getElementById('payIntentRelic').addEventListener('click',function(){_showPayView('relic');});
   document.getElementById('payMinggeBack').addEventListener('click',function(){_showPayView('split');});
   document.getElementById('payRelicBack').addEventListener('click',function(){_showPayView('split');});
-  if(isArtifactMockViewer()){ initArtifactMock(); }
+  initArtifactList();   // MG-RM-03:實品清單一律讀 owning store;沒有可上架的列就維持「尚未開放」
   ['planSingle149','planDeepdive200','planFupan1490'].forEach(function(id){
     var card=document.getElementById(id);
     function showPending(){var status=card.querySelector('.pc-status');status.classList.add('pc-status--activated');status.focus();}
@@ -1410,130 +1416,151 @@ async function initPayPage(){
   }catch(e){console.warn('[pay page]',e);}
 }
 
-var _artifactMockItems=[];
-var _artifactMockTitles={XTVSSPvA:'【示範】龍宮舍利手鍊 A',agmh9hhJ:'【示範】龍宮舍利手鍊 B'};
-var _artifactMockSlotLabels=['這是什麼物','我們知道什麼','我們不知道什麼','適合情境','不承諾什麼'];
+/* ====================================================
+   MG-RM-03 · 龍宮舍利實品接線(owning store = Airtable Artifacts,經 mingge-relay /artifacts)
+   ★ FAIL CLOSED:只有 owning store 判定 publish_blocked === 'PUBLISHABLE' 的列才會出現。
+     取不到、格式不符、清單為空 → 一律維持「尚未開放」原句,不降級成示範資料。
+   ★ 沒有的事實就留白:空值或 NEEDS_/PENDING_ 佔位一律不顯示,不從來源平台文案或圖片回填。
+   ★ 不做卦→商品推薦:本區完全不讀 gua_result,也不因卦象好壞改變任何呈現。
+   ==================================================== */
+var ARTIFACT_PUBLISHABLE='PUBLISHABLE';
+var _artifactItems=[];
+var _artifactPlaceholderRe=/^(NEEDS_|PENDING_|N\/A)/i;
 
-var _artifactPriceBandLabels={'6000_14999':'主力'};
+/* Offer Contract v1.2 §4:三個價帶 → 藏主期間;每個有效月權益相同,無月配額。
+   刻意由 price_band 推導,不採信任何自由文字欄位裡的舊 quota 說法。 */
+var ARTIFACT_COLLECTOR_PERIOD={
+  '3000_5999':'三個月藏主',
+  '6000_14999':'半年藏主',
+  '15000_plus':'兩年藏主'
+};
+var ARTIFACT_INVENTORY_LABEL={
+  unique_item:'一物一件 —— 您看到的就是收到的這一件。',
+  multi_quantity:'同款多件 —— 實際個體與照片可能不完全相同。'
+};
+var ARTIFACT_NO_PROMISE='這是一件收藏品。我們不宣稱它能招財、開運、改運、療癒或改善健康,也不宣稱任何身體或運勢上的效果。';
+var ARTIFACT_SUPPORT='購買、到貨與售後:到〔書僮客服〕說一聲。';
+var ARTIFACT_CHECKOUT_GATE='付款通道整備中,眼下還付不了款;開通到哪一步了,問一聲「書僮客服」便知。';
 
-function artifactMockBandLabel(band){
-  return _artifactPriceBandLabels[band]||band;
+function artifactFact(value){
+  if(value===null||value===undefined) return '';
+  var text=String(value).trim();
+  if(!text) return '';
+  if(_artifactPlaceholderRe.test(text)) return '';   // 佔位值不得當成已查證的事實顯示
+  return text;
 }
-
-function artifactCheckoutAllowed(items){
-  return items.every(function(i){return i.data_state==='VERIFIED';});
+function artifactPriceTWD(value){
+  if(typeof value!=='number'||!isFinite(value)) return '';
+  return 'NT$'+value.toLocaleString('en-US');
 }
-
-function artifactMockImageUrl(id){
-  return 'https://cdn01.pinkoi.com/product/'+encodeURIComponent(id)+'/0/1/1080x0.jpg';
+function artifactIsPublishable(item){
+  return !!item && item.publish_blocked===ARTIFACT_PUBLISHABLE;
 }
-
-function artifactMockPrice(value){
-  return 'NT$'+Number(value).toLocaleString('en-US');
+function artifactAppendSection(parent,label,value){
+  var text=artifactFact(value);
+  if(!text) return;            // 缺的事實維持缺,不補、不猜、不寫「尚未取得」冒充已查證
+  var section=document.createElement('section');
+  var heading=document.createElement('h4');
+  heading.textContent=label;
+  var body=document.createElement('p');
+  body.textContent=text;
+  section.append(heading,body);
+  parent.appendChild(section);
 }
-
-function showArtifactMockList(){
-  document.getElementById('artifactMockList').hidden=false;
-  document.getElementById('artifactMockDetail').hidden=true;
+function artifactAppendLine(parent,text){
+  if(!text) return;
+  var p=document.createElement('p');
+  p.textContent=text;
+  parent.appendChild(p);
 }
-
-function showArtifactMockDetail(item){
-  var body=document.getElementById('artifactMockDetailBody');
-  body.replaceChildren();
-  var badge=document.createElement('div');
-  badge.textContent='示意畫面｜非售品｜資料為佔位';
-  body.appendChild(badge);
-  var title=document.createElement('h3');
-  title.textContent=_artifactMockTitles[item.id];
-  body.appendChild(title);
+function artifactAppendPhoto(parent,item){
+  var url=artifactFact(item.photo_url);
+  if(!url) return;             // photo_rights 未 CLEARED 者永遠取不到(publish gate 已擋在 owning store)
   var image=document.createElement('img');
-  image.src=artifactMockImageUrl(item.id);
-  image.alt=_artifactMockTitles[item.id];
-  body.appendChild(image);
-  _artifactMockSlotLabels.forEach(function(label){
-    var section=document.createElement('section');
-    var heading=document.createElement('h4');
-    heading.textContent=label;
-    var value=document.createElement('p');
-    value.textContent=item.detail_slots[label]||'這一項尚未取得';
-    section.append(heading,value);
-    body.appendChild(section);
-  });
-  var price=document.createElement('p');
-  price.textContent='示範價 '+artifactMockPrice(item.price_pinkoi_twd);
-  body.appendChild(price);
-  var band=document.createElement('p');
-  band.textContent=artifactMockBandLabel(item.price_band)+'｜6 個月';
-  body.appendChild(band);
-  var buy=document.createElement('button');
-  buy.type='button';
-  buy.className='gate-door';
-  buy.textContent='選購';
-  buy.addEventListener('click',function(){ openArtifactMockCheckout(item); });
-  body.appendChild(buy);
-  document.getElementById('artifactMockList').hidden=true;
-  document.getElementById('artifactMockDetail').hidden=false;
+  image.src=url;
+  image.alt=artifactFact(item.title_mingge)||'龍宮舍利實拍';
+  image.loading='lazy';
+  parent.appendChild(image);
 }
 
-function restoreArtifactMockCheckout(){
-  var checkoutBadge=document.getElementById('artifactMockCheckoutBadge');
-  if(checkoutBadge) checkoutBadge.hidden=true;
-  document.getElementById('payMockTitle').textContent='模擬付款';
-  document.getElementById('payMockSub').textContent='';
-  document.getElementById('payMockOk').hidden=false;
-  document.getElementById('payMockFail').hidden=false;
+function showArtifactList(){
+  document.getElementById('artifactList').hidden=false;
+  document.getElementById('artifactDetail').hidden=true;
 }
 
-function openArtifactMockCheckout(item){
-  if(artifactCheckoutAllowed([item])) return;
-  openPayMock('planSingle149');
-  var checkoutBadge=document.getElementById('artifactMockCheckoutBadge');
-  if(!checkoutBadge){
-    checkoutBadge=document.createElement('div');
-    checkoutBadge.id='artifactMockCheckoutBadge';
-    checkoutBadge.textContent='示意畫面｜非售品｜資料為佔位';
-    document.querySelector('.pay-mock-card').prepend(checkoutBadge);
-  }
-  checkoutBadge.hidden=false;
-  document.getElementById('payMockTitle').textContent=_artifactMockTitles[item.id];
-  document.getElementById('payMockSub').textContent='示範價 '+artifactMockPrice(item.price_pinkoi_twd);
-  document.getElementById('payMockOk').hidden=true;
-  document.getElementById('payMockFail').hidden=true;
+function showArtifactDetail(item){
+  var body=document.getElementById('artifactDetailBody');
+  body.replaceChildren();
+
+  var title=document.createElement('h3');
+  title.textContent=artifactFact(item.title_mingge);
+  body.appendChild(title);
+  artifactAppendPhoto(body,item);
+  artifactAppendLine(body,artifactPriceTWD(item.price_mingge_twd));
+
+  // 1 這是什麼物
+  artifactAppendSection(body,'這是什麼物',item.material_claim);
+  artifactAppendSection(body,'尺寸',item.dimensions);
+  artifactAppendSection(body,'重量',item.weight);
+  artifactAppendSection(body,'品相',item.condition);
+  artifactAppendSection(body,'件數',ARTIFACT_INVENTORY_LABEL[item.inventory_model]||'');
+  artifactAppendSection(body,'供貨狀態',item.availability);
+  // 2 我們知道什麼
+  artifactAppendSection(body,'我們知道什麼',item.known_facts);
+  artifactAppendSection(body,'來源說明',item.source_provenance);
+  artifactAppendSection(body,'可追溯資料',item.traceability);
+  // 3 我們不知道什麼
+  artifactAppendSection(body,'我們不知道什麼',item.unknowns);
+  // 4 文化／收藏情境
+  artifactAppendSection(body,'文化與收藏情境',item.cultural_use_context);
+  // 5 不承諾什麼(固定句;不輸出 owning store 的禁詞清單)
+  artifactAppendSection(body,'不承諾什麼',ARTIFACT_NO_PROMISE);
+  // 保養
+  artifactAppendSection(body,'保養與保存',item.care);
+  // 藏主期間(由 price_band 依 Offer Contract v1.2 推導)
+  artifactAppendSection(body,'藏主權益',ARTIFACT_COLLECTOR_PERIOD[item.price_band]
+    ? ARTIFACT_COLLECTOR_PERIOD[item.price_band]+' —— 每一個有效月權益相同,無月配額;自您完成啟用那一天起算。'
+    : '');
+  // 售後 + 誠實整備態(尚未選定金流,不得出現可下單的假入口)
+  artifactAppendSection(body,'售後與退換',ARTIFACT_SUPPORT);
+  artifactAppendLine(body,ARTIFACT_CHECKOUT_GATE);
+
+  document.getElementById('artifactList').hidden=true;
+  document.getElementById('artifactDetail').hidden=false;
 }
 
-async function initArtifactMock(){
-  document.getElementById('payRelicLiveMessage').hidden=true;
-  showArtifactMockList();
-  document.getElementById('artifactMockListBack').addEventListener('click',showArtifactMockList);
-  document.getElementById('payMockCancel').addEventListener('click',restoreArtifactMockCheckout);
+async function initArtifactList(){
+  var msgEl=document.getElementById('payRelicLiveMessage');
+  var backEl=document.getElementById('artifactListBack');
+  if(backEl) backEl.addEventListener('click',showArtifactList);
   try{
-    var response=await fetch('./data/artifacts_placeholder.json');
-    if(!response.ok) return;
+    var response=await fetch(RELAY_URL+'artifacts',{method:'GET'});
+    if(!response.ok) return;                                   // fail closed
     var payload=await response.json();
-    _artifactMockItems=payload.items.filter(function(item){return item.data_state!=='DELISTED';});
-    var cards=document.getElementById('artifactMockCards');
-    _artifactMockItems.forEach(function(item){
+    var items=(payload&&Array.isArray(payload.items))?payload.items:[];
+    _artifactItems=items.filter(artifactIsPublishable);         // 前端第三道 publish gate
+    if(!_artifactItems.length) return;                          // fail closed:維持「尚未開放」
+    var cards=document.getElementById('artifactCards');
+    cards.replaceChildren();
+    _artifactItems.forEach(function(item){
       var card=document.createElement('article');
-      var badge=document.createElement('div');
-      badge.textContent='示意畫面｜非售品｜資料為佔位';
       var title=document.createElement('h3');
-      title.textContent=_artifactMockTitles[item.id];
-      var image=document.createElement('img');
-      image.src=artifactMockImageUrl(item.id);
-      image.alt=_artifactMockTitles[item.id];
-      var price=document.createElement('p');
-      price.textContent='示範價 '+artifactMockPrice(item.price_pinkoi_twd);
-      var band=document.createElement('p');
-      band.textContent=artifactMockBandLabel(item.price_band)+'｜6 個月';
+      title.textContent=artifactFact(item.title_mingge);
+      card.appendChild(title);
+      artifactAppendPhoto(card,item);
+      artifactAppendLine(card,artifactPriceTWD(item.price_mingge_twd));
+      artifactAppendLine(card,ARTIFACT_COLLECTOR_PERIOD[item.price_band]||'');
       var detail=document.createElement('button');
       detail.type='button';
       detail.className='gate-door';
-      detail.textContent='商品詳情';
-      detail.addEventListener('click',function(){showArtifactMockDetail(item);});
-      card.append(badge,title,image,price,band,detail);
+      detail.textContent='看這一件';
+      detail.addEventListener('click',function(){showArtifactDetail(item);});
+      card.appendChild(detail);
       cards.appendChild(card);
     });
-  }catch(error){console.warn('[artifact mock]',error);}
+    msgEl.hidden=true;
+    showArtifactList();
+  }catch(error){ console.warn('[artifacts]',error); }           // fail closed
 }
 
 /* ====================================================
@@ -1923,7 +1950,7 @@ function buildGlyphRing(){
 
 /* ===== S2 起卦互動(放開即成卦模型) ===== */
 const READY_MS=5000;          // 最低凝神門檻:5 秒(不顯示秒數,滿了給「可放開」信號)
-let pressStart=0, raf=null, pressing=false, runTimer=null, ready=false;
+let pressStart=0, raf=null, pressing=false, runTimer=null, ready=false, readyTimer=null;
 const core=document.getElementById('core');
 const progBar=document.getElementById('progBar');
 const ring64=document.getElementById('ring64');
@@ -1935,12 +1962,34 @@ progBar.style.strokeDasharray=CIRC; progBar.style.strokeDashoffset=CIRC;
 
 function prepQi(){
   buildGlyphRing(); buildRing64();
-  document.getElementById('guide').innerHTML='按住光點，心中默念你想問的事<br>念畢放開，卦自成';
-  document.getElementById('coreLabel').innerHTML='按住凝神<br>念畢放開';
+  document.getElementById('guide').innerHTML='按住光點，心中默念你想問的事<br>等金色光環繞滿一圈，再放開起卦';
+  document.getElementById('coreLabel').innerHTML='按住光點<br>等光環繞滿';
+  document.getElementById('guidePermit').textContent='光環繞滿一圈之前放開,卦不會成';
   document.getElementById('breatheTxt').classList.remove('show');
   progBar.style.strokeDashoffset=CIRC;
   runner.classList.remove('show'); rgua.style.opacity=0;
+  clearReady();
+}
+
+/* R1:光環圓滿 → 明說「可以放開了」。
+   ★ 主要觸發是真實時鐘 setTimeout;rAF 只負責畫圓環。
+     LINE webview 會凍住 rAF,唯有真實時鐘能保證這句指引一定出現。
+   ★ 只改視覺與指引,不改門檻、不改隨機、不改 T0(卦仍在放開那一剎那才成)。 */
+function markReady(){
+  if(ready) return;
+  ready=true;
+  core.classList.add('ready');
+  document.getElementById('prog').classList.add('ready');
+  document.getElementById('coreLabel').innerHTML='可以放開了';
+  document.getElementById('guide').innerHTML='光環已圓滿，可以放開了';
+  document.getElementById('guidePermit').textContent='放開即成卦';
+  document.getElementById('breatheTxt').textContent='光環已圓滿 · 放開即成卦';
+}
+function clearReady(){
   ready=false;
+  if(readyTimer){ clearTimeout(readyTimer); readyTimer=null; }
+  core.classList.remove('ready');
+  document.getElementById('prog').classList.remove('ready');
 }
 
 /* 卦象在大圈跑(按住時) */
@@ -1960,22 +2009,23 @@ function startRunner(){
 function stopRunner(){ if(runTimer){clearInterval(runTimer);runTimer=null;} runner.classList.remove('show'); rgua.style.opacity=0; }
 
 function startPress(){
-  if(pressing)return; pressing=true; ready=false;
+  if(pressing)return; pressing=true; clearReady();
   pressStart=Date.now();
   core.classList.add('pressing'); ring64.classList.add('fast'); glyphring.classList.add('fast');
   document.getElementById('coreLabel').innerHTML='凝神…';
-  document.getElementById('guide').innerHTML='心中反覆默念你想問的事<br>念定了，放開即成卦';
+  document.getElementById('guide').innerHTML='心中默念你想問的事<br>等金色光環繞滿一圈，再放開起卦';
+  document.getElementById('guidePermit').textContent='光環繞滿一圈之前放開,卦不會成';
   document.getElementById('breatheTxt').classList.add('show');
   document.getElementById('breatheTxt').textContent='凝神 · 反覆默念心中所問';
   startRunner();
+  readyTimer=setTimeout(markReady, READY_MS);   // ★ 真實時鐘:rAF 被凍住也一定會給到「可以放開了」
   function tick(){
     const el=Date.now()-pressStart;
-    // 光環只在凝聚階段(0→5秒)安靜前進,滿了就靜停在圓滿狀態(不催、不閃、非計時器)
+    // 光環在凝聚階段(0→READY_MS)前進,繞滿一圈後停在圓滿狀態
     const p=Math.min(el/READY_MS,1);
     progBar.style.strokeDashoffset=CIRC*(1-p);
-    // ★ 滿 5 秒只是「門檻已過」的後台標記 —— 畫面完全不變化,不亮、不催、不宣告卦成。
-    //   天地一直安靜地轉、安靜地聽;卦在 TA 放開那一剎那才成。
-    if(p>=1 && !ready){ ready=true; }
+    // ★ 繞滿一圈 → 明說可以放開。門檻與成卦語意不變:卦仍在放開那一剎那才成。
+    if(p>=1){ markReady(); }
     raf=requestAnimationFrame(tick);
   }
   raf=requestAnimationFrame(tick);
@@ -1984,6 +2034,7 @@ function startPress(){
 function cancelPress(){
   if(!pressing)return;
   pressing=false; if(raf)cancelAnimationFrame(raf); stopRunner();
+  if(readyTimer){ clearTimeout(readyTimer); readyTimer=null; }
   // ★ 用真實時鐘判定門檻(不靠 rAF 累計的 ready,因 LINE webview 可能凍住 rAF)
   const held = Date.now() - pressStart;
   if(held >= READY_MS){
@@ -1991,12 +2042,14 @@ function cancelPress(){
     doQi();
   }else{
     // 未滿門檻就放開 → 不成卦,提示再凝神久一些
+    clearReady();
     core.classList.remove('pressing');
     ring64.classList.remove('fast'); glyphring.classList.remove('fast');
     progBar.style.strokeDashoffset=CIRC;
-    document.getElementById('coreLabel').innerHTML='按住凝神<br>念畢放開';
-    document.getElementById('guide').innerHTML='還沒成卦——按住的時間要久一點<br>凝神默念，念畢再放開';
-    document.getElementById('breatheTxt').textContent='叩問需誠 · 再按住凝神片刻';
+    document.getElementById('coreLabel').innerHTML='按住光點<br>等光環繞滿';
+    document.getElementById('guide').innerHTML='光環還沒繞滿，卦未成<br>再按住一次，等光環繞滿一圈再放開';
+    document.getElementById('guidePermit').textContent='光環繞滿一圈之前放開,卦不會成';
+    document.getElementById('breatheTxt').textContent='叩問需誠 · 等光環繞滿一圈';
   }
 }
 core.addEventListener('mousedown',startPress);
@@ -2011,7 +2064,7 @@ core.addEventListener('pointerup',e=>{cancelPress();});
 core.addEventListener('pointercancel',e=>{cancelPress();});
 
 function doQi(){
-  pressing=false; ready=false; if(raf)cancelAnimationFrame(raf); stopRunner();
+  pressing=false; clearReady(); if(raf)cancelAnimationFrame(raf); stopRunner();
   const now=new Date();              // ★ 放開那一刻(qigua_time 來源,守 T0)
   const g=qiGua(now); lastG=g;
   core.classList.remove('pressing');
@@ -2121,21 +2174,6 @@ function isCheckoutTestViewer(){
     return true;
   }
   try{return sessionStorage.getItem('mg_paytest')==='1';}catch(_){return false;}
-}
-
-function isArtifactMockViewer(){
-  var params=new URLSearchParams(location.search);
-  if(params.get('artifactmock')==='1') return true;
-  var state=params.get('liff.state');
-  if(state){
-    try{
-      var decoded=decodeURIComponent(state);
-      var queryAt=decoded.indexOf('?');
-      var query=queryAt>=0?decoded.slice(queryAt+1):decoded;
-      return new URLSearchParams(query.split('#')[0]).get('artifactmock')==='1';
-    }catch(_){}
-  }
-  return false;
 }
 
 /* ★ v1.2.3:卦記會話編號(D3 卦記 schema 唯一缺口補件)
