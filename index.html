@@ -563,11 +563,6 @@
     border:0;border-bottom:1px solid rgba(184,134,11,.42);padding:8px 4px;
     font-family:inherit;font-size:17px;letter-spacing:.12em;cursor:pointer;}
   .pay-back-link:hover{color:var(--rice);border-bottom-color:var(--gold);}
-  .entry-gift{
-    border:1px solid rgba(184,134,11,.22);border-radius:4px;
-    padding:14px 16px;margin-bottom:12px;color:var(--gold-lit);
-    font-size:16px;line-height:1.9;font-weight:600;letter-spacing:.05em;text-align:center;
-    background:rgba(184,134,11,.06);}
   .single-log-entry{margin-top:18px;text-align:center;min-height:34px;}
   .single-log-entry a{
     display:inline-block;color:var(--moss);border:1px solid var(--gold);
@@ -591,7 +586,6 @@
         <small>心 有 所 惑 · 方 來 起 卦</small>
       </div>
       <div class="scope">事 業 · 決 策 · 進 退 · 時 機</div>
-      <div class="entry-gift" id="entryGiftEntry" hidden></div>
       <label class="consent-row">
         <input type="checkbox" id="consentChk" onchange="onConsentToggle()">
         <span>我已閱讀並同意 <span class="terms-word">服務條款</span>，且同意命格為提供卜卦服務所需，蒐集與使用必要之個人資料。</span>
@@ -809,7 +803,6 @@
       <div class="lp-sub">您問過的卦，都在這裡記著。</div>
     </div>
     <div class="lp-body">
-      <div class="entry-gift" id="entryGift" hidden></div>
       <div class="log-status" id="logStatus">載入中……</div>
       <div id="fupanBanner"></div>
       <div id="logList"><div class="log-loading" id="logLoading">讀取記錄中……</div></div>
@@ -1782,18 +1775,13 @@ async function initLogPage(){
     //   trial_quota_remaining, monthly_quota_remaining, subscription_start}，
     //   不是 subscription:{active,expires_at} / coins；原判斷永遠落到 else 分支。
     var sub=data.subscriber;
-    var giftEl=document.getElementById('entryGift');
     if(sub&&sub.tier==='subscriber'){
       statusEl.textContent='訂閱中，書房為您常開。';
-      if(giftEl){ giftEl.hidden=true; }
     }else{
+      // ★ 只陳述 owning runtime readback 回來的實際餘額,不宣稱任何贈與。
+      //   readback 若不可用,此分支根本不會執行(上方 resp.ok 失敗即進 catch)。
       var coins=quotaCreditsFromSub(sub);
       statusEl.textContent='尚餘 '+coins+' 枚問卦銅錢。';
-      if(giftEl){
-        var isFirstTouch=giftShouldShow(sub);
-        giftEl.textContent=isFirstTouch?GIFT_TEXT:'';
-        giftEl.hidden=!isFirstTouch;
-      }
     }
     // E27:複盤 CTA —— 分流依剛拿到的 sub + records.length,不需額外請求
     var fupanBannerEl=document.getElementById('fupanBanner');
@@ -2214,12 +2202,12 @@ function quotaCreditsFromSub(sub){
   return (Number(sub.trial_quota_remaining)||0) + (Number(sub.monthly_quota_remaining)||0);
 }
 
-const GIFT_TEXT = '一輩子相贈 3 枚問卦銅錢 —— 一枚一問。';   // ★ E40②:唯一定義處,log/entry 兩頁共用,不得另造字串
-
-function giftShouldShow(sub){
-  if(sub && sub.tier==='subscriber') return false;   // 訂閱戶一律不顯示,與 initLogPage 既有分流一致
-  return sub===null || quotaCreditsFromSub(sub)===3;
-}
+/* ★ 免費贈幣公開宣稱已下架(Offer Contract v1.2 未採納為 current offer truth)。
+   原 GIFT_TEXT 常數與 giftShouldShow() 一併移除 —— 其判斷式 `sub===null || credits===3`
+   會在 readback 為 null 時「推定」TA 有三枚幣,那正是不可留的推定式宣稱。
+   底層 trial/quota 機制不動:quotaCreditsFromSub / trial_quota_remaining /
+   monthly_quota_remaining / entry gate / 實際扣打全部維持原狀,
+   卦記頁仍以 readback 的實際餘額顯示「尚餘 N 枚問卦銅錢。」。 */
 
 function setSceneById(id){
   document.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
@@ -2314,27 +2302,6 @@ async function renderSingleLogEntry(token){
 
 let liffReady=false, liffUserId=null, liffAccessToken=null;
 
-async function applyEntryGift(token){
-  var giftEl=document.getElementById('entryGiftEntry');
-  if(!giftEl) return;
-  giftEl.hidden=true; giftEl.textContent='';          // 先重置,避免殘留舊狀態(重入/BFCache 防呆)
-  if(DEV_MODE || !token) return;                      // LIFF 未登入/DEV → 保持 hidden
-  var ctrl = (typeof AbortController!=='undefined') ? new AbortController() : null;
-  var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, 8000) : null;  // 逾時 8s 視同失敗
-  try{
-    var resp=await fetch(RELAY_URL+'history',{method:'GET',headers:{'X-Line-AccessToken':token},cache:'no-store',signal:ctrl?ctrl.signal:undefined});
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
-    var data=await resp.json();
-    var show=giftShouldShow(data?data.subscriber:null);
-    giftEl.textContent=show?GIFT_TEXT:'';
-    giftEl.hidden=!show;
-  }catch(e){
-    console.warn('[entry gift]', e && e.message ? e.message : e);   // 失敗/逾時 → 保持 hidden(已於前置重置)
-  }finally{
-    if(timer) clearTimeout(timer);
-  }
-}
-
 /* LIFF 初始化(DEV 模式下略過,不報錯)
    方案3:改用 Access Token(SDK 自動續期,解決 ID Token 不續期會過期的問題);前端零固定祕密。 */
 async function initLiff(){
@@ -2355,7 +2322,6 @@ async function initLiff(){
     console.log('[LIFF] init done. accessToken at init:', liffAccessToken ? 'OK' : 'null(送出時會重抓)');
     var gateState = await refreshEntryGateState(liffAccessToken);
     if(blockEntryIfNeeded(gateState)) return;
-    void applyEntryGift(liffAccessToken);   // ★ E40②:非阻塞 fire-and-forget(void 明示不等待),失敗/逾時不擋起卦主流程
     restorePendingIfAny();                  // ★ v1.2:若是登入跳轉返回,還原送出前暫存的卦(qigua_time 原封,守 T0)
   }catch(e){
     console.error('LIFF init failed:', e);

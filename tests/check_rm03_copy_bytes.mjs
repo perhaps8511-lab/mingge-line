@@ -93,8 +93,15 @@ else {
   const rm03 = html.slice(html.indexOf('id="payIntentSplit"'), html.indexOf('<!-- P-STUDY'));
   for (const claim of ['初訪(免費)', 'pay-plan-free', '您的 3 枚銅錢已在囊中', '3 枚問卦銅錢', '3 枚銅錢'])
     ok(!rm03.includes(claim), `RM03 呈現層免費銅錢宣稱「${claim}」已下架`);
-  ok(html.includes("const GIFT_TEXT"), '底層 trial 機制單一真相源 GIFT_TEXT 仍在（未刪除、未重設計）');
+  // GIFT_TEXT 是「一輩子相贈 3 枚」這句宣稱本身，已依 Owner 裁決自兩個 surface 下架；
+  // 底層 trial/quota 機制另有其真相源（quotaCreditsFromSub + 兩個 quota 欄位），必須完好。
+  // 只掃程式碼與 markup;說明「為何移除」的註解允許提及舊名。
+  const htmlCode = html.replace(/<!--[\s\S]*?-->/g,'').replace(/\/\*[\s\S]*?\*\//g,'').replace(/^\s*\/\/.*$/gm,'');
+  ok(!htmlCode.includes('GIFT_TEXT'), '贈幣宣稱常數 GIFT_TEXT 已自程式碼移除');
+  ok(!htmlCode.includes('一輩子相贈'), '「一輩子相贈」字面已自程式碼與 markup 移除');
   ok(html.includes('quotaCreditsFromSub'), '底層 credits 讀取路徑仍在');
+  ok(html.includes('trial_quota_remaining') && html.includes('monthly_quota_remaining'), '底層 quota 欄位讀取仍在');
+  ok(html.includes("statusEl.textContent='尚餘 '+coins+' 枚問卦銅錢。';"), '實際餘額顯示仍在（事實陳述，非宣稱）');
   ok(html.includes('<strong>問道·複盤|1490(6 個月)</strong>'), '<strong> 只包卡名，未包整段');
   ok(html.includes('跨卦複盤仍在整備中,尚未開放使用;方案內容以實際開通為準。'),
      '複盤能力未 live → 卡上有誠實 gate 註記');
