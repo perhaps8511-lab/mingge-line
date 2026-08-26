@@ -700,15 +700,11 @@
     <div class="lp-body">
       <div class="pay-sub-active" id="paySubActive" style="display:none"></div>
       <div id="payIntentSplit">
-        <h2>您今天想看哪一邊？</h2>
+        <h2>你今天想看哪一邊？</h2>
         <button type="button" class="gate-door" id="payIntentMingge">繼續使用命格</button>
         <button type="button" class="gate-door" id="payIntentRelic">看看龍宮舍利</button>
       </div>
       <div id="payMinggeBranch" hidden>
-      <div class="pay-plan pay-plan-featured pay-plan-free">
-        <p class="pl-copy"><strong>初訪(免費)</strong> — 一輩子相贈 <strong>3 枚問卦銅錢</strong>。一枚一問;卦象、解讀都是真的,先進來問問看。</p>
-        <div class="pc-status pc-ok">您的 3 枚銅錢已在囊中 —— 到<span class="pay-action-label">〔向天問卦〕</span>便可用。</div>
-      </div>
         <div class="pay-plan pay-plan-featured pay-plan-single" id="planSingle149" role="button" tabindex="0">
           <p class="pl-copy"><strong>向天問卦|149</strong> — 問一件現在掛心的事,正式起一卦;解讀與卦記都會留下,之後可以回看、補記後續。</p>
           <div class="pc-status" tabindex="-1">付款通道整備中,眼下還付不了款;開通到哪一步了,問一聲「書僮客服」便知。</div>
@@ -731,6 +727,7 @@
       </div>
       <div id="payRelicBranch" hidden>
         <p id="payRelicLiveMessage">龍宮舍利尚未開放。每一件都是實品,來源、材質、已知與未知,整理清楚了才上架;您若想先認識信物文化,「易經書房」裡有得讀。</p>
+        <p id="payRelicReadError" hidden>目前無法讀取龍宮舍利資料，請稍後再試。</p>
         <div id="artifactList" hidden>
           <h2>已整理好的龍宮舍利</h2>
           <div id="artifactCards"></div>
@@ -1529,15 +1526,27 @@ function showArtifactDetail(item){
   document.getElementById('artifactDetail').hidden=false;
 }
 
+/* 讀取失敗 ≠ 沒有商品:
+   ok + 空清單 → 維持「尚未開放」誠實句(那是真的:owning store 目前沒有可上架的列)
+   read_error  → 換成人看得懂的「目前無法讀取…請稍後再試」
+   兩者都絕不以示範資料頂替。 */
+function showArtifactReadError(){
+  var msgEl=document.getElementById('payRelicLiveMessage');
+  var errEl=document.getElementById('payRelicReadError');
+  if(msgEl) msgEl.hidden=true;
+  if(errEl) errEl.hidden=false;
+}
+
 async function initArtifactList(){
   var msgEl=document.getElementById('payRelicLiveMessage');
   var backEl=document.getElementById('artifactListBack');
   if(backEl) backEl.addEventListener('click',showArtifactList);
   try{
     var response=await fetch(RELAY_URL+'artifacts',{method:'GET'});
-    if(!response.ok) return;                                   // fail closed
+    if(!response.ok){ showArtifactReadError(); return; }        // 憑證/權限/HTTP 失敗
     var payload=await response.json();
-    var items=(payload&&Array.isArray(payload.items))?payload.items:[];
+    if(!payload||payload.state!=='ok'){ showArtifactReadError(); return; }
+    var items=Array.isArray(payload.items)?payload.items:[];
     _artifactItems=items.filter(artifactIsPublishable);         // 前端第三道 publish gate
     if(!_artifactItems.length) return;                          // fail closed:維持「尚未開放」
     var cards=document.getElementById('artifactCards');
@@ -1560,7 +1569,10 @@ async function initArtifactList(){
     });
     msgEl.hidden=true;
     showArtifactList();
-  }catch(error){ console.warn('[artifacts]',error); }           // fail closed
+  }catch(error){                                                // 網路/解析失敗 = 讀取失敗
+    console.warn('[artifacts]',error);
+    showArtifactReadError();
+  }
 }
 
 /* ====================================================

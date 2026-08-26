@@ -12,7 +12,7 @@ const split = between('<div id="payIntentSplit">', '<div id="payMinggeBranch"');
 const mingge = between('<div id="payMinggeBranch"', '<div id="payRelicBranch"');
 const relic = between('<div id="payRelicBranch"', '<!-- P-STUDY');
 
-check(split.includes('您今天想看哪一邊？'), 'A1', 'no-src split question is exact');
+check(split.includes('你今天想看哪一邊？') && !split.includes('您今天想看哪一邊？'), 'A1', 'split question === Product Basis UI Spec 逐字「你今天想看哪一邊？」');
 check((split.match(/class="gate-door"/g) || []).length === 2 && split.includes('繼續使用命格') && split.includes('看看龍宮舍利'), 'A2', 'split has exactly two Product-Basis plain-language entries');
 const minggeBack = '<button type="button" class="pay-back-link" id="payMinggeBack">回首屏,換一邊看看</button>';
 const relicBack = '<button type="button" class="pay-back-link" id="payRelicBack">回首屏,換一邊看看</button>';
@@ -33,7 +33,7 @@ check(html.includes("var pageMap = {ask:'page-about', about:'page-about', log:'p
 const payPresentation = split + mingge + relic;
 check(!/(倒數|不買就錯過|負面卦象)/.test(payPresentation) && !/(^|[^不])限時/.test(payPresentation), 'C6', 'pay presentation has no coercive promotion terms');
 check(!/(gua_result|卦象結果).*(plan|product|商品)/i.test(html), 'C7', 'no divination-result product derivation found');
-check((mingge.match(/初訪\(免費\)/g) || []).length === 1 && (mingge.match(/pay-plan-free/g) || []).length === 1 && (mingge.match(/您的 3 枚銅錢已在囊中/g) || []).length === 1, 'A5', '初訪免費卡存在：「初訪(免費)」×1、「pay-plan-free」×1、「您的 3 枚銅錢已在囊中」×1');
+check((mingge.match(/初訪\(免費\)/g) || []).length === 0 && (mingge.match(/pay-plan-free/g) || []).length === 0 && (mingge.match(/3 枚(問卦)?銅錢/g) || []).length === 0, 'A5', 'RM03 呈現層無免費三枚銅錢 offer（Offer v1.2 未採納為 current truth）');
 check((mingge.match(/四鏡·深卜\|\+200/g) || []).length === 1 && (mingge.match(/四鏡·深卜 200/g) || []).length === 0, 'A6', 'Copy Master v1.0：「四鏡·深卜|+200」×1，v1.1 的「四鏡·深卜 200」×0');
 check(/id="planDeepdive200"[\s\S]*?不重新起卦[\s\S]*?同一件事[\s\S]*?<\/div>/.test(mingge), 'A7', '深卜卡語意：「不重新起卦…同一件事」在位（Copy Master §1.2）');
 const fupanStrong = mingge.match(/id="planFupan1490"[\s\S]*?<strong>([^<]*)<\/strong>/)?.[1];
