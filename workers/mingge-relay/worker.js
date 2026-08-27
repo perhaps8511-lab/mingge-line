@@ -22,6 +22,21 @@ const AT_BASE        = "apptFfyVBYE4ygW3E";
 const AT_DIV_LOG     = "tblVyf8WfTQxvtpEg";
 const AT_SUBS        = "tbljXninuBm76D9nf";
 const AT_SHUFANG     = "tblbzhwwmBDfAKQAs";
+
+// MG-RM-03 · 龍宮舍利 artifact owning store(與卦記/書房不同 base)
+const AT_PRODUCT_BASE = "appfQm6On0Wp9LtL9";
+const AT_ARTIFACTS    = "tbllxi9NZNhsBjLxD";
+// publish gate:Artifacts.publish_blocked 是 owning store 的 formula,只有這個字串代表可上架。
+const ARTIFACT_PUBLISHABLE = "PUBLISHABLE";
+// TA 面白名單。刻意不含 sku_source_ref(來源平台 SKU)、unverified_factual_claims、
+// supplier_facts_note、data_state、evidence_grade、publish_block_reasons —— 那些是內部欄位。
+const ARTIFACT_PUBLIC_FIELDS = [
+  "artifact_id", "title_mingge", "actual_photos", "price_mingge_twd", "price_band",
+  "inventory_model", "availability", "dimensions", "weight", "condition",
+  "material_claim", "source_provenance", "traceability",
+  "known_facts", "unknowns", "cultural_use_context", "care",
+  "collector_entitlement", "publish_blocked",
+];
 const TRACE_MAX_BODY_BYTES = 4096;
 const LAOYI_CONV_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 const LAOYI_UPSTREAM_TIMEOUT_MS = 30000;
@@ -162,6 +177,54 @@ export default {
       });
       const articles = (result.records || []).map(r => r.fields);
       return json({ articles });
+    }
+
+    // MG-RM-03 · GET /artifacts —— 龍宮舍利公開清單
+    // ★ fail closed:只回傳 publish_blocked === "PUBLISHABLE" 的列。
+    //   讀不到金鑰、Airtable 失敗、欄位缺漏 → 一律回空清單,TA 面維持「尚未開放」,
+    //   絕不降級成示範資料、絕不用來源平台圖片或價格頂替。
+    if (request.method === "GET" && url.pathname === "/artifacts") {
+      // ★ 讀取失敗 ≠ 沒有商品。缺金鑰 / 權限不足 / 網路或 HTTP 失敗 → read_error(非 2xx);
+      //   讀取成功但零筆 → state:"ok" + items:[]。兩者必須讓前端分得出來。
+      //   回應一律不夾帶 Airtable 原始回應或任何金鑰。
+      if (!env.AIRTABLE_API_KEY) {
+        return json({ state: "read_error", items: [], gate: "publish_blocked", reason: "credential_unavailable" }, 503);
+      }
+      const result = await airtableFetchStrict(env.AIRTABLE_API_KEY, AT_PRODUCT_BASE, AT_ARTIFACTS, {
+        filterByFormula: `{publish_blocked}="${ARTIFACT_PUBLISHABLE}"`,
+        fields: ARTIFACT_PUBLIC_FIELDS,
+        maxRecords: 100,
+      });
+      if (!result.ok) {
+        return json({ state: "read_error", items: [], gate: "publish_blocked", reason: result.reason }, 503);
+      }
+      const items = (result.records || [])
+        .map(r => r.fields || {})
+        // 第二道:即使 filterByFormula 被改壞,這裡仍逐列驗一次 publish gate。
+        .filter(f => f.publish_blocked === ARTIFACT_PUBLISHABLE)
+        .map(f => ({
+          artifact_id:          f.artifact_id || "",
+          title_mingge:         f.title_mingge || "",
+          photo_url:            Array.isArray(f.actual_photos) && f.actual_photos[0] && f.actual_photos[0].url
+                                  ? f.actual_photos[0].url : "",
+          price_mingge_twd:     typeof f.price_mingge_twd === "number" ? f.price_mingge_twd : null,
+          price_band:           f.price_band || "",
+          inventory_model:      f.inventory_model || "",
+          availability:         f.availability || "",
+          dimensions:           f.dimensions || "",
+          weight:               f.weight || "",
+          condition:            f.condition || "",
+          material_claim:       f.material_claim || "",
+          source_provenance:    f.source_provenance || "",
+          traceability:         f.traceability || "",
+          known_facts:          f.known_facts || "",
+          unknowns:             f.unknowns || "",
+          cultural_use_context: f.cultural_use_context || "",
+          care:                 f.care || "",
+          collector_entitlement:f.collector_entitlement || "",
+          publish_blocked:      f.publish_blocked,
+        }));
+      return json({ state: "ok", items, gate: "publish_blocked" });
     }
 
     if (request.method === "POST" && url.pathname === "/log/seal") {
@@ -900,6 +963,37 @@ async function airtableFetch(apiKey, base, table, opts) {
     return { records: [] };
   }
   return res.json();
+}
+
+// 與 airtableFetch 相同的查詢組裝,但把「讀取失敗」與「讀到零筆」分開回報。
+// 刻意獨立一支:既有路由依賴 airtableFetch 的吞錯行為,不在本卡改它的契約。
+// reason 只回固定字串,永不回傳 Airtable 原始回應內容。
+async function airtableFetchStrict(apiKey, base, table, opts) {
+  const params = new URLSearchParams();
+  if (opts.filterByFormula) params.set("filterByFormula", opts.filterByFormula);
+  if (opts.maxRecords)      params.set("maxRecords", String(opts.maxRecords));
+  if (opts.fields)          opts.fields.forEach(f => params.append("fields[]", f));
+  let res;
+  try {
+    res = await fetch(
+      `https://api.airtable.com/v0/${base}/${table}?${params.toString()}`,
+      { headers: { "Authorization": "Bearer " + apiKey } }
+    );
+  } catch (e) {
+    console.log("Airtable network error", String(e && e.message));
+    return { ok: false, reason: "upstream_unreachable", records: [] };
+  }
+  if (!res.ok) {
+    console.log("Airtable error", res.status, await res.text());
+    return { ok: false, reason: res.status === 401 || res.status === 403 ? "permission_denied" : "upstream_error", records: [] };
+  }
+  let body;
+  try { body = await res.json(); }
+  catch (e) { return { ok: false, reason: "upstream_malformed", records: [] }; }
+  if (!body || !Array.isArray(body.records)) {
+    return { ok: false, reason: "upstream_malformed", records: [] };
+  }
+  return { ok: true, reason: "", records: body.records };
 }
 
 async function readQuotaGate(env, lineUserId) {
