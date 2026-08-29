@@ -53,7 +53,13 @@ for (const forbidden of ['深卜', '複盤', '半年方案', '龍運藏', '商�
   check(!completionMarkup.includes(forbidden), `N-16-${forbidden}`, `保存完成 state 不含「${forbidden}」`);
 }
 
-const persistenceSlice = html.slice(html.indexOf('function persistenceDelay'), html.indexOf('/* LIFF 初始化'));
+const currentQiguaTime = '2026-08-29T15:22:00+08:00';
+const currentQiguaTimeUtc = '2026-08-29T07:22:00.000Z';
+const olderQiguaTimeUtc = '2026-08-29T07:20:00.000Z';
+const persistenceStart = html.includes('function normalizedTimestampMs')
+  ? html.indexOf('function normalizedTimestampMs')
+  : html.indexOf('function persistenceDelay');
+const persistenceSlice = html.slice(persistenceStart, html.indexOf('/* LIFF 初始化'));
 const pageEvents = {};
 const documentEvents = {};
 const persistenceCtx = {
@@ -79,31 +85,68 @@ const persistenceCtx = {
   },
 };
 vm.createContext(persistenceCtx);
-vm.runInContext(persistenceSlice + '\nthis.__wait=waitForPersistedLog;this.__show=showSaveComplete;this.__recover=recoverInflightSave;this.__setRecoveryToken=function(v){liffReady=true;liffAccessToken=v;};this.__readbackBudgetMs=(PERSISTENCE_POLL_ATTEMPTS-1)*PERSISTENCE_POLL_INTERVAL_MS;', persistenceCtx);
+vm.runInContext(persistenceSlice + '\nthis.__wait=waitForPersistedLog;this.__show=showSaveComplete;this.__recover=recoverInflightSave;this.__sameInstant=typeof timestampsRepresentSameInstant===\"function\"?timestampsRepresentSameInstant:null;this.__setRecoveryToken=function(v){liffReady=true;liffAccessToken=v;};this.__readbackBudgetMs=(PERSISTENCE_POLL_ATTEMPTS-1)*PERSISTENCE_POLL_INTERVAL_MS;', persistenceCtx);
 let pollCount = 0;
+persistenceCtx.sessionStorage.setItem('mg_inflight_session_id', 'session-rc1');
+persistenceCtx.sessionStorage.setItem('mg_inflight_qigua_time', currentQiguaTime);
 persistenceCtx.fetch = async () => ({
   ok: true,
-  json: async () => ({ records: ++pollCount < 3 ? [] : [{ session_id: 'session-rc1', log_id: 'rec123' }] }),
+  json: async () => ({ records: ++pollCount < 3 ? [] : [{ session_id: 'session-rc1', qigua_time: currentQiguaTimeUtc, log_id: 'rec123' }] }),
 });
-const persisted = await persistenceCtx.__wait('token');
+const persisted = await persistenceCtx.__wait('token', 'session-rc1', currentQiguaTime);
 check(persisted?.log_id === 'rec123' && pollCount === 3
-  && persistenceCtx.sessionStorage.removed.includes('mg_inflight_session_id'),
-  'R1-05-readback', '同 session_id 的 history readback 後才取得 record_ref');
+  && !persistenceCtx.sessionStorage.values.has('mg_inflight_session_id')
+  && !persistenceCtx.sessionStorage.values.has('mg_inflight_qigua_time'),
+  'R1-05-readback', '同 session_id + normalized qigua_time 的 history readback 後才取得 record_ref');
 pollCount = 0;
+persistenceCtx.sessionStorage.setItem('mg_inflight_session_id', 'session-rc1');
+persistenceCtx.sessionStorage.setItem('mg_inflight_qigua_time', currentQiguaTime);
 persistenceCtx.fetch = async () => ({
   ok: true,
-  json: async () => ({ records: ++pollCount < 60 ? [] : [{ session_id: 'session-rc1', log_id: 'rec-late' }] }),
+  json: async () => ({ records: ++pollCount < 60 ? [] : [{ session_id: 'session-rc1', qigua_time: currentQiguaTimeUtc, log_id: 'rec-late' }] }),
 });
-const delayedPersisted = await persistenceCtx.__wait('token');
+const delayedPersisted = await persistenceCtx.__wait('token', 'session-rc1', currentQiguaTime);
 check(delayedPersisted?.log_id === 'rec-late' && pollCount === 60
   && persistenceCtx.__readbackBudgetMs >= 120000,
   'R1-05-latency', '120 秒 readback 視窗涵蓋現役 Make/Airtable 近 90 秒延遲');
+let stalePollCount = 0;
+persistenceCtx.fetch = async () => ({
+  ok: true,
+  json: async () => { stalePollCount++; return { records: [{ session_id: 'session-rc1', qigua_time: olderQiguaTimeUtc, log_id: 'rec-stale' }] }; },
+});
+const stalePersisted = await persistenceCtx.__wait('token', 'session-rc1', currentQiguaTime);
+check(stalePersisted === null && stalePollCount === 81,
+  'R1-05-stale-session', '同 session_id 但較舊 qigua_time 的 record 不得被接受');
+persistenceCtx.fetch = async () => ({
+  ok: true,
+  json: async () => ({ records: [
+    { session_id: 'session-rc1', qigua_time: olderQiguaTimeUtc, log_id: 'rec-old' },
+    { session_id: 'session-rc1', qigua_time: currentQiguaTimeUtc, log_id: 'rec-new' },
+  ] }),
+});
+persistenceCtx.sessionStorage.setItem('mg_inflight_session_id', 'session-rc1');
+persistenceCtx.sessionStorage.setItem('mg_inflight_qigua_time', currentQiguaTime);
+const exactPersisted = await persistenceCtx.__wait('token', 'session-rc1', currentQiguaTime);
+check(exactPersisted?.log_id === 'rec-new',
+  'R1-05-current-log', '同 session 多筆 record 必須選本次 exact qigua_time 的新 log_id');
+check(typeof persistenceCtx.__sameInstant === 'function'
+  && persistenceCtx.__sameInstant(currentQiguaTime, currentQiguaTimeUtc) === true,
+  'R1-05-time-equivalence', '+08:00 與 Airtable Z 時間相同 instant 可正規化匹配');
+for (const invalidTime of [null, '', 'not-a-time']) {
+  persistenceCtx.fetch = async () => ({ ok: true, json: async () => ({ records: [{ session_id: 'session-rc1', qigua_time: currentQiguaTimeUtc, log_id: 'rec-arbitrary' }] }) });
+  const invalidPersisted = await persistenceCtx.__wait('token', 'session-rc1', invalidTime);
+  check(invalidPersisted === null,
+    `R1-05-invalid-time-${String(invalidTime)}`, '缺少或無效 qigua_time 時 fail honest，不顯示成功');
+}
 persistenceCtx.__show(persisted.log_id);
 check(persistenceCtx.document.elements.saveCompleteView.href === './log.html?log_id=rec123&context=first_completion'
   && persistenceCtx.document.elements.saveComplete.classList.values.includes('show'),
   'C-12-first', '保存完成導向 first_completion context');
 
-const gateSlice = html.slice(html.indexOf('function readEntryGateState'), html.indexOf('function persistenceDelay'));
+const gateStart = html.includes('function normalizedTimestampMs')
+  ? html.indexOf('function normalizedTimestampMs')
+  : html.indexOf('function readEntryGateState');
+const gateSlice = html.slice(gateStart, html.indexOf('function persistenceDelay'));
 let gateShownLogId = null;
 const gateCtx = {
   SESSION_ID: 'session-rc1', APP_BUILD_ID: buildId, READING_STATUS_TEXT: '讀卦中',
@@ -119,47 +162,76 @@ const gateCtx = {
 vm.createContext(gateCtx);
 vm.runInContext(gateSlice + '\nthis.__readEntry=readEntryGateState;this.__blockEntry=blockEntryIfNeeded;', gateCtx);
 persistenceCtx.sessionStorage.setItem('mg_inflight_session_id', 'session-rc1');
-let reopenedState = gateCtx.__readEntry({ records: [{ session_id: 'session-rc1', log_id: 'rec-reopen' }] });
+persistenceCtx.sessionStorage.setItem('mg_inflight_qigua_time', currentQiguaTime);
+let reopenedState = gateCtx.__readEntry({ records: [{ session_id: 'session-rc1', qigua_time: currentQiguaTimeUtc, log_id: 'rec-reopen' }] });
 check(gateCtx.__blockEntry(reopenedState) === true
   && gateShownLogId === 'rec-reopen'
-  && !persistenceCtx.sessionStorage.values.has('mg_inflight_session_id'),
-  'R1-05-reopen', 'reopen 讀到 exact session_id + log_id 即顯示完成並清除 inflight');
+  && !persistenceCtx.sessionStorage.values.has('mg_inflight_session_id')
+  && !persistenceCtx.sessionStorage.values.has('mg_inflight_qigua_time'),
+  'R1-05-reopen', 'reopen 讀到 exact session_id + normalized qigua_time + log_id 即顯示完成並清除兩個 inflight keys');
 persistenceCtx.sessionStorage.setItem('mg_inflight_session_id', 'session-rc1');
-reopenedState = gateCtx.__readEntry({ records: [{ session_id: 'other-session', log_id: 'rec-other' }] });
+persistenceCtx.sessionStorage.setItem('mg_inflight_qigua_time', currentQiguaTime);
+reopenedState = gateCtx.__readEntry({ records: [{ session_id: 'other-session', qigua_time: currentQiguaTimeUtc, log_id: 'rec-other' }] });
 check(reopenedState.persistedLogId === null && reopenedState.inFlight === true,
   'R1-05-session-negative', '不同 session_id 不得誤判保存成功');
-reopenedState = gateCtx.__readEntry({ records: [{ session_id: 'session-rc1' }] });
+reopenedState = gateCtx.__readEntry({ records: [{ session_id: 'session-rc1', qigua_time: currentQiguaTimeUtc }] });
 check(reopenedState.persistedLogId === null && reopenedState.inFlight === true,
   'R1-05-log-negative', 'exact session 沒有 log_id 仍不得顯示成功');
+persistenceCtx.sessionStorage.setItem('mg_inflight_qigua_time', currentQiguaTime);
+reopenedState = gateCtx.__readEntry({ records: [{ session_id: 'session-rc1', qigua_time: olderQiguaTimeUtc, log_id: 'rec-stale-reopen' }] });
+check(reopenedState.persistedLogId === null && reopenedState.inFlight === true,
+  'R1-05-reopen-stale', 'reopen 不得接受同 session 的舊 qigua_time record');
+for (const invalidTime of [null, 'invalid']) {
+  persistenceCtx.sessionStorage.setItem('mg_inflight_session_id', 'session-rc1');
+  if(invalidTime === null) persistenceCtx.sessionStorage.removeItem('mg_inflight_qigua_time');
+  else persistenceCtx.sessionStorage.setItem('mg_inflight_qigua_time', invalidTime);
+  reopenedState = gateCtx.__readEntry({ records: [{ session_id: 'session-rc1', qigua_time: currentQiguaTimeUtc, log_id: 'rec-arbitrary' }] });
+  check(reopenedState.persistedLogId === null,
+    `R1-05-reopen-invalid-${String(invalidTime)}`, 'reopen 缺少或無效 inflight qigua_time 不得成功');
+}
 
 const resumeMethods = [];
 persistenceCtx.__setRecoveryToken('resume-token');
 persistenceCtx.sessionStorage.setItem('mg_inflight_session_id', 'session-rc1');
+persistenceCtx.sessionStorage.setItem('mg_inflight_qigua_time', currentQiguaTime);
 persistenceCtx.fetch = async (_url, options) => {
   resumeMethods.push(options?.method);
-  return { ok: true, json: async () => ({ records: [{ session_id: 'session-rc1', log_id: 'rec-pageshow' }] }) };
+  return { ok: true, json: async () => ({ records: [
+    { session_id: 'session-rc1', qigua_time: olderQiguaTimeUtc, log_id: 'rec-pageshow-stale' },
+    { session_id: 'session-rc1', qigua_time: currentQiguaTimeUtc, log_id: 'rec-pageshow' },
+  ] }) };
 };
 const pageshowRecovered = await pageEvents.pageshow();
 check(pageshowRecovered?.log_id === 'rec-pageshow'
   && persistenceCtx.document.elements.saveCompleteView.href.includes('log_id=rec-pageshow')
-  && resumeMethods.every(method => method === 'GET'),
-  'R1-05-pageshow', 'pageshow 前景恢復只做 GET readback 並顯示 exact log');
+  && resumeMethods.every(method => method === 'GET')
+  && !persistenceCtx.sessionStorage.values.has('mg_inflight_session_id')
+  && !persistenceCtx.sessionStorage.values.has('mg_inflight_qigua_time'),
+  'R1-05-pageshow', 'pageshow 前景恢復只用 session_id + normalized qigua_time 做 GET readback');
 persistenceCtx.sessionStorage.setItem('mg_inflight_session_id', 'session-rc1');
+persistenceCtx.sessionStorage.setItem('mg_inflight_qigua_time', currentQiguaTime);
 persistenceCtx.fetch = async (_url, options) => {
   resumeMethods.push(options?.method);
-  return { ok: true, json: async () => ({ records: [{ session_id: 'session-rc1', log_id: 'rec-visible' }] }) };
+  return { ok: true, json: async () => ({ records: [
+    { session_id: 'session-rc1', qigua_time: olderQiguaTimeUtc, log_id: 'rec-visible-stale' },
+    { session_id: 'session-rc1', qigua_time: currentQiguaTimeUtc, log_id: 'rec-visible' },
+  ] }) };
 };
 const visibilityRecovered = await documentEvents.visibilitychange();
 check(visibilityRecovered?.log_id === 'rec-visible'
   && persistenceCtx.document.elements.saveCompleteView.href.includes('log_id=rec-visible')
-  && resumeMethods.every(method => method === 'GET'),
-  'R1-05-visibility', 'visibilitychange 回前景只做 GET readback 並顯示 exact log');
+  && resumeMethods.every(method => method === 'GET')
+  && !persistenceCtx.sessionStorage.values.has('mg_inflight_session_id')
+  && !persistenceCtx.sessionStorage.values.has('mg_inflight_qigua_time'),
+  'R1-05-visibility', 'visibilitychange 回前景只用 session_id + normalized qigua_time 做 GET readback');
 
 const sendSlice = html.slice(html.indexOf('async function sendSay'), html.indexOf('function copyJson'));
 check(sendSlice.indexOf('waitForPersistedLog') < sendSlice.indexOf('showSaveComplete')
   && /if\(persisted\)\{[\s\S]*showSaveComplete/.test(sendSlice)
-  && /else\{[\s\S]*showSendingAndClose/.test(sendSlice),
-  'C-11-order', 'POST 後先 readback；未讀回不宣稱已保存');
+  && /else\{[\s\S]*showSendingAndClose/.test(sendSlice)
+  && sendSlice.includes("sessionStorage.setItem('mg_inflight_session_id', payload.session_id)")
+  && sendSlice.includes("sessionStorage.setItem('mg_inflight_qigua_time', payload.qigua_time)"),
+  'C-11-order', 'POST 後保存 exact session/qigua correlation 再 readback；未讀回不宣稱已保存');
 
 const delayedSource = log.slice(log.indexOf('function buildDelayedActionsHtml'), log.indexOf('function renderDetail'));
 for (const action of ['事情有變了', '想把這一卦看深', '想回看這一路', '問另一件新的事']) {

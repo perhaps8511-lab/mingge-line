@@ -2417,17 +2417,64 @@ function setSceneById(id){
   if(el) el.classList.add('active');
 }
 
+function normalizedTimestampMs(value){
+  if(typeof value!=='string' || !value.trim()) return null;
+  var timestamp=Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function timestampsRepresentSameInstant(left,right){
+  var leftMs=normalizedTimestampMs(left);
+  var rightMs=normalizedTimestampMs(right);
+  return leftMs!==null && rightMs!==null && leftMs===rightMs;
+}
+
+function readInflightSaveState(){
+  var sessionId=null, qiguaTime=null;
+  try{
+    sessionId=sessionStorage.getItem('mg_inflight_session_id');
+    qiguaTime=sessionStorage.getItem('mg_inflight_qigua_time');
+  }catch(_){}
+  return {
+    sessionId:sessionId,
+    qiguaTime:qiguaTime,
+    currentSession:sessionId===SESSION_ID,
+    validQiguaTime:normalizedTimestampMs(qiguaTime)!==null
+  };
+}
+
+function clearInflightSaveState(expectedSessionId,expectedQiguaTime){
+  if(expectedSessionId || expectedQiguaTime){
+    var inflight=readInflightSaveState();
+    if(inflight.sessionId!==expectedSessionId
+      || !timestampsRepresentSameInstant(inflight.qiguaTime,expectedQiguaTime)) return false;
+  }
+  try{
+    sessionStorage.removeItem('mg_inflight_session_id');
+    sessionStorage.removeItem('mg_inflight_qigua_time');
+  }catch(_){}
+  return true;
+}
+
+function findExactPersistedRecord(records,expectedSessionId,expectedQiguaTime){
+  if(!expectedSessionId || normalizedTimestampMs(expectedQiguaTime)===null) return null;
+  return (records||[]).find(function(r){
+    return r
+      && r.session_id===expectedSessionId
+      && timestampsRepresentSameInstant(r.qigua_time,expectedQiguaTime)
+      && r.log_id;
+  }) || null;
+}
+
 function readEntryGateState(data){
   var records = (data && data.records) || [];
   var sub = data ? data.subscriber : null;
   var hasSubscriber = !!sub;
   var tier = sub && sub.tier ? sub.tier : 'free';
   var credits = quotaCreditsFromSub(sub);
-  var activeSession = null;
-  try{ activeSession = sessionStorage.getItem('mg_inflight_session_id'); }catch(_){}
-  var activeSessionMatches = activeSession===SESSION_ID;
-  var persistedRecord = activeSessionMatches
-    ? records.find(function(r){ return r && r.session_id===SESSION_ID && r.log_id; })
+  var inflight=readInflightSaveState();
+  var persistedRecord = inflight.currentSession && inflight.validQiguaTime
+    ? findExactPersistedRecord(records,inflight.sessionId,inflight.qiguaTime)
     : null;
   return {
     ready:true,
@@ -2436,7 +2483,7 @@ function readEntryGateState(data){
     tier:tier,
     credits:credits,
     recordsCount:records.length,
-    inFlight:activeSessionMatches && !persistedRecord,
+    inFlight:inflight.currentSession && !persistedRecord,
     persistedLogId:persistedRecord ? persistedRecord.log_id : null
   };
 }
@@ -2484,7 +2531,7 @@ function renderReadingGate(){
 function blockEntryIfNeeded(state){
   if(!state || !state.ready) return false;
   if(state.persistedLogId){
-    try{ sessionStorage.removeItem('mg_inflight_session_id'); }catch(_){}
+    clearInflightSaveState();
     showSaveComplete(state.persistedLogId);
     return true;
   }
@@ -2504,11 +2551,12 @@ const PERSISTENCE_POLL_ATTEMPTS=81;
 const PERSISTENCE_POLL_INTERVAL_MS=1500;
 let persistencePollPromise=null;
 
-/* Auto-saved truth：POST 成功只代表 relay 接受；必須在 /history 讀回同 session_id + log_id
+/* Auto-saved truth：POST 成功只代表 relay 接受；必須在 /history 讀回同 session_id
+   + normalized qigua_time + log_id
    才能對 TA 說「已收進」。保留 120 秒 readback 視窗，涵蓋現役 Make/Airtable 延遲；
    輪詢逾時仍不猜，退回既有「讀卦中」誠實狀態。 */
-async function waitForPersistedLog(token){
-  if(!token) return null;
+async function waitForPersistedLog(token,expectedSessionId,expectedQiguaTime){
+  if(!token || !expectedSessionId || normalizedTimestampMs(expectedQiguaTime)===null) return null;
   if(persistencePollPromise) return persistencePollPromise;
   persistencePollPromise=(async function(){
     for(var attempt=0;attempt<PERSISTENCE_POLL_ATTEMPTS;attempt++){
@@ -2516,9 +2564,9 @@ async function waitForPersistedLog(token){
         var resp=await fetch(RELAY_URL+'history',{method:'GET',cache:'no-store',headers:{'X-Line-AccessToken':token}});
         if(resp.ok){
           var data=await resp.json();
-          var rec=((data&&data.records)||[]).find(function(r){ return r && r.session_id===SESSION_ID && r.log_id; });
+          var rec=findExactPersistedRecord((data&&data.records)||[],expectedSessionId,expectedQiguaTime);
           if(rec){
-            try{ sessionStorage.removeItem('mg_inflight_session_id'); }catch(_){}
+            clearInflightSaveState(expectedSessionId,expectedQiguaTime);
             return rec;
           }
         }
@@ -2547,12 +2595,13 @@ function showSaveComplete(logId){
 let liffReady=false, liffUserId=null, liffAccessToken=null;
 
 function hasCurrentInflightSession(){
-  try{ return sessionStorage.getItem('mg_inflight_session_id')===SESSION_ID; }
-  catch(_){ return false; }
+  var inflight=readInflightSaveState();
+  return inflight.currentSession && inflight.validQiguaTime;
 }
 
 async function recoverInflightSave(){
-  if(!hasCurrentInflightSession()) return null;
+  var inflight=readInflightSaveState();
+  if(!inflight.currentSession || !inflight.validQiguaTime) return null;
   var token=liffAccessToken;
   try{
     if(liffReady && liff.isLoggedIn()){
@@ -2561,8 +2610,11 @@ async function recoverInflightSave(){
     }
   }catch(_){}
   if(!token) return null;
-  var persisted=await waitForPersistedLog(token);
-  if(persisted && persisted.session_id===SESSION_ID && persisted.log_id){
+  var persisted=await waitForPersistedLog(token,inflight.sessionId,inflight.qiguaTime);
+  if(persisted
+    && persisted.session_id===inflight.sessionId
+    && timestampsRepresentSameInstant(persisted.qigua_time,inflight.qiguaTime)
+    && persisted.log_id){
     showSaveComplete(persisted.log_id);
     return persisted;
   }
@@ -2696,9 +2748,12 @@ async function sendSay(){
       return;
     }
     if(!res.ok) throw new Error('relay HTTP '+res.status);
-    try{ sessionStorage.setItem('mg_inflight_session_id', SESSION_ID); }catch(_){}
+    try{
+      sessionStorage.setItem('mg_inflight_session_id', payload.session_id);
+      sessionStorage.setItem('mg_inflight_qigua_time', payload.qigua_time);
+    }catch(_){}
     if(btn){btn.textContent='已送出 · 老易解卦中';}
-    var persisted=await waitForPersistedLog(liffAccessToken);
+    var persisted=await waitForPersistedLog(liffAccessToken,payload.session_id,payload.qigua_time);
     if(persisted){
       showSaveComplete(persisted.log_id);
     }else{
