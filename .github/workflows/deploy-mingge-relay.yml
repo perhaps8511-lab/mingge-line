@@ -1,0 +1,39 @@
+name: Deploy Mingge Relay
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mingge-relay-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy exact RC1 Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_ACCOUNT_ID: 2a876d44d3cd6ee6b833272e724fb7a6
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      EXPECTED_WORKER_SHA256: 8787293114c2439aac4ac8db07e3b320cc6300c3e5874494d9b1b154173e4d11
+
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+
+      - name: Verify exact Worker bytes
+        shell: bash
+        run: |
+          actual_sha="$(sha256sum workers/mingge-relay/worker.js | cut -d ' ' -f 1)"
+          test "$actual_sha" = "$EXPECTED_WORKER_SHA256"
+
+      - name: Require scoped Cloudflare token
+        shell: bash
+        run: test -n "$CLOUDFLARE_API_TOKEN"
+
+      - name: Deploy mingge-relay
+        working-directory: workers/mingge-relay
+        run: npx --yes wrangler@4.107.0 deploy --keep-vars
