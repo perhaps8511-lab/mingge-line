@@ -2466,11 +2466,15 @@ function persistenceDelay(ms){
   return new Promise(function(resolve){ setTimeout(resolve,ms); });
 }
 
+const PERSISTENCE_POLL_ATTEMPTS=81;
+const PERSISTENCE_POLL_INTERVAL_MS=1500;
+
 /* Auto-saved truth：POST 成功只代表 relay 接受；必須在 /history 讀回同 session_id + log_id
-   才能對 TA 說「已收進」。輪詢逾時不猜，退回既有「讀卦中」誠實狀態。 */
+   才能對 TA 說「已收進」。保留 120 秒 readback 視窗，涵蓋現役 Make/Airtable 延遲；
+   輪詢逾時仍不猜，退回既有「讀卦中」誠實狀態。 */
 async function waitForPersistedLog(token){
   if(!token) return null;
-  for(var attempt=0;attempt<18;attempt++){
+  for(var attempt=0;attempt<PERSISTENCE_POLL_ATTEMPTS;attempt++){
     try{
       var resp=await fetch(RELAY_URL+'history',{method:'GET',cache:'no-store',headers:{'X-Line-AccessToken':token}});
       if(resp.ok){
@@ -2484,7 +2488,7 @@ async function waitForPersistedLog(token){
     }catch(e){
       console.warn('[persistence readback]', e && e.message ? e.message : e);
     }
-    if(attempt<17){ await persistenceDelay(1500); }
+    if(attempt<PERSISTENCE_POLL_ATTEMPTS-1){ await persistenceDelay(PERSISTENCE_POLL_INTERVAL_MS); }
   }
   return null;
 }
