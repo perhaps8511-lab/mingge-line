@@ -8,24 +8,33 @@
 
 - 視覺基底：Owner 提供的 `Mix_ Rich Menu v3 底圖 + richmenu_image_labeled.png`。
 - 正式來源證據：`plans/mingge_showcase_005_content_canonical_manifest_v1_0.md` 已記錄 SHA-256、`1376×768`、`1,963,606 bytes`，並裁決「不可直接上傳」。
-- 第 5 格正式標籤：`問老易`。不得退回 `老易介紹`。
+- 六格 display label／副標以 adopted Product Basis v1.2 RC1 為準；本 Slice 只更新 repository candidate，不做 LINE mutation。
 - 候選輸出檔名：`richmenu_mingge_005a_2500x1686_v1_0.png`。
 - 候選輸出必須是 `2500×1686`、小於 `900,000 bytes`，保留文字可讀性、六格分隔線與外框。
 - 原圖比例與 `2500×1686` 不同；不得直接非等比拉伸。應以原設計元素重排至標準畫布，再輸出 PNG-8／最佳化 PNG。若 PNG 無法在手機保住文字且低於門檻，才改用高品質 JPEG，並重新檢查細線與字緣。
 - 不覆寫 Owner 原圖；候選圖須另存，記錄 SHA-256、像素與 bytes。
 
+### 1.1 RC1 候選圖留證（2026-08-29）
+
+- Repository path：`assets/richmenu_mingge_005a_2500x1686_v1_0.png`
+- SHA-256：`b68193ade39f312860f42d5ebc775c9e8d271bee670887bd904945059af517c1`
+- 像素：`2500×1686`
+- 檔案大小：`601,225 bytes`
+- 手機可讀性修正：依 Owner（40–65 歲 TA）回饋，下排三格副標由 `31px` 放大為 `40px`；上排維持 `31px`。
+- 狀態：`CANDIDATE-QA / NOT ACTIVATED`；尚未上傳 LINE、綁定、切換或正式啟用。
+
 ## 2. 六格 routing 契約
 
 機讀 mapping：`plans/mingge_showcase_005a_rich_menu_mapping_v1_0.json`。
 
-| 格 | 標籤 | action | 免費／限制 |
-|---|---|---|---|
-| 1 | 向天問卦 | LIFF 主入口 | 受現行額度 gate；零額度顯示 NT$149 路標，不付款 |
-| 2 | 我的卦記 | `action=log` | 可看既有卦記；不重設額度 |
-| 3 | 訂閱方案 | `action=pay` | 只展示方案；正式金流未串接，不付款 |
-| 4 | 易經書房 | `action=study` | 免費；只做現行 `GET /study` |
-| 5 | 問老易 | LINE message：`問老易` | 免費；由後續 Make intent route 接 Dify，不得進問卦 Worker POST |
-| 6 | 書僮客服 | LINE message：`書僮客服` | 客服對話；不得誤送問卦 Worker |
+| 格 | Display label | 副標 | action | 免費／限制 |
+|---|---|---|---|---|
+| 1 | 向天問卦 | 問一件新的事 | LIFF 主入口 | 受現行額度 gate；零額度顯示 NT$149 路標，不付款 |
+| 2 | 我的卦記 | 回看、補記已有的事 | `action=log` | 可看既有卦記；不重設額度 |
+| 3 | 方案・信物 | 看方案或龍宮舍利 | `action=pay` | Intent split；正式金流未串接，不付款 |
+| 4 | 易經書房 | 自己讀一篇 | `action=study` | 免費；只做現行 `GET /study` |
+| 5 | 問老易 | 把看不懂的問懂 | LINE message：`問老易` | 免費；由後續 Make intent route 接 Dify，不得進問卦 Worker POST |
+| 6 | 書僮客服 | 查權益、訂單與售後 | LINE message：`書僮客服` | 客服對話；不得誤送問卦 Worker |
 
 ## 3. 命中區
 
@@ -34,7 +43,7 @@
 ## 4. 上線前獨立 gate
 
 1. Design／Owner 看候選圖的手機預覽，確認六格文字與品牌氣質。
-2. 驗證候選圖 exact dimensions、bytes 與 SHA-256。
+2. Repository test 驗證候選圖 exact dimensions、bytes 與 SHA-256；LINE 後台仍須讀回確認接受此檔。
 3. 以 LINE 後台預覽確認命中區未偏移。
 4. Make 建立／確認 `問老易` 與 `書僮客服` intent；`問老易` 不得消耗問卦銅錢。
 5. Dify 完整內容掛載及 `21+15` 回歸另行通過。

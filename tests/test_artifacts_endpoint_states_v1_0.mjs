@@ -26,6 +26,7 @@ const publishable = {
   },
 };
 const blocked = { fields: { artifact_id: 'TESTBLK1', publish_blocked: 'BLOCKED' } };
+const firstBatchLegacyPass = { fields: { ...publishable.fields, artifact_id: 'XTVSSPvA' } };
 
 // 1) 讀取成功但零筆
 {
@@ -33,6 +34,7 @@ const blocked = { fields: { artifact_id: 'TESTBLK1', publish_blocked: 'BLOCKED' 
   check(r.status === 200, 'EP1a', `零筆 → HTTP 200（實得 ${r.status}）`);
   check(r.body.state === 'ok', 'EP1b', `零筆 → state="ok"（實得 ${r.body.state}）`);
   check(Array.isArray(r.body.items) && r.body.items.length === 0, 'EP1c', '零筆 → items=[]');
+  check(r.body.catalog_state === 'empty' && r.body.published_count === 0 && r.body.gate === 'publication_state', 'EP1d', 'catalog state 由 published_count=0 衍生');
 }
 // 2) 讀到資料但全部 BLOCKED → 仍是 ok + 空
 {
@@ -42,7 +44,7 @@ const blocked = { fields: { artifact_id: 'TESTBLK1', publish_blocked: 'BLOCKED' 
 // 3) 缺金鑰
 {
   const r = await run({}, airtableOk([publishable]));
-  check(r.status === 503 && r.body.state === 'read_error' && r.body.reason === 'credential_unavailable', 'EP3', `缺金鑰 → 503 read_error/credential_unavailable（實得 ${r.status}/${r.body.state}）`);
+  check(r.status === 503 && r.body.state === 'read_error' && r.body.catalog_state === 'read_error' && r.body.reason === 'credential_unavailable', 'EP3', `缺金鑰 → 503 read_error/credential_unavailable（實得 ${r.status}/${r.body.state}）`);
   check(r.body.items.length === 0, 'EP3b', '缺金鑰不得回任何商品');
 }
 // 4) 權限不足
@@ -66,14 +68,19 @@ for (const s of [401, 403]) {
   const raw = JSON.stringify(r.body);
   check(!raw.includes('SECRET-KEY-VALUE') && !raw.includes('upstream said no'), 'EP7', 'read_error 回應不含金鑰、不含 Airtable 原始回應');
 }
-// 8) 有可上架列 → ok + 只回白名單欄位
+// 8) legacy PUBLISHABLE 不得自動升格 published
 {
   const r = await run({ AIRTABLE_API_KEY: 'k' }, airtableOk([publishable, blocked]));
-  check(r.status === 200 && r.body.state === 'ok' && r.body.items.length === 1, 'EP8a', '1 筆 PUBLISHABLE + 1 筆 BLOCKED → 只回 1 筆');
-  const it = r.body.items[0];
-  check(it.artifact_id === 'TESTPUB1' && it.photo_url === 'https://own.cdn/test.jpg' && it.price_mingge_twd === 6800, 'EP8b', '欄位映射正確');
-  for (const internal of ['sku_source_ref', 'unverified_factual_claims', 'supplier_facts_note', 'data_state', 'evidence_grade', 'publish_block_reasons'])
-    check(!(internal in it), 'EP8c-' + internal, `內部欄位「${internal}」未外流`);
+  check(r.status === 200 && r.body.state === 'ok' && r.body.catalog_state === 'empty' && r.body.items.length === 0, 'EP8a', '未知 SKU 即使 legacy PUBLISHABLE 仍 fail closed');
+  check(r.body.published_count === 0, 'EP8b', 'published count 不採信 legacy formula');
+}
+// 9) first batch 明列 needs_supplier，即使 legacy gate 通過仍不得公開
+{
+  const r = await run({ AIRTABLE_API_KEY: 'k' }, airtableOk([firstBatchLegacyPass]));
+  check(r.status === 200 && r.body.catalog_state === 'empty' && r.body.items.length === 0, 'EP9a', 'XTVSSPvA needs_supplier → empty');
+  const raw = JSON.stringify(r.body);
+  for (const internal of ['pending_source', 'source_category', 'current_offer_price_twd', 'evidence_refs'])
+    check(!raw.includes(internal), 'EP9b-' + internal, `internal publication 欄位「${internal}」未外流`);
 }
 
 console.log(`PASS=${pass} FAIL=${fail}`);

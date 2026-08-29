@@ -198,6 +198,18 @@
     text-decoration:none;cursor:pointer;transition:.25s;
   }
   .return-btn:hover{background:var(--paper-card);border-color:var(--ink-soft);}
+
+  /* RC1 R2-S02：延後回訪才出現的四路分流。 */
+  .delayed-actions{padding:24px 22px;background:var(--paper-card);border-bottom:1px solid var(--line);}
+  .delayed-actions h2{font-family:var(--serif);font-size:21px;line-height:1.6;margin-bottom:16px;color:var(--ink);}
+  .delayed-action-list{display:grid;gap:10px;}
+  .delayed-action{display:block;width:100%;text-align:left;text-decoration:none;background:#fff;color:var(--ink);
+    border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-family:var(--sans);cursor:pointer;}
+  .delayed-action strong{display:block;font-family:var(--serif);font-size:17px;line-height:1.6;color:var(--ink);}
+  .delayed-action span{display:block;margin-top:3px;font-size:14px;line-height:1.7;color:var(--ink-soft);}
+  .delayed-action:hover{border-color:var(--gold);background:var(--paper);}
+  .delayed-actions .deepen-status{color:var(--ink-soft);}
+  #delayedTracePanel[hidden]{display:none;}
 </style>
 </head>
 <body>
@@ -312,11 +324,15 @@ async function fetchSubscriberTier(token) {
       method: "GET",
       headers: { "X-Line-AccessToken": token },
     });
-    if (!res.ok) return { ok: false, tier: "free" };
+    if (!res.ok) return { ok: false, tier: "free", recordsCount: 0 };
     const data = await res.json();
-    return { ok: true, tier: data.subscriber ? data.subscriber.tier : "free" };
+    return {
+      ok: true,
+      tier: data.subscriber ? data.subscriber.tier : "free",
+      recordsCount: Array.isArray(data.records) ? data.records.length : 0,
+    };
   } catch (e) {
-    return { ok: false, tier: "free" };
+    return { ok: false, tier: "free", recordsCount: 0 };
   }
 }
 
@@ -469,7 +485,38 @@ function wireStampHandlers(logId, token) {
   }
 }
 
-function renderDetail(rec, tierInfo, token, face) {
+function buildDelayedActionsHtml(rec, tierInfo) {
+  const isSubscriber = tierInfo.ok && tierInfo.tier === "subscriber";
+  const fupanEligible = isSubscriber && tierInfo.recordsCount >= 3;
+  const fupanHtml = fupanEligible ? `
+    <a class="delayed-action" href="./index.html?action=log&amp;focus=fupan">
+      <strong>想回看這一路</strong>
+      <span>把多筆卦記與後續放在一起。</span>
+    </a>` : "";
+  return `
+    <div class="delayed-actions" id="delayedActions">
+      <h2>這次回來，想做什麼？</h2>
+      <div class="delayed-action-list">
+        <button class="delayed-action" id="delayedTraceBtn" type="button" aria-controls="delayedTracePanel" aria-expanded="false">
+          <strong>事情有變了</strong>
+          <span>補記事情後來的變化。</span>
+        </button>
+        <button class="delayed-action" id="deepdiveBtn" type="button" data-mode="${isSubscriber ? "trigger" : "purchase"}">
+          <strong>想把這一卦看深</strong>
+          <span>從四個角度再看同一件事。</span>
+        </button>
+        ${fupanHtml}
+        <a class="delayed-action" href="./index.html">
+          <strong>問另一件新的事</strong>
+          <span>回到向天問卦。</span>
+        </a>
+      </div>
+      <div class="deepen-status" id="deepdiveStatus"></div>
+    </div>
+    <div id="delayedTracePanel" hidden>${buildStampSectionHtml(rec)}</div>`;
+}
+
+function renderDetail(rec, tierInfo, token, viewContext) {
   const wrap = document.getElementById("viewDetail");
 
   const benSym  = guaSymbol(rec.ben_gua  || "");
@@ -483,14 +530,18 @@ function renderDetail(rec, tierInfo, token, face) {
       <a class="return-btn" href="./index.html?action=log">回到卦記</a>
     </div>`;
 
-  // SOUL-04b(v3.3 §2/§3):頂 header 依 src 分支 —— 深讀面(letter)無小字,卦記面(log)定向句+小字
-  const headerHtml = face === "letter"
+  const firstCompletionReturnHtml = `
+    <div class="section return-section">
+      <a class="return-btn" href="./index.html">回首頁</a>
+    </div>`;
+
+  const headerHtml = viewContext === "first_completion"
     ? `<div class="orient-block">
-         <div class="orient-main">這一卦，還能再往裡讀四面。</div>
+         <div class="orient-main">已收進「我的卦記」</div>
+         <div class="orient-sub">事情有了變化，再回來補記就好。</div>
        </div>`
     : `<div class="orient-block">
          <div class="orient-main">這封信，已收進您的卦記。</div>
-         <div class="orient-sub">往下可補個後續。</div>
        </div>`;
 
   const guaHeaderHtml = `
@@ -583,30 +634,31 @@ function renderDetail(rec, tierInfo, token, face) {
     }
   }
 
-  let html;
-  if (face === "letter") {
-    // 深讀面(v3.3 §2):header → 卦 → ① 四鏡·深卜卡(置頂、緊接卦) → ② 完整解讀 → ③ 回程門。無落款。
-    html = headerHtml + guaHeaderHtml;
-    if (isDivination) html += buildDeepdiveCtaHtml(tierInfo);
-    html += readingHtml;
-    html += returnDoorHtml;
+  let html = headerHtml + guaHeaderHtml + readingHtml;
+  if (viewContext === "first_completion") {
+    // 首次完成只確認、查看與離開；不立即要求後續、深卜、複盤或購買。
+    html += firstCompletionReturnHtml;
   } else {
-    // 卦記面(v3.3 §3):header → 卦 → ① 完整解讀 → ② 落款欄 → ③ 回程門。不推深卜。
-    html = headerHtml + guaHeaderHtml + readingHtml;
-    if (isDivination) html += buildStampSectionHtml(rec);
+    if (isDivination) html += buildDelayedActionsHtml(rec, tierInfo);
     html += returnDoorHtml;
   }
 
   wrap.innerHTML = html;
 
-  if (isDivination) {
-    if (face === "letter") {
-      const deepdiveBtn = document.getElementById("deepdiveBtn");
-      if (deepdiveBtn && !deepdiveBtn.disabled) {
-        deepdiveBtn.addEventListener("click", () => handleDeepdiveClick(rec.log_id, token));
-      }
-    } else {
-      wireStampHandlers(rec.log_id, token);
+  if (isDivination && viewContext === "delayed_return") {
+    const traceBtn = document.getElementById("delayedTraceBtn");
+    const tracePanel = document.getElementById("delayedTracePanel");
+    if (traceBtn && tracePanel) {
+      traceBtn.addEventListener("click", () => {
+        tracePanel.hidden = false;
+        traceBtn.setAttribute("aria-expanded", "true");
+        wireStampHandlers(rec.log_id, token);
+        tracePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, { once: true });
+    }
+    const deepdiveBtn = document.getElementById("deepdiveBtn");
+    if (deepdiveBtn) {
+      deepdiveBtn.addEventListener("click", () => handleDeepdiveClick(rec.log_id, token));
     }
   }
 }
@@ -614,8 +666,9 @@ function renderDetail(rec, tierInfo, token, face) {
 async function init() {
   const params = new URLSearchParams(window.location.search);
   const logId = params.get("log_id");
-  // SOUL-04b(v3.3 §1):src=letter → 深讀面;src=log 或無參數 → 卦記面(預設)
-  const face = params.get("src") === "letter" ? "letter" : "log";
+  // 現役 OA 信箋 src=letter 屬首次完成；從「我的卦記」進入才是延後回訪。
+  const viewContext = params.get("context") === "first_completion" || params.get("src") === "letter"
+    ? "first_completion" : "delayed_return";
   if (!logId) {
     show("viewError");
     document.getElementById("errMsg").textContent = "缺少卦記編號，請從卦記列表進入。";
@@ -666,7 +719,7 @@ async function init() {
   }
 
   const tierInfo = await fetchSubscriberTier(token); // E27:失敗不擋主流程,降級處理見 buildDeepdiveCtaHtml
-  renderDetail(data.record, tierInfo, token, face);
+  renderDetail(data.record, tierInfo, token, viewContext);
   show("viewDetail");
 }
 

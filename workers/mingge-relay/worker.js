@@ -26,16 +26,47 @@ const AT_SHUFANG     = "tblbzhwwmBDfAKQAs";
 // MG-RM-03 · 龍宮舍利 artifact owning store(與卦記/書房不同 base)
 const AT_PRODUCT_BASE = "appfQm6On0Wp9LtL9";
 const AT_ARTIFACTS    = "tbllxi9NZNhsBjLxD";
-// publish gate:Artifacts.publish_blocked 是 owning store 的 formula,只有這個字串代表可上架。
+// Legacy formula 只代表既有資料列通過舊 gate；RC1 不把它升格成 published truth。
 const ARTIFACT_PUBLISHABLE = "PUBLISHABLE";
-// TA 面白名單。刻意不含 sku_source_ref(來源平台 SKU)、unverified_factual_claims、
-// supplier_facts_note、data_state、evidence_grade、publish_block_reasons —— 那些是內部欄位。
+const ARTIFACT_PUBLICATION_STATES = Object.freeze([
+  "source_reference_only", "needs_supplier", "publishable_candidate", "published", "unavailable",
+]);
+
+// RC1 D-D08：逐 SKU publication truth。這是 internal scaffold，不會由 API 原樣輸出。
+// pending_source 是資料工作缺口；disclosed_unknowns 只有具 evidence ref 後才可進 public item。
+const FIRST_BATCH_ARTIFACT_PUBLICATION = Object.freeze({
+  XTVSSPvA: Object.freeze({
+    artifact_id: "XTVSSPvA", source_category: "bracelet", current_offer_price_twd: 6000,
+    publication_state: "needs_supplier", title_state: "missing", photo_rights_state: "missing",
+    owned_photo_assets: [], inventory_model: "PENDING_SUPPLIER", price_state: "confirmed",
+    required_facts_state: "missing", disclosed_unknowns_state: "missing", care_state: "missing",
+    after_sales_state: "missing", evidence_refs: [], pending_source: ["supplier_facts", "photo_rights", "inventory"],
+    disclosed_unknowns: [],
+  }),
+  agmh9hhJ: Object.freeze({
+    artifact_id: "agmh9hhJ", source_category: "bracelet", current_offer_price_twd: 6800,
+    publication_state: "needs_supplier", title_state: "missing", photo_rights_state: "missing",
+    owned_photo_assets: [], inventory_model: "PENDING_SUPPLIER", price_state: "confirmed",
+    required_facts_state: "missing", disclosed_unknowns_state: "missing", care_state: "missing",
+    after_sales_state: "missing", evidence_refs: [], pending_source: ["supplier_facts", "photo_rights", "inventory"],
+    disclosed_unknowns: [],
+  }),
+  S9j544BD: Object.freeze({
+    artifact_id: "S9j544BD", source_category: "bracelet", current_offer_price_twd: null,
+    publication_state: "needs_supplier", title_state: "missing", photo_rights_state: "missing",
+    owned_photo_assets: [], inventory_model: "PENDING_SUPPLIER", price_state: "missing",
+    required_facts_state: "missing", disclosed_unknowns_state: "missing", care_state: "missing",
+    after_sales_state: "missing", evidence_refs: [], pending_source: ["supplier_facts", "photo_rights", "inventory", "price"],
+    disclosed_unknowns: [],
+  }),
+});
+
+// TA 白名單刻意不含 source ref、pending_source、供應商工作註記與 publication internals。
 const ARTIFACT_PUBLIC_FIELDS = [
-  "artifact_id", "title_mingge", "actual_photos", "price_mingge_twd", "price_band",
+  "artifact_id", "title_mingge", "price_mingge_twd", "price_band",
   "inventory_model", "availability", "dimensions", "weight", "condition",
   "material_claim", "source_provenance", "traceability",
-  "known_facts", "unknowns", "cultural_use_context", "care",
-  "collector_entitlement", "publish_blocked",
+  "known_facts", "cultural_use_context", "care", "publish_blocked",
 ];
 const TRACE_MAX_BODY_BYTES = 4096;
 const LAOYI_CONV_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
@@ -179,52 +210,38 @@ export default {
       return json({ articles });
     }
 
-    // MG-RM-03 · GET /artifacts —— 龍宮舍利公開清單
-    // ★ fail closed:只回傳 publish_blocked === "PUBLISHABLE" 的列。
-    //   讀不到金鑰、Airtable 失敗、欄位缺漏 → 一律回空清單,TA 面維持「尚未開放」,
-    //   絕不降級成示範資料、絕不用來源平台圖片或價格頂替。
+    // RC1 · GET /artifacts —— publication-state 衍生的公開 catalog read model。
+    // ★ legacy PUBLISHABLE 不等於 published；只有逐 SKU publication_state=published 才可回傳。
+    // ★ 0 published → catalog_state=empty；store 讀失敗 → catalog_state=read_error。
     if (request.method === "GET" && url.pathname === "/artifacts") {
-      // ★ 讀取失敗 ≠ 沒有商品。缺金鑰 / 權限不足 / 網路或 HTTP 失敗 → read_error(非 2xx);
-      //   讀取成功但零筆 → state:"ok" + items:[]。兩者必須讓前端分得出來。
-      //   回應一律不夾帶 Airtable 原始回應或任何金鑰。
       if (!env.AIRTABLE_API_KEY) {
-        return json({ state: "read_error", items: [], gate: "publish_blocked", reason: "credential_unavailable" }, 503);
+        return json({
+          state: "read_error", catalog_state: "read_error", published_count: 0,
+          items: [], gate: "publication_state", reason: "credential_unavailable",
+        }, 503);
       }
       const result = await airtableFetchStrict(env.AIRTABLE_API_KEY, AT_PRODUCT_BASE, AT_ARTIFACTS, {
-        filterByFormula: `{publish_blocked}="${ARTIFACT_PUBLISHABLE}"`,
         fields: ARTIFACT_PUBLIC_FIELDS,
         maxRecords: 100,
       });
       if (!result.ok) {
-        return json({ state: "read_error", items: [], gate: "publish_blocked", reason: result.reason }, 503);
+        return json({
+          state: "read_error", catalog_state: "read_error", published_count: 0,
+          items: [], gate: "publication_state", reason: result.reason,
+        }, 503);
       }
       const items = (result.records || [])
         .map(r => r.fields || {})
-        // 第二道:即使 filterByFormula 被改壞,這裡仍逐列驗一次 publish gate。
-        .filter(f => f.publish_blocked === ARTIFACT_PUBLISHABLE)
-        .map(f => ({
-          artifact_id:          f.artifact_id || "",
-          title_mingge:         f.title_mingge || "",
-          photo_url:            Array.isArray(f.actual_photos) && f.actual_photos[0] && f.actual_photos[0].url
-                                  ? f.actual_photos[0].url : "",
-          price_mingge_twd:     typeof f.price_mingge_twd === "number" ? f.price_mingge_twd : null,
-          price_band:           f.price_band || "",
-          inventory_model:      f.inventory_model || "",
-          availability:         f.availability || "",
-          dimensions:           f.dimensions || "",
-          weight:               f.weight || "",
-          condition:            f.condition || "",
-          material_claim:       f.material_claim || "",
-          source_provenance:    f.source_provenance || "",
-          traceability:         f.traceability || "",
-          known_facts:          f.known_facts || "",
-          unknowns:             f.unknowns || "",
-          cultural_use_context: f.cultural_use_context || "",
-          care:                 f.care || "",
-          collector_entitlement:f.collector_entitlement || "",
-          publish_blocked:      f.publish_blocked,
-        }));
-      return json({ state: "ok", items, gate: "publish_blocked" });
+        .map(f => ({ fields: f, publication: artifactPublicationTruth(f.artifact_id) }))
+        // Production dual gate：explicit published truth + legacy owning-store formula 都要成立。
+        .filter(row => row.publication.publication_state === "published"
+          && row.fields.publish_blocked === ARTIFACT_PUBLISHABLE)
+        .map(row => artifactPublicView(row.fields, row.publication));
+      const catalogState = deriveArtifactCatalogState(items.length);
+      return json({
+        state: "ok", catalog_state: catalogState, published_count: items.length,
+        items, gate: "publication_state",
+      });
     }
 
     if (request.method === "POST" && url.pathname === "/log/seal") {
@@ -887,6 +904,56 @@ export default {
     }
   },
 };
+
+function artifactPublicationTruth(artifactId) {
+  const configured = artifactId ? FIRST_BATCH_ARTIFACT_PUBLICATION[artifactId] : null;
+  if (configured && ARTIFACT_PUBLICATION_STATES.includes(configured.publication_state)) {
+    return configured;
+  }
+  // 未逐 SKU admission 的資料列一律只是 source reference，不從 legacy formula 猜成 published。
+  return {
+    artifact_id: artifactId || "", publication_state: "source_reference_only",
+    title_state: "missing", photo_rights_state: "missing", owned_photo_assets: [],
+    inventory_model: "PENDING_SUPPLIER", price_state: "missing", required_facts_state: "missing",
+    disclosed_unknowns_state: "missing", care_state: "missing", after_sales_state: "missing",
+    evidence_refs: [], pending_source: ["publication_admission"], disclosed_unknowns: [],
+  };
+}
+
+function deriveArtifactCatalogState(publishedCount) {
+  return Number(publishedCount) > 0 ? "open" : "empty";
+}
+
+function artifactPublicView(fields, publication) {
+  const hasUnknownEvidence = publication.disclosed_unknowns_state === "confirmed"
+    && Array.isArray(publication.evidence_refs) && publication.evidence_refs.length > 0;
+  const disclosedUnknowns = hasUnknownEvidence && Array.isArray(publication.disclosed_unknowns)
+    ? publication.disclosed_unknowns.join("；") : "";
+  const ownedPhoto = publication.photo_rights_state === "cleared"
+    && Array.isArray(publication.owned_photo_assets) ? publication.owned_photo_assets[0] : "";
+  const factsConfirmed = publication.required_facts_state === "confirmed";
+  return {
+    artifact_id: publication.artifact_id,
+    publication_state: "published",
+    title_mingge: publication.title_state === "approved" ? (fields.title_mingge || "") : "",
+    photo_url: ownedPhoto || "",
+    price_mingge_twd: publication.price_state === "confirmed" && typeof fields.price_mingge_twd === "number"
+      ? fields.price_mingge_twd : null,
+    price_band: publication.price_state === "confirmed" ? (fields.price_band || "") : "",
+    inventory_model: factsConfirmed ? publication.inventory_model : "",
+    availability: factsConfirmed ? (fields.availability || "") : "",
+    dimensions: factsConfirmed ? (fields.dimensions || "") : "",
+    weight: factsConfirmed ? (fields.weight || "") : "",
+    condition: factsConfirmed ? (fields.condition || "") : "",
+    material_claim: factsConfirmed ? (fields.material_claim || "") : "",
+    source_provenance: factsConfirmed ? (fields.source_provenance || "") : "",
+    traceability: factsConfirmed ? (fields.traceability || "") : "",
+    known_facts: factsConfirmed ? (fields.known_facts || "") : "",
+    disclosed_unknowns: disclosedUnknowns,
+    cultural_use_context: factsConfirmed ? (fields.cultural_use_context || "") : "",
+    care: publication.care_state === "confirmed" ? (fields.care || "") : "",
+  };
+}
 
 // S163(E25②):邊讀邊擋的 body 位元組上限 —— 用 stream reader 累計位元組數,
 // 一旦超過 limit 立即 cancel 底層串流並丟出 tooLarge,不等整包 body 進記憶體才檢查

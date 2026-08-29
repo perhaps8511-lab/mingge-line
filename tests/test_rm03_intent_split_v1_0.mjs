@@ -25,7 +25,11 @@ check((mingge.match(/role="button" tabindex="0"/g) || []).length === 3 && mingge
 check((mingge.match(/role="button" tabindex="0"/g) || []).length === 3 && html.includes("card.addEventListener('click',showPending)") && html.includes("e.key==='Enter'||e.key===' '"), 'R302-c', 'all offers expose pointer and keyboard purchase intent');
 check(html.includes("status.classList.add('pc-status--activated');status.focus()") && /\.pc-status--activated\s*\{[^}]*border:[^;}]+;[^}]*background:[^;}]+;/.test(html), 'R302-c/R302-d behavior', 'activation adds a distinct, visibly styled fail-honest response state');
 check((mingge.match(/付款通道整備中,眼下還付不了款;開通到哪一步了,問一聲「書僮客服」便知。/g) || []).length === 3, 'R302-d', 'all offers expose exact fail-honest next step');
-check(relic.includes('龍宮舍利尚未開放。每一件都是實品,來源、材質、已知與未知,整理清楚了才上架;您若想先認識信物文化,「易經書房」裡有得讀。') && !relic.includes('pay-plan'), 'B1/B2', 'relic branch distinguishes unavailable inventory without fake products');
+check(relic.includes('運好氣旗下｜龍宮舍利選藏')
+  && relic.includes('先看清一件物，再決定要不要留下。')
+  && relic.includes('實品資料正在整理，完成後才會開放。')
+  && relic.includes('id="longyunPrimary">先認識龍宮舍利</button>')
+  && !relic.includes('pay-plan'), 'B1/B2', 'relic branch is content-first and 0 SKU honest');
 check(!relic.includes('示範') && !relic.includes('佔位') && !relic.includes('pinkoi'), 'B3', 'relic branch carries no mock/placeholder/source-platform residue');
 check(html.includes("var _payScrollMap={zero:'planSingle149',deepdive:'planDeepdive200',fupan:'planFupan1490'}") && html.includes("_showPayView(_payCtxMap[_src]?'mingge':'split')"), 'C1-C3', 'known src enters Mingge and preserves target mapping');
 check(html.includes("var _payCtxMap={zero:'下卦已立,要往上建嗎?要緊的事還在,上卦的來法都在這裡。',deepdive:'方才那一卦,若想再往深處讀——深卜的來法在這裡。',fupan:'想把走過的決定回頭看——問道·複盤的來法在這裡。'}"), 'C4', 'live context map remains exact');
