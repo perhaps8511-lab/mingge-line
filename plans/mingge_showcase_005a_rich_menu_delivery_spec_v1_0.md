@@ -14,6 +14,14 @@
 - 原圖比例與 `2500×1686` 不同；不得直接非等比拉伸。應以原設計元素重排至標準畫布，再輸出 PNG-8／最佳化 PNG。若 PNG 無法在手機保住文字且低於門檻，才改用高品質 JPEG，並重新檢查細線與字緣。
 - 不覆寫 Owner 原圖；候選圖須另存，記錄 SHA-256、像素與 bytes。
 
+### 1.1 RC1 候選圖留證（2026-08-29）
+
+- Repository path：`assets/richmenu_mingge_005a_2500x1686_v1_0.png`
+- SHA-256：`fc2b162715061ae5703c53bb8323d3d16a76204b6fa729621bc08db9d6347993`
+- 像素：`2500×1686`
+- 檔案大小：`630,565 bytes`
+- 狀態：`CANDIDATE-QA / NOT ACTIVATED`；尚未上傳 LINE、綁定、切換或正式啟用。
+
 ## 2. 六格 routing 契約
 
 機讀 mapping：`plans/mingge_showcase_005a_rich_menu_mapping_v1_0.json`。
@@ -34,7 +42,7 @@
 ## 4. 上線前獨立 gate
 
 1. Design／Owner 看候選圖的手機預覽，確認六格文字與品牌氣質。
-2. 驗證候選圖 exact dimensions、bytes 與 SHA-256。
+2. Repository test 驗證候選圖 exact dimensions、bytes 與 SHA-256；LINE 後台仍須讀回確認接受此檔。
 3. 以 LINE 後台預覽確認命中區未偏移。
 4. Make 建立／確認 `問老易` 與 `書僮客服` intent；`問老易` 不得消耗問卦銅錢。
 5. Dify 完整內容掛載及 `21+15` 回歸另行通過。

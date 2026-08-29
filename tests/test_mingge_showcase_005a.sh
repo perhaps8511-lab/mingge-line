@@ -9,6 +9,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IDX="$ROOT/index.html"
 MAP="$ROOT/plans/mingge_showcase_005a_rich_menu_mapping_v1_0.json"
 SPEC="$ROOT/plans/mingge_showcase_005a_rich_menu_delivery_spec_v1_0.md"
+MANIFEST="$ROOT/plans/mingge_showcase_005_content_canonical_manifest_v1_0.md"
+ASSET="$ROOT/assets/richmenu_mingge_005a_2500x1686_v1_0.png"
 
 check(){
   if "$@"; then echo "[PASS] $1"; ((PASS++)); else echo "[FAIL] $1"; ((FAIL++)); fi
@@ -112,6 +114,33 @@ if grep -q '小於 `900,000 bytes`' "$SPEC" && grep -q '不得直接非等比拉
   echo "[PASS] 壓縮、比例與未啟用邊界已明列"; ((PASS++))
 else
   echo "[FAIL] Rich Menu 交付規格不完整"; ((FAIL++))
+fi
+
+ASSET_OUT=$(node - "$ASSET" <<'NODE'
+const fs=require('fs');
+const crypto=require('crypto');
+const p=process.argv[2];
+const expectedHash='fc2b162715061ae5703c53bb8323d3d16a76204b6fa729621bc08db9d6347993';
+const b=fs.readFileSync(p);
+const signature=b.subarray(0,8).toString('hex');
+const width=b.readUInt32BE(16);
+const height=b.readUInt32BE(20);
+const sha256=crypto.createHash('sha256').update(b).digest('hex');
+const ok=signature==='89504e470d0a1a0a'&&width===2500&&height===1686&&b.length<900000&&sha256===expectedHash;
+console.log(JSON.stringify({width,height,bytes:b.length,sha256,ok}));
+if(!ok) process.exit(1);
+NODE
+)
+if [ $? -eq 0 ]; then
+  echo "[PASS] 候選 PNG 尺寸、容量與 SHA-256 已凍結: $ASSET_OUT"; ((PASS++))
+else
+  echo "[FAIL] 候選 PNG 驗證失敗: $ASSET_OUT"; ((FAIL++))
+fi
+
+if grep -q 'assets/richmenu_mingge_005a_2500x1686_v1_0.png' "$MANIFEST" && grep -q 'fc2b162715061ae5703c53bb8323d3d16a76204b6fa729621bc08db9d6347993' "$MANIFEST"; then
+  echo "[PASS] canonical manifest 已記錄 RC1 候選圖與 hash"; ((PASS++))
+else
+  echo "[FAIL] canonical manifest 候選圖留證缺失"; ((FAIL++))
 fi
 
 echo ""

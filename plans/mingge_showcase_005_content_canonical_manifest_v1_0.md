@@ -17,7 +17,8 @@
 
 | 資產 | 指定正本／候選 | 狀態 | SHA-256／證據 | 後續處置 |
 |---|---|---|---|---|
-| Rich Menu 視覺 | `Mix_ Rich Menu v3 底圖 + richmenu_image_labeled.png` | `CANONICAL-SOURCE`（視覺基底，不可直接上傳） | `a150a1494af13fb2d30736898c3d31f28381ba9aa6e5c87e15136809036c7121`；1376×768；1,963,606 bytes | 只改第 5 格文字為「問老易」，壓到 `<900 KB`；輸出新檔，不覆寫原檔 |
+| Rich Menu 視覺 | `Mix_ Rich Menu v3 底圖 + richmenu_image_labeled.png` | `CANONICAL-SOURCE`（視覺基底，不可直接上傳） | `a150a1494af13fb2d30736898c3d31f28381ba9aa6e5c87e15136809036c7121`；1376×768；1,963,606 bytes | 保留作視覺基底；六格文字以 Product Basis v1.2 RC1 重排，輸出新檔且不覆寫原檔 |
+| Rich Menu RC1 候選圖 | `assets/richmenu_mingge_005a_2500x1686_v1_0.png` | `CANDIDATE-QA / NOT ACTIVATED` | `fc2b162715061ae5703c53bb8323d3d16a76204b6fa729621bc08db9d6347993`；2500×1686；630,565 bytes | Owner 手機預覽 UAT 與 LINE 後台命中區預覽通過後，仍須另行授權才可上傳或切換；目前不得視為 live |
 | dg 聲線 | `001_spec_dg_voice_S165_v1_0.md` | `SUPPORTING-SPEC` | `03156179fd1b43f73071dbf25c242e3f3058bdcd8d8c529595c8b9ea0b2a2308` | V1–V6 保留；任何新 production prompt/spec 改用特質描述，不用在世作者姓名作模仿錨 |
 | 老易迎新 KB | `001_product_kb2_31_reception_S166_v1_0.md` | `CANDIDATE-QA` | `89cb1b9201ca78ab21b6efc790b6aeae8e4380c1bd126c22849b17de9cbb9710` | Claude 正確性／邊界 QA → 21+15 回歸全過才可掛 Dify |
 | 讀卦隨筆 batch3 | `001_product_shufang_dugua_batch3_S166_v1_0.md` | `CANDIDATE-QA` | `6a97134e3df27490af0553d78748c4c291a9cf0b00fb8d7ff205b1ad81149f62` | 取代 S165 batch3；先做三篇代表樣本 QA，再決定整批 |
