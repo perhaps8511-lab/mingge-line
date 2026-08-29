@@ -27,26 +27,59 @@ check(completionMarkup.includes('已收進「我的卦記」')
   && completionMarkup.includes('>看這一卦</a>')
   && completionMarkup.includes('>回首頁</a>'),
   'R1-05/C-11', '保存完成 state 只提供查看與退出');
+const buildId = html.match(/const APP_BUILD_ID = "([^"]+)";/)?.[1];
+check(buildId === '20260829-save-complete-mobile-recovery-r1'
+  && html.includes('id="handoffBuildId"')
+  && html.includes('id="sendingBuildId"')
+  && html.includes('id="saveCompleteBuildId"')
+  && html.includes("console.info('[Mingge] APP_BUILD_ID='+APP_BUILD_ID)"),
+  'R1-05-build', '固定 build id 可在 console、保存等待與完成畫面辨識');
+
+const versionUrlSlice = html.slice(html.indexOf('function versionedLiffEndpointUrl'), html.indexOf('function renderAppBuildId'));
+const versionUrlCtx = {
+  URL,
+  APP_BUILD_ID: buildId,
+  APP_BUILD_QUERY_PARAM: 'app_build',
+  LIFF_ENDPOINT_URL: 'https://perhaps8511-lab.github.io/mingge-line/',
+};
+vm.createContext(versionUrlCtx);
+vm.runInContext(versionUrlSlice + '\nthis.__versionUrl=versionedLiffEndpointUrl;', versionUrlCtx);
+const versionedUrl = new URL(versionUrlCtx.__versionUrl('https://perhaps8511-lab.github.io/mingge-line/?action=log&src=menu'));
+check(versionedUrl.searchParams.get('action') === 'log'
+  && versionedUrl.searchParams.get('src') === 'menu'
+  && versionedUrl.searchParams.get('app_build') === buildId,
+  'R1-05-cache-bust', '版本化 LIFF URL 保留既有 query parameters');
 for (const forbidden of ['深卜', '複盤', '半年方案', '龍運藏', '商品', '靜心']) {
   check(!completionMarkup.includes(forbidden), `N-16-${forbidden}`, `保存完成 state 不含「${forbidden}」`);
 }
 
-const persistenceSlice = html.slice(html.indexOf('function persistenceDelay'), html.indexOf('let liffReady'));
+const persistenceSlice = html.slice(html.indexOf('function persistenceDelay'), html.indexOf('/* LIFF 初始化'));
+const pageEvents = {};
+const documentEvents = {};
 const persistenceCtx = {
   RELAY_URL: 'https://relay.test/', SESSION_ID: 'session-rc1',
-  sessionStorage: { removed: [], removeItem(k) { this.removed.push(k); } },
+  sessionStorage: {
+    values: new Map(), removed: [],
+    getItem(k) { return this.values.has(k) ? this.values.get(k) : null; },
+    setItem(k, v) { this.values.set(k, String(v)); },
+    removeItem(k) { this.removed.push(k); this.values.delete(k); },
+  },
   setTimeout(fn) { fn(); return 1; },
   console: { warn() {} },
+  liff: { isLoggedIn: () => true, getAccessToken: () => 'resume-token' },
+  window: { addEventListener(name, fn) { pageEvents[name] = fn; } },
   document: {
+    visibilityState: 'visible',
     elements: {
       saveCompleteView: { href: '' },
       saveComplete: { classList: { values: [], add(v) { this.values.push(v); } } },
     },
     getElementById(id) { return this.elements[id] || null; },
+    addEventListener(name, fn) { documentEvents[name] = fn; },
   },
 };
 vm.createContext(persistenceCtx);
-vm.runInContext(persistenceSlice + '\nthis.__wait=waitForPersistedLog;this.__show=showSaveComplete;this.__readbackBudgetMs=(PERSISTENCE_POLL_ATTEMPTS-1)*PERSISTENCE_POLL_INTERVAL_MS;', persistenceCtx);
+vm.runInContext(persistenceSlice + '\nthis.__wait=waitForPersistedLog;this.__show=showSaveComplete;this.__recover=recoverInflightSave;this.__setRecoveryToken=function(v){liffReady=true;liffAccessToken=v;};this.__readbackBudgetMs=(PERSISTENCE_POLL_ATTEMPTS-1)*PERSISTENCE_POLL_INTERVAL_MS;', persistenceCtx);
 let pollCount = 0;
 persistenceCtx.fetch = async () => ({
   ok: true,
@@ -69,6 +102,58 @@ persistenceCtx.__show(persisted.log_id);
 check(persistenceCtx.document.elements.saveCompleteView.href === './log.html?log_id=rec123&context=first_completion'
   && persistenceCtx.document.elements.saveComplete.classList.values.includes('show'),
   'C-12-first', '保存完成導向 first_completion context');
+
+const gateSlice = html.slice(html.indexOf('function readEntryGateState'), html.indexOf('function persistenceDelay'));
+let gateShownLogId = null;
+const gateCtx = {
+  SESSION_ID: 'session-rc1', APP_BUILD_ID: buildId, READING_STATUS_TEXT: '讀卦中',
+  sessionStorage: persistenceCtx.sessionStorage,
+  quotaCreditsFromSub: () => 0,
+  showSaveComplete(logId) { gateShownLogId = logId; },
+  setSceneById() {},
+  document: {
+    getElementById() { return null; },
+    querySelector() { return null; },
+  },
+};
+vm.createContext(gateCtx);
+vm.runInContext(gateSlice + '\nthis.__readEntry=readEntryGateState;this.__blockEntry=blockEntryIfNeeded;', gateCtx);
+persistenceCtx.sessionStorage.setItem('mg_inflight_session_id', 'session-rc1');
+let reopenedState = gateCtx.__readEntry({ records: [{ session_id: 'session-rc1', log_id: 'rec-reopen' }] });
+check(gateCtx.__blockEntry(reopenedState) === true
+  && gateShownLogId === 'rec-reopen'
+  && !persistenceCtx.sessionStorage.values.has('mg_inflight_session_id'),
+  'R1-05-reopen', 'reopen 讀到 exact session_id + log_id 即顯示完成並清除 inflight');
+persistenceCtx.sessionStorage.setItem('mg_inflight_session_id', 'session-rc1');
+reopenedState = gateCtx.__readEntry({ records: [{ session_id: 'other-session', log_id: 'rec-other' }] });
+check(reopenedState.persistedLogId === null && reopenedState.inFlight === true,
+  'R1-05-session-negative', '不同 session_id 不得誤判保存成功');
+reopenedState = gateCtx.__readEntry({ records: [{ session_id: 'session-rc1' }] });
+check(reopenedState.persistedLogId === null && reopenedState.inFlight === true,
+  'R1-05-log-negative', 'exact session 沒有 log_id 仍不得顯示成功');
+
+const resumeMethods = [];
+persistenceCtx.__setRecoveryToken('resume-token');
+persistenceCtx.sessionStorage.setItem('mg_inflight_session_id', 'session-rc1');
+persistenceCtx.fetch = async (_url, options) => {
+  resumeMethods.push(options?.method);
+  return { ok: true, json: async () => ({ records: [{ session_id: 'session-rc1', log_id: 'rec-pageshow' }] }) };
+};
+const pageshowRecovered = await pageEvents.pageshow();
+check(pageshowRecovered?.log_id === 'rec-pageshow'
+  && persistenceCtx.document.elements.saveCompleteView.href.includes('log_id=rec-pageshow')
+  && resumeMethods.every(method => method === 'GET'),
+  'R1-05-pageshow', 'pageshow 前景恢復只做 GET readback 並顯示 exact log');
+persistenceCtx.sessionStorage.setItem('mg_inflight_session_id', 'session-rc1');
+persistenceCtx.fetch = async (_url, options) => {
+  resumeMethods.push(options?.method);
+  return { ok: true, json: async () => ({ records: [{ session_id: 'session-rc1', log_id: 'rec-visible' }] }) };
+};
+const visibilityRecovered = await documentEvents.visibilitychange();
+check(visibilityRecovered?.log_id === 'rec-visible'
+  && persistenceCtx.document.elements.saveCompleteView.href.includes('log_id=rec-visible')
+  && resumeMethods.every(method => method === 'GET'),
+  'R1-05-visibility', 'visibilitychange 回前景只做 GET readback 並顯示 exact log');
 
 const sendSlice = html.slice(html.indexOf('async function sendSay'), html.indexOf('function copyJson'));
 check(sendSlice.indexOf('waitForPersistedLog') < sendSlice.indexOf('showSaveComplete')

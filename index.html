@@ -240,6 +240,7 @@
   .save-complete-actions a{display:block;padding:13px 18px;border-radius:4px;text-decoration:none;
     font-size:17px;letter-spacing:.1em;color:var(--rice);border:1px solid var(--gold);}
   .save-complete-actions a:first-child{background:var(--gold);color:#15200f;font-weight:600;}
+  .app-build-id{margin-top:18px;font-size:11px;line-height:1.5;letter-spacing:.08em;color:var(--gold);word-break:break-all;}
 
   /* ====================================================
      086卡:mock 結帳 overlay(格3付費卡,?paytest=1 顯式觸發才會用到)
@@ -681,6 +682,7 @@
         <div class="ask">卦已成形。<br>請寫下你此卦所問。</div>
         <textarea class="say-input" id="sayInput" placeholder="例如：我在堅持做的這件事，會不會又是過度樂觀了？"></textarea>
         <button class="send" onclick="sendSay()">交給老易解卦</button>
+        <div class="app-build-id" id="handoffBuildId"></div>
       </div>
 
       <div class="devjson">
@@ -697,6 +699,7 @@
     <div class="st1">卦已成形 · 老易讀卦中</div>
     <div class="st2">信箋稍候片刻便到<br>請回到對話中等候</div>
     <div class="st3" id="sendHint">可關閉此頁，回到 LINE 對話等候信箋</div>
+    <div class="app-build-id" id="sendingBuildId"></div>
   </div>
 
   <!-- R2-S00：自動保存 write/readback 完成後的唯一完成狀態。 -->
@@ -708,6 +711,7 @@
         <a id="saveCompleteView" href="./index.html?action=log">看這一卦</a>
         <a href="./index.html">回首頁</a>
       </div>
+      <div class="app-build-id" id="saveCompleteBuildId"></div>
     </div>
   </div>
 
@@ -2297,6 +2301,26 @@ function showResult(g,now){
 ==================================================== */
 const DEV_MODE = false;                      // ★ 正式上線:走真實 LIFF + ID Token
 const LIFF_ID  = "2010192384-9AwjI8qH";       // S37 已建:命格進場儀式 LIFF App
+const APP_BUILD_ID = "20260829-save-complete-mobile-recovery-r1";
+const APP_BUILD_QUERY_PARAM = "app_build";
+const LIFF_ENDPOINT_URL = "https://perhaps8511-lab.github.io/mingge-line/";
+
+function versionedLiffEndpointUrl(urlLike){
+  var url=new URL(urlLike || LIFF_ENDPOINT_URL, LIFF_ENDPOINT_URL);
+  url.searchParams.set(APP_BUILD_QUERY_PARAM, APP_BUILD_ID);
+  return url.toString();
+}
+
+function renderAppBuildId(){
+  ['handoffBuildId','sendingBuildId','saveCompleteBuildId'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.textContent='版本 '+APP_BUILD_ID;
+  });
+}
+
+console.info('[Mingge] APP_BUILD_ID='+APP_BUILD_ID);
+console.info('[Mingge] versioned LIFF endpoint='+versionedLiffEndpointUrl(LIFF_ENDPOINT_URL));
+renderAppBuildId();
 /* ===== T2/T2b:debug 檢視區(gua_result 內測檢視)可見性閘門 ===== */
 /*  非 dev 進頁 → .devjson 零渲染;僅網址帶 ?dev=1 或 DEV_MODE 見(不明碼任何 userId)。 */
 function isDebugViewer(){ return DEV_MODE || new URLSearchParams(location.search).get('dev')==='1'; }
@@ -2401,6 +2425,10 @@ function readEntryGateState(data){
   var credits = quotaCreditsFromSub(sub);
   var activeSession = null;
   try{ activeSession = sessionStorage.getItem('mg_inflight_session_id'); }catch(_){}
+  var activeSessionMatches = activeSession===SESSION_ID;
+  var persistedRecord = activeSessionMatches
+    ? records.find(function(r){ return r && r.session_id===SESSION_ID && r.log_id; })
+    : null;
   return {
     ready:true,
     allow:true,
@@ -2408,7 +2436,8 @@ function readEntryGateState(data){
     tier:tier,
     credits:credits,
     recordsCount:records.length,
-    inFlight:activeSession===SESSION_ID && records.some(function(r){ return r && r.session_id===SESSION_ID; })
+    inFlight:activeSessionMatches && !persistedRecord,
+    persistedLogId:persistedRecord ? persistedRecord.log_id : null
   };
 }
 
@@ -2446,7 +2475,7 @@ function renderZeroQuotaGate(state){
 
 function renderReadingGate(){
   var el=document.getElementById('entryGateText');
-  if(el) el.textContent = READING_STATUS_TEXT;
+  if(el) el.textContent = READING_STATUS_TEXT+' · 版本 '+APP_BUILD_ID;
   var send=document.querySelector('.handoff .send');
   if(send){ send.disabled=true; send.textContent=READING_STATUS_TEXT; }
   setSceneById('sGate');
@@ -2454,6 +2483,11 @@ function renderReadingGate(){
 
 function blockEntryIfNeeded(state){
   if(!state || !state.ready) return false;
+  if(state.persistedLogId){
+    try{ sessionStorage.removeItem('mg_inflight_session_id'); }catch(_){}
+    showSaveComplete(state.persistedLogId);
+    return true;
+  }
   if(state.inFlight){ renderReadingGate(); return true; }
   if(state.hasSubscriber && state.tier==='free' && state.credits===0){
     renderZeroQuotaGate(state);
@@ -2468,29 +2502,38 @@ function persistenceDelay(ms){
 
 const PERSISTENCE_POLL_ATTEMPTS=81;
 const PERSISTENCE_POLL_INTERVAL_MS=1500;
+let persistencePollPromise=null;
 
 /* Auto-saved truth：POST 成功只代表 relay 接受；必須在 /history 讀回同 session_id + log_id
    才能對 TA 說「已收進」。保留 120 秒 readback 視窗，涵蓋現役 Make/Airtable 延遲；
    輪詢逾時仍不猜，退回既有「讀卦中」誠實狀態。 */
 async function waitForPersistedLog(token){
   if(!token) return null;
-  for(var attempt=0;attempt<PERSISTENCE_POLL_ATTEMPTS;attempt++){
-    try{
-      var resp=await fetch(RELAY_URL+'history',{method:'GET',cache:'no-store',headers:{'X-Line-AccessToken':token}});
-      if(resp.ok){
-        var data=await resp.json();
-        var rec=((data&&data.records)||[]).find(function(r){ return r && r.session_id===SESSION_ID && r.log_id; });
-        if(rec){
-          try{ sessionStorage.removeItem('mg_inflight_session_id'); }catch(_){}
-          return rec;
+  if(persistencePollPromise) return persistencePollPromise;
+  persistencePollPromise=(async function(){
+    for(var attempt=0;attempt<PERSISTENCE_POLL_ATTEMPTS;attempt++){
+      try{
+        var resp=await fetch(RELAY_URL+'history',{method:'GET',cache:'no-store',headers:{'X-Line-AccessToken':token}});
+        if(resp.ok){
+          var data=await resp.json();
+          var rec=((data&&data.records)||[]).find(function(r){ return r && r.session_id===SESSION_ID && r.log_id; });
+          if(rec){
+            try{ sessionStorage.removeItem('mg_inflight_session_id'); }catch(_){}
+            return rec;
+          }
         }
+      }catch(e){
+        console.warn('[persistence readback]', e && e.message ? e.message : e);
       }
-    }catch(e){
-      console.warn('[persistence readback]', e && e.message ? e.message : e);
+      if(attempt<PERSISTENCE_POLL_ATTEMPTS-1){ await persistenceDelay(PERSISTENCE_POLL_INTERVAL_MS); }
     }
-    if(attempt<PERSISTENCE_POLL_ATTEMPTS-1){ await persistenceDelay(PERSISTENCE_POLL_INTERVAL_MS); }
+    return null;
+  })();
+  try{
+    return await persistencePollPromise;
+  }finally{
+    persistencePollPromise=null;
   }
-  return null;
 }
 
 function showSaveComplete(logId){
@@ -2502,6 +2545,38 @@ function showSaveComplete(logId){
 }
 
 let liffReady=false, liffUserId=null, liffAccessToken=null;
+
+function hasCurrentInflightSession(){
+  try{ return sessionStorage.getItem('mg_inflight_session_id')===SESSION_ID; }
+  catch(_){ return false; }
+}
+
+async function recoverInflightSave(){
+  if(!hasCurrentInflightSession()) return null;
+  var token=liffAccessToken;
+  try{
+    if(liffReady && liff.isLoggedIn()){
+      token=liff.getAccessToken() || token;
+      if(token) liffAccessToken=token;
+    }
+  }catch(_){}
+  if(!token) return null;
+  var persisted=await waitForPersistedLog(token);
+  if(persisted && persisted.session_id===SESSION_ID && persisted.log_id){
+    showSaveComplete(persisted.log_id);
+    return persisted;
+  }
+  return null;
+}
+
+function handleForegroundSaveRecovery(){
+  return recoverInflightSave();
+}
+
+window.addEventListener('pageshow', handleForegroundSaveRecovery);
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState==='visible') return handleForegroundSaveRecovery();
+});
 
 /* LIFF 初始化(DEV 模式下略過,不報錯)
    方案3:改用 Access Token(SDK 自動續期,解決 ID Token 不續期會過期的問題);前端零固定祕密。 */
@@ -2522,7 +2597,10 @@ async function initLiff(){
     liffAccessToken=liff.getAccessToken();  // ★ 方案3:Access Token(SDK 管理、會自動續期;送出時會再即時重抓一次)
     console.log('[LIFF] init done. accessToken at init:', liffAccessToken ? 'OK' : 'null(送出時會重抓)');
     var gateState = await refreshEntryGateState(liffAccessToken);
-    if(blockEntryIfNeeded(gateState)) return;
+    if(blockEntryIfNeeded(gateState)){
+      if(gateState.inFlight) void recoverInflightSave();
+      return;
+    }
     restorePendingIfAny();                  // ★ v1.2:若是登入跳轉返回,還原送出前暫存的卦(qigua_time 原封,守 T0)
   }catch(e){
     console.error('LIFF init failed:', e);
