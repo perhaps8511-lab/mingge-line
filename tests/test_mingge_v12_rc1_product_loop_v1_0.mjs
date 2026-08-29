@@ -46,7 +46,7 @@ const persistenceCtx = {
   },
 };
 vm.createContext(persistenceCtx);
-vm.runInContext(persistenceSlice + '\nthis.__wait=waitForPersistedLog;this.__show=showSaveComplete;', persistenceCtx);
+vm.runInContext(persistenceSlice + '\nthis.__wait=waitForPersistedLog;this.__show=showSaveComplete;this.__readbackBudgetMs=(PERSISTENCE_POLL_ATTEMPTS-1)*PERSISTENCE_POLL_INTERVAL_MS;', persistenceCtx);
 let pollCount = 0;
 persistenceCtx.fetch = async () => ({
   ok: true,
@@ -56,6 +56,15 @@ const persisted = await persistenceCtx.__wait('token');
 check(persisted?.log_id === 'rec123' && pollCount === 3
   && persistenceCtx.sessionStorage.removed.includes('mg_inflight_session_id'),
   'R1-05-readback', '同 session_id 的 history readback 後才取得 record_ref');
+pollCount = 0;
+persistenceCtx.fetch = async () => ({
+  ok: true,
+  json: async () => ({ records: ++pollCount < 60 ? [] : [{ session_id: 'session-rc1', log_id: 'rec-late' }] }),
+});
+const delayedPersisted = await persistenceCtx.__wait('token');
+check(delayedPersisted?.log_id === 'rec-late' && pollCount === 60
+  && persistenceCtx.__readbackBudgetMs >= 120000,
+  'R1-05-latency', '120 秒 readback 視窗涵蓋現役 Make/Airtable 近 90 秒延遲');
 persistenceCtx.__show(persisted.log_id);
 check(persistenceCtx.document.elements.saveCompleteView.href === './log.html?log_id=rec123&context=first_completion'
   && persistenceCtx.document.elements.saveComplete.classList.values.includes('show'),
