@@ -228,6 +228,19 @@
   .sending .st3{margin-top:28px;font-size:11.5px;letter-spacing:.1em;color:var(--jade);opacity:.85;display:none;}
   @media (prefers-reduced-motion: reduce){.sending .slines{animation:none;opacity:.9;}}
 
+  /* RC1 R2-S00：只有 persistence readback 成功才顯示，不以 POST success 冒充已保存。 */
+  .save-complete{position:fixed;inset:0;z-index:65;display:none;align-items:center;justify-content:center;
+    background:rgba(7,11,7,.97);padding:40px 24px;text-align:center;}
+  .save-complete.show{display:flex;}
+  .save-complete-card{width:100%;max-width:360px;border:1px solid rgba(184,134,11,.5);
+    border-radius:8px;padding:30px 24px;background:rgba(34,53,31,.78);box-shadow:0 24px 70px rgba(0,0,0,.42);}
+  .save-complete-card h2{font-size:24px;line-height:1.6;letter-spacing:.08em;color:var(--gold-lit);}
+  .save-complete-card p{margin:14px 0 24px;font-size:17px;line-height:1.9;color:var(--rice-deep);}
+  .save-complete-actions{display:flex;flex-direction:column;gap:12px;}
+  .save-complete-actions a{display:block;padding:13px 18px;border-radius:4px;text-decoration:none;
+    font-size:17px;letter-spacing:.1em;color:var(--rice);border:1px solid var(--gold);}
+  .save-complete-actions a:first-child{background:var(--gold);color:#15200f;font-weight:600;}
+
   /* ====================================================
      086卡:mock 結帳 overlay(格3付費卡,?paytest=1 顯式觸發才會用到)
   ==================================================== */
@@ -539,7 +552,25 @@
   .lp-body p.pay-gate-note{font-size:17px;line-height:1.9;letter-spacing:.04em;
     color:var(--gold-soft);opacity:1;margin:10px 0 0;}
   #payRelicBranch{line-height:1.9;}
+  .longyun-view[hidden]{display:none;}
+  .longyun-eyebrow{font-size:12px!important;letter-spacing:.16em!important;color:var(--gold-soft)!important;margin-bottom:8px!important;}
+  .longyun-title{font-size:28px;letter-spacing:.18em;color:var(--rice);margin-bottom:12px;}
+  .longyun-hero{font-size:19px!important;line-height:1.8!important;color:var(--gold-lit)!important;}
+  .longyun-status{padding:14px 16px;border:1px solid rgba(184,134,11,.28);border-radius:6px;
+    font-size:17px!important;line-height:1.9!important;color:var(--rice-deep)!important;}
+  .longyun-actions{display:flex;flex-direction:column;align-items:stretch;gap:10px;margin:18px 0 10px;}
+  .longyun-actions .gate-door{width:100%;margin-top:0;}
+  .longyun-guide h2,.longyun-not-open h2{font-size:22px;line-height:1.6;color:var(--rice);margin-bottom:18px;}
+  .longyun-guide details{border-top:1px solid rgba(184,134,11,.22);padding:14px 0;}
+  .longyun-guide summary{cursor:pointer;font-size:17px;line-height:1.7;color:var(--gold-lit);}
+  .longyun-guide details p{margin:10px 0 0;}
   #payRelicLiveMessage{font-size:17px;line-height:1.9;}
+  #payRelicReadError{font-size:17px;line-height:1.9;color:var(--rice-deep);}
+  .longyun-link{
+    display:block;margin:18px auto 0;background:transparent;color:var(--rice-deep);
+    border:0;border-bottom:1px solid rgba(184,134,11,.42);padding:8px 4px;
+    font-family:inherit;font-size:17px;letter-spacing:.12em;cursor:pointer;}
+  .longyun-link:hover{color:var(--rice);border-bottom-color:var(--gold);}
   .pay-ctx{margin:12px auto 0;max-width:30em;font-size:17px;line-height:1.9;letter-spacing:.04em;color:var(--jade);text-align:center;}
   .quota-gate{
     max-width:360px;text-align:center;border:1px solid rgba(184,134,11,.28);
@@ -668,6 +699,18 @@
     <div class="st3" id="sendHint">可關閉此頁，回到 LINE 對話等候信箋</div>
   </div>
 
+  <!-- R2-S00：自動保存 write/readback 完成後的唯一完成狀態。 -->
+  <div class="save-complete" id="saveComplete" role="dialog" aria-modal="true" aria-labelledby="saveCompleteTitle">
+    <div class="save-complete-card">
+      <h2 id="saveCompleteTitle">已收進「我的卦記」</h2>
+      <p>事情有了變化，再回來補記就好。</p>
+      <div class="save-complete-actions">
+        <a id="saveCompleteView" href="./index.html?action=log">看這一卦</a>
+        <a href="./index.html">回首頁</a>
+      </div>
+    </div>
+  </div>
+
   <!-- 086卡:mock 結帳 overlay。只在 ?paytest=1 + 卡片點擊時由 JS 顯示;預設 hidden,不影響任何現況畫面。 -->
   <div class="pay-mock-overlay" id="payMockOverlay" hidden>
     <div class="pay-mock-card">
@@ -720,15 +763,59 @@
         <button type="button" class="pay-back-link" id="payMinggeBack">回首屏,換一邊看看</button>
       </div>
       <div id="payRelicBranch" hidden>
-        <p id="payRelicLiveMessage">龍宮舍利尚未開放。每一件都是實品,來源、材質、已知與未知,整理清楚了才上架;您若想先認識信物文化,「易經書房」裡有得讀。</p>
-        <p id="payRelicReadError" hidden>目前無法讀取龍宮舍利資料，請稍後再試。</p>
+        <div class="longyun-view longyun-entry" id="longyunEntry">
+          <p class="longyun-eyebrow">運好氣旗下｜龍宮舍利選藏</p>
+          <h2 class="longyun-title">龍運藏</h2>
+          <p class="longyun-hero">先看清一件物，再決定要不要留下。</p>
+          <p>龍運藏整理龍宮舍利的收藏與逐件資料。卦象不替您挑商品。</p>
+          <p class="longyun-status" id="payRelicLiveMessage">實品資料正在整理，完成後才會開放。</p>
+          <p id="payRelicReadError" hidden>目前無法讀取龍宮舍利資料，請稍後再試。</p>
+          <div class="longyun-actions">
+            <button type="button" class="gate-door" id="longyunPrimary">先認識龍宮舍利</button>
+            <button type="button" class="longyun-link" id="longyunSecondary" hidden>先認識龍宮舍利</button>
+            <button type="button" class="longyun-link" data-longyun-home>回命格</button>
+          </div>
+        </div>
+        <div class="longyun-view longyun-guide" id="longyunGuide" hidden>
+          <h2>龍宮舍利，是這批收藏沿用的名稱</h2>
+          <details>
+            <summary>可以確認的實品資料</summary>
+            <p>正式公開時，只列出有依據的照片、規格、品相、價格與售後資料。</p>
+          </details>
+          <details>
+            <summary>供應商提供的來源說明</summary>
+            <p>來源說明會標出依據；相似商品或外部平台頁面不能代替逐件事實。</p>
+          </details>
+          <details>
+            <summary>目前仍無法確認的部分</summary>
+            <p>只有已有證據支持「目前無法確認」的內容，才會公開列為未知。</p>
+          </details>
+          <details>
+            <summary>看實品時先問</summary>
+            <p>先看照片、規格與品相、來源依據、已揭露未知，以及售後。</p>
+          </details>
+          <div class="longyun-actions">
+            <button type="button" class="gate-door" id="longyunGuidePrimary">回龍運藏</button>
+            <button type="button" class="longyun-link" data-longyun-home>回命格</button>
+          </div>
+        </div>
+        <div class="longyun-view longyun-not-open" id="longyunNotOpen" hidden>
+          <h2>實品資料正在整理</h2>
+          <p>龍運藏只會開放資料已整理清楚的商品。您可以先認識龍宮舍利，或回命格。</p>
+          <div class="longyun-actions">
+            <button type="button" class="gate-door" id="longyunNotOpenGuide">先認識龍宮舍利</button>
+            <button type="button" class="longyun-link" data-longyun-home>回命格</button>
+          </div>
+        </div>
         <div id="artifactList" hidden>
-          <h2>已整理好的龍宮舍利</h2>
+          <h2>現有手鍊</h2>
           <div id="artifactCards"></div>
+          <button type="button" class="longyun-link" id="artifactGuideLink">了解我們怎麼標示來源與未知</button>
+          <button type="button" class="longyun-link" id="artifactListHome">回龍運藏</button>
         </div>
         <div id="artifactDetail" hidden>
           <div id="artifactDetailBody"></div>
-          <button type="button" class="pay-back-link" id="artifactListBack">回列表</button>
+          <button type="button" class="pay-back-link" id="artifactListBack">回手鍊列表</button>
         </div>
         <button type="button" class="pay-back-link" id="payRelicBack">回首屏,換一邊看看</button>
       </div>
@@ -754,7 +841,7 @@
           <div class="lp-icon">📚</div>
           <h1>易經書房</h1>
         </div>
-        <p class="study-intro">主人讀易的地方，也擱著些可看的東西。<span class="si-2">不必問卦也能進來坐 —— 挑一卷，慢慢看。</span></p>
+        <p class="study-intro"><strong>今天想自己讀一篇？</strong><span class="si-2">從生活裡常遇到的事開始，不必先懂卦名。</span></p>
         <div class="study-tags" id="studyTags"></div>
         <div class="study-featured" id="studyFeatured" hidden>
           <div class="sf-head">本週擱在案上的</div>
@@ -776,10 +863,10 @@
           <div class="sr-body" id="studyReadBody"></div>
           <div class="sr-seal" aria-hidden="true">☰ ☷</div>
           <div class="study-signpost">
-            <p>讀到一處想再問深一點，可以先拿這篇去問老易；若心裡已有一件要緊的事，再向天問卦。</p>
+            <p>想繼續讀，就回文章列表；有一段看不懂，再帶著這篇問老易。</p>
             <div class="ask-actions">
-              <button type="button" class="sp-btn ask-primary" id="studyAskLaoyi">拿這篇問老易</button>
-              <button type="button" class="ask-secondary" onclick="location.href='./index.html'">向天問卦</button>
+              <button type="button" class="sp-btn ask-primary" id="studyAskLaoyi">這篇看不懂？問老易</button>
+              <button type="button" class="ask-secondary" onclick="history.back()">繼續閱讀</button>
               <button type="button" class="ask-secondary" id="studyShareBtn">分享這一篇</button>
             </div>
             <p class="ask-status" id="studyAskStatus" role="status" aria-live="polite"></p>
@@ -814,11 +901,13 @@
     <div class="lp-header">
       <div class="lp-icon">👤</div>
       <h1>問老易</h1>
-      <div class="lp-sub">不必問卦，也能來聊《易經》的學問。</div>
+      <div class="lp-sub">把看不懂的問懂</div>
     </div>
     <!-- 態1:門廳 -->
     <div class="laoyi-view laoyi-hall" id="laoyiHall">
       <div class="lp-body">
+        <h2 style="font-size:22px;line-height:1.7;color:var(--rice);margin-bottom:10px;">有一段看不懂？</h2>
+        <p>把文章、卦辭或既有卦象帶來；這裡只做解釋，不會替您再起一卦。</p>
         <div class="about-portrait" aria-hidden="true"></div><!-- T6:頁首老易形象 image-slot 留白框(米白紙感·無人像);raster 待 Design 另輪換皮補 -->
         <p>老易，六十出頭，讀了大半輩子的《易經》。</p>
         <p>他不是算命的，也不替您決定什麼——他是替您把卦讀清楚的人。</p>
@@ -827,14 +916,21 @@
         <p>不必先有一卦。讀不懂一句、想知道一個觀念，或只是想把剛讀完的文章再問深一點，都可以來坐坐。</p>
         <div class="laoyi-hall-close"><!-- S1 --><p>老易這裡。這一進是問學的地方——易經的道理、卦的意思、書房裡的文章，都可以問。但有三件事老夫不做：不替你占、不替你斷、不談店務帳目。占卦是天的事，店務找書僮。想清楚了，就進來坐。</p></div>
         <div class="ask-actions">
-          <button type="button" class="sp-btn ask-primary" id="laoyiHallEnter">向老易請教</button>
+          <button type="button" class="sp-btn ask-primary" id="laoyiHallEnter">選擇要問的內容</button>
           <button type="button" class="ask-secondary" id="laoyiHallStudy">先逛書房</button>
         </div>
       </div>
     </div>
     <!-- 態2:問答室 -->
     <div class="laoyi-view laoyi-room" id="laoyiRoom" hidden>
+      <button type="button" class="study-back" id="laoyiContextReturn" hidden>← 回原文章</button>
       <div class="laoyi-thread" id="laoyiThread" role="log" aria-live="polite"></div>
+      <div class="ask-prompts" id="laoyiFollowUpChips" aria-label="追問方向">
+        <button type="button" class="ask-prompt" data-laoyi-chip="請說得更白話。">更白話</button>
+        <button type="button" class="ask-prompt" data-laoyi-chip="請換一個生活例子。">換生活例子</button>
+        <button type="button" class="ask-prompt" data-laoyi-chip="請帶我看古典脈絡。">看古典脈絡</button>
+        <button type="button" class="ask-prompt" data-laoyi-chip="請比較另一卦。">比較另一卦</button>
+      </div>
       <div class="laoyi-closing" id="laoyiClosing" hidden></div>
       <p class="ask-status" id="askLaoyiStatus" role="status" aria-live="polite"></p>
       <div class="ask-fallback" id="askLaoyiFallback" hidden>
@@ -1020,8 +1116,9 @@ async function studyShareArticle(gidx,btnEl){
    失敗 → 走現行 showAskLaoyiFallback,一字不動(零回歸)。 */
 function studySendAskLaoyi(gidx,btnEl){
   var a=studyState.articles[gidx]; if(!a){ return; }
-  if(btnEl){ btnEl.disabled=true; } // E56:改走格5老易問答室 deep link(帶篇名,S3開場),不再送 LINE 訊息寄生客服鏈
-  location.href='./index.html?action=ask&content_id='+encodeURIComponent(a.title||'這篇文章');
+  if(btnEl){ btnEl.disabled=true; }
+  location.href='./index.html?action=ask&content_id='+encodeURIComponent(a.title||'這篇文章')
+    +'&entry_context=article&content_ref='+encodeURIComponent(String(gidx));
 }
 
 /* 導覽狀態機:單次 fetch 快取,層間不重抓;pushState/popstate + 邊界 guard(R1-#5) */
@@ -1064,7 +1161,10 @@ async function initStudyPage(){
     studyState.loaded=true;
     if(clean.length===0){ studyFail('書房整理中，稍候。'); return; }
     studyRenderCover();
-    studyApply(history.state||{v:'cover'});
+    var requestedRef=Number(new URLSearchParams(location.search).get('article'));
+    var requestedState=Number.isInteger(requestedRef) && requestedRef>=0 && clean[requestedRef]
+      ? {v:'read',gidx:requestedRef,from:'list'} : null;
+    studyApply(requestedState||history.state||{v:'cover'});
   }catch(e){
     studyState.loaded=true;
     studyFail('書房暫時無法開門，請稍後再試。');
@@ -1339,7 +1439,23 @@ function initAskLaoyiPage(){
   var svcEntry=document.getElementById('laoyiSvcEntry');
   if(svcEntry){ svcEntry.addEventListener('click', laoyiShowSvcHandoff); }
 
-  var contentTitle=laoyiSanitizeTitle(new URLSearchParams(location.search).get('content_id'));
+  var routeParams=new URLSearchParams(location.search);
+  var contentTitle=laoyiSanitizeTitle(routeParams.get('content_id'));
+  var contentRef=routeParams.get('content_ref');
+  var contextReturn=document.getElementById('laoyiContextReturn');
+  if(contentTitle && /^\d+$/.test(contentRef||'') && contextReturn){
+    contextReturn.hidden=false;
+    contextReturn.addEventListener('click',function(){
+      location.href='./index.html?action=study&article='+encodeURIComponent(contentRef);
+    });
+  }
+  document.querySelectorAll('[data-laoyi-chip]').forEach(function(chip){
+    chip.addEventListener('click',function(){
+      if(!laoyiInput) return;
+      laoyiInput.value=chip.getAttribute('data-laoyi-chip')||'';
+      laoyiInput.focus();
+    });
+  });
   if(contentTitle){
     laoyiEnterRoom({opener:'content', contentTitle:contentTitle});
   } else if(laoyiHasSeenHall()){
@@ -1375,10 +1491,11 @@ async function initPayPage(){
     _relic.hidden=view!=='relic';
   }
   document.getElementById('payIntentMingge').addEventListener('click',function(){_showPayView('mingge');});
-  document.getElementById('payIntentRelic').addEventListener('click',function(){_showPayView('relic');});
+  document.getElementById('payIntentRelic').addEventListener('click',function(){_showPayView('relic');longyunShow('longyunEntry');});
   document.getElementById('payMinggeBack').addEventListener('click',function(){_showPayView('split');});
   document.getElementById('payRelicBack').addEventListener('click',function(){_showPayView('split');});
-  initArtifactList();   // MG-RM-03:實品清單一律讀 owning store;沒有可上架的列就維持「尚未開放」
+  initLongyunNavigation();
+  initArtifactList();   // RC1:目錄狀態由 published count 衍生；0 published 只開內容閉環。
   ['planSingle149','planDeepdive200','planFupan1490'].forEach(function(id){
     var card=document.getElementById(id);
     function showPending(){var status=card.querySelector('.pc-status');status.classList.add('pc-status--activated');status.focus();}
@@ -1407,14 +1524,18 @@ async function initPayPage(){
 }
 
 /* ====================================================
-   MG-RM-03 · 龍宮舍利實品接線(owning store = Airtable Artifacts,經 mingge-relay /artifacts)
-   ★ FAIL CLOSED:只有 owning store 判定 publish_blocked === 'PUBLISHABLE' 的列才會出現。
-     取不到、格式不符、清單為空 → 一律維持「尚未開放」原句,不降級成示範資料。
-   ★ 沒有的事實就留白:空值或 NEEDS_/PENDING_ 佔位一律不顯示,不從來源平台文案或圖片回填。
-   ★ 不做卦→商品推薦:本區完全不讀 gua_result,也不因卦象好壞改變任何呈現。
+   RC1 · 龍運藏 content-first + publication-state read model。
+   ★ production 只認 publication_state === published；publishable_candidate 仍不得公開。
+   ★ catalog_state 由 published count 衍生，0 published 不顯示卡片、價格或購買入口。
+   ★ pending_source 永不進 TA renderer；詳情第 3 層只讀 disclosed_unknowns。
+   ★ 本區不讀任何卦象變數，不做卦→商品推薦。
    ==================================================== */
-var ARTIFACT_PUBLISHABLE='PUBLISHABLE';
+var ARTIFACT_PUBLISHED='published';
+var ARTIFACT_CATALOG_EMPTY='empty';
+var ARTIFACT_CATALOG_OPEN='open';
+var ARTIFACT_CATALOG_READ_ERROR='read_error';
 var _artifactItems=[];
+var _artifactCatalogState=ARTIFACT_CATALOG_EMPTY;
 var _artifactPlaceholderRe=/^(NEEDS_|PENDING_|N\/A)/i;
 
 /* Offer Contract v1.2 §4:三個價帶 → 藏主期間;每個有效月權益相同,無月配額。
@@ -1443,8 +1564,8 @@ function artifactPriceTWD(value){
   if(typeof value!=='number'||!isFinite(value)) return '';
   return 'NT$'+value.toLocaleString('en-US');
 }
-function artifactIsPublishable(item){
-  return !!item && item.publish_blocked===ARTIFACT_PUBLISHABLE;
+function artifactIsPublished(item){
+  return !!item && item.publication_state===ARTIFACT_PUBLISHED;
 }
 function artifactAppendSection(parent,label,value){
   var text=artifactFact(value);
@@ -1473,9 +1594,61 @@ function artifactAppendPhoto(parent,item){
   parent.appendChild(image);
 }
 
+function longyunShow(viewId){
+  ['longyunEntry','longyunGuide','longyunNotOpen','artifactList','artifactDetail'].forEach(function(id){
+    var el=document.getElementById(id); if(el){ el.hidden=id!==viewId; }
+  });
+}
+
+function initLongyunNavigation(){
+  var primary=document.getElementById('longyunPrimary');
+  var secondary=document.getElementById('longyunSecondary');
+  var guidePrimary=document.getElementById('longyunGuidePrimary');
+  var notOpenGuide=document.getElementById('longyunNotOpenGuide');
+  var guideLink=document.getElementById('artifactGuideLink');
+  var listHome=document.getElementById('artifactListHome');
+  if(primary){ primary.addEventListener('click',function(){
+    if(_artifactCatalogState===ARTIFACT_CATALOG_OPEN){ showArtifactList(); }
+    else{ longyunShow('longyunGuide'); }
+  }); }
+  if(secondary){ secondary.addEventListener('click',function(){ longyunShow('longyunGuide'); }); }
+  if(guidePrimary){ guidePrimary.addEventListener('click',function(){
+    if(_artifactCatalogState===ARTIFACT_CATALOG_OPEN){ showArtifactList(); }
+    else{ longyunShow('longyunNotOpen'); }
+  }); }
+  if(notOpenGuide){ notOpenGuide.addEventListener('click',function(){ longyunShow('longyunGuide'); }); }
+  if(guideLink){ guideLink.addEventListener('click',function(){ longyunShow('longyunGuide'); }); }
+  if(listHome){ listHome.addEventListener('click',function(){ longyunShow('longyunEntry'); }); }
+  document.querySelectorAll('[data-longyun-home]').forEach(function(btn){
+    btn.addEventListener('click',function(){ location.href='./index.html'; });
+  });
+}
+
+function renderArtifactCatalogState(state){
+  _artifactCatalogState=state;
+  var status=document.getElementById('payRelicLiveMessage');
+  var primary=document.getElementById('longyunPrimary');
+  var secondary=document.getElementById('longyunSecondary');
+  var guidePrimary=document.getElementById('longyunGuidePrimary');
+  if(state===ARTIFACT_CATALOG_OPEN){
+    if(status){ status.textContent='實品資料已整理完成，可以逐件查看。'; status.hidden=false; }
+    if(primary){ primary.textContent='看看現有手鍊'; }
+    if(secondary){ secondary.hidden=false; }
+    if(guidePrimary){ guidePrimary.textContent='看看現有手鍊'; }
+    return;
+  }
+  if(status){ status.textContent='實品資料正在整理，完成後才會開放。'; status.hidden=false; }
+  if(primary){ primary.textContent='先認識龍宮舍利'; }
+  if(secondary){ secondary.hidden=true; }
+  if(guidePrimary){ guidePrimary.textContent='回龍運藏'; }
+}
+
 function showArtifactList(){
-  document.getElementById('artifactList').hidden=false;
-  document.getElementById('artifactDetail').hidden=true;
+  if(_artifactCatalogState!==ARTIFACT_CATALOG_OPEN || !_artifactItems.length){
+    longyunShow('longyunNotOpen');
+    return;
+  }
+  longyunShow('artifactList');
 }
 
 function showArtifactDetail(item){
@@ -1500,7 +1673,7 @@ function showArtifactDetail(item){
   artifactAppendSection(body,'來源說明',item.source_provenance);
   artifactAppendSection(body,'可追溯資料',item.traceability);
   // 3 我們不知道什麼
-  artifactAppendSection(body,'我們不知道什麼',item.unknowns);
+  artifactAppendSection(body,'我們目前無法確認什麼',item.disclosed_unknowns);
   // 4 文化／收藏情境
   artifactAppendSection(body,'文化與收藏情境',item.cultural_use_context);
   // 5 不承諾什麼(固定句;不輸出 owning store 的禁詞清單)
@@ -1515,8 +1688,7 @@ function showArtifactDetail(item){
   artifactAppendSection(body,'售後與退換',ARTIFACT_SUPPORT);
   artifactAppendLine(body,ARTIFACT_CHECKOUT_GATE);
 
-  document.getElementById('artifactList').hidden=true;
-  document.getElementById('artifactDetail').hidden=false;
+  longyunShow('artifactDetail');
 }
 
 /* 讀取失敗 ≠ 沒有商品:
@@ -1524,24 +1696,32 @@ function showArtifactDetail(item){
    read_error  → 換成人看得懂的「目前無法讀取…請稍後再試」
    兩者都絕不以示範資料頂替。 */
 function showArtifactReadError(){
-  var msgEl=document.getElementById('payRelicLiveMessage');
+  renderArtifactCatalogState(ARTIFACT_CATALOG_READ_ERROR);
+  longyunShow('longyunEntry');
+  var statusEl=document.getElementById('payRelicLiveMessage');
   var errEl=document.getElementById('payRelicReadError');
-  if(msgEl) msgEl.hidden=true;
+  if(statusEl) statusEl.hidden=true;
   if(errEl) errEl.hidden=false;
 }
 
 async function initArtifactList(){
-  var msgEl=document.getElementById('payRelicLiveMessage');
+  var errEl=document.getElementById('payRelicReadError');
   var backEl=document.getElementById('artifactListBack');
   if(backEl) backEl.addEventListener('click',showArtifactList);
+  renderArtifactCatalogState(ARTIFACT_CATALOG_EMPTY);
   try{
     var response=await fetch(RELAY_URL+'artifacts',{method:'GET'});
     if(!response.ok){ showArtifactReadError(); return; }        // 憑證/權限/HTTP 失敗
     var payload=await response.json();
     if(!payload||payload.state!=='ok'){ showArtifactReadError(); return; }
+    if(errEl){ errEl.hidden=true; }
     var items=Array.isArray(payload.items)?payload.items:[];
-    _artifactItems=items.filter(artifactIsPublishable);         // 前端第三道 publish gate
-    if(!_artifactItems.length) return;                          // fail closed:維持「尚未開放」
+    _artifactItems=items.filter(artifactIsPublished);           // 前端最後一道 publication gate
+    var derivedState=_artifactItems.length>0?ARTIFACT_CATALOG_OPEN:ARTIFACT_CATALOG_EMPTY;
+    if(payload.catalog_state===ARTIFACT_CATALOG_READ_ERROR){ showArtifactReadError(); return; }
+    // 伺服器若聲稱 open 但沒有 published item，仍以 count fail closed。
+    renderArtifactCatalogState(derivedState);
+    if(derivedState!==ARTIFACT_CATALOG_OPEN){ return; }
     var cards=document.getElementById('artifactCards');
     cards.replaceChildren();
     _artifactItems.forEach(function(item){
@@ -1555,13 +1735,11 @@ async function initArtifactList(){
       var detail=document.createElement('button');
       detail.type='button';
       detail.className='gate-door';
-      detail.textContent='看這一件';
+      detail.textContent='看這件實品';
       detail.addEventListener('click',function(){showArtifactDetail(item);});
       card.appendChild(detail);
       cards.appendChild(card);
     });
-    msgEl.hidden=true;
-    showArtifactList();
   }catch(error){                                                // 網路/解析失敗 = 讀取失敗
     console.warn('[artifacts]',error);
     showArtifactReadError();
@@ -2284,20 +2462,39 @@ function blockEntryIfNeeded(state){
   return false;
 }
 
-async function renderSingleLogEntry(token){
-  var el=document.getElementById('singleLogEntry');
-  if(!el || !token) return;
-  try{
-    var resp=await fetch(RELAY_URL+'history',{method:'GET',headers:{'X-Line-AccessToken':token}});
-    if(!resp.ok) return;
-    var data=await resp.json();
-    var rec=((data&&data.records)||[]).find(function(r){ return r && r.session_id===SESSION_ID && r.log_id; });
-    if(rec){
-      el.innerHTML='<a href="./log.html?log_id='+encodeURIComponent(rec.log_id)+'">查看信箋 ›</a>';
+function persistenceDelay(ms){
+  return new Promise(function(resolve){ setTimeout(resolve,ms); });
+}
+
+/* Auto-saved truth：POST 成功只代表 relay 接受；必須在 /history 讀回同 session_id + log_id
+   才能對 TA 說「已收進」。輪詢逾時不猜，退回既有「讀卦中」誠實狀態。 */
+async function waitForPersistedLog(token){
+  if(!token) return null;
+  for(var attempt=0;attempt<18;attempt++){
+    try{
+      var resp=await fetch(RELAY_URL+'history',{method:'GET',cache:'no-store',headers:{'X-Line-AccessToken':token}});
+      if(resp.ok){
+        var data=await resp.json();
+        var rec=((data&&data.records)||[]).find(function(r){ return r && r.session_id===SESSION_ID && r.log_id; });
+        if(rec){
+          try{ sessionStorage.removeItem('mg_inflight_session_id'); }catch(_){}
+          return rec;
+        }
+      }
+    }catch(e){
+      console.warn('[persistence readback]', e && e.message ? e.message : e);
     }
-  }catch(e){
-    console.warn('[single log entry]', e && e.message ? e.message : e);
+    if(attempt<17){ await persistenceDelay(1500); }
   }
+  return null;
+}
+
+function showSaveComplete(logId){
+  if(!logId) return;
+  var view=document.getElementById('saveCompleteView');
+  if(view){ view.href='./log.html?log_id='+encodeURIComponent(logId)+'&context=first_completion'; }
+  var complete=document.getElementById('saveComplete');
+  if(complete){ complete.classList.add('show'); }
 }
 
 let liffReady=false, liffUserId=null, liffAccessToken=null;
@@ -2419,10 +2616,13 @@ async function sendSay(){
     if(!res.ok) throw new Error('relay HTTP '+res.status);
     try{ sessionStorage.setItem('mg_inflight_session_id', SESSION_ID); }catch(_){}
     if(btn){btn.textContent='已送出 · 老易解卦中';}
-    await renderSingleLogEntry(liffAccessToken);
-    // 回覆由 LINE OA 推回(本頁不負責顯示解卦結果)。
-    // S79:送出成功 → 顯示「解卦中」引導 → 自動收合 LIFF 回聊天室等信箋。
-    showSendingAndClose();
+    var persisted=await waitForPersistedLog(liffAccessToken);
+    if(persisted){
+      showSaveComplete(persisted.log_id);
+    }else{
+      // 尚未 readback 就不宣稱保存；維持讀卦中並回 LINE 等候。
+      showSendingAndClose();
+    }
   }catch(e){
     console.error('send failed:', e);
     alert('送出時遇到問題,請稍後再試。\n('+e.message+')');

@@ -9,6 +9,7 @@
   "areas": [
     {
       "bounds": { "x": 0, "y": 0, "width": 834, "height": 843 },
+      "display": { "label": "向天問卦", "subtitle": "問一件新的事" },
       "action": {
         "type": "uri",
         "label": "向天問卦",
@@ -17,6 +18,7 @@
     },
     {
       "bounds": { "x": 834, "y": 0, "width": 833, "height": 843 },
+      "display": { "label": "我的卦記", "subtitle": "回看、補記已有的事" },
       "action": {
         "type": "uri",
         "label": "我的卦記",
@@ -25,14 +27,16 @@
     },
     {
       "bounds": { "x": 1667, "y": 0, "width": 833, "height": 843 },
+      "display": { "label": "方案・信物", "subtitle": "看方案或龍宮舍利" },
       "action": {
         "type": "uri",
-        "label": "訂閱方案",
+        "label": "方案・信物",
         "uri": "https://liff.line.me/2010192384-9AwjI8qH?action=pay"
       }
     },
     {
       "bounds": { "x": 0, "y": 843, "width": 834, "height": 843 },
+      "display": { "label": "易經書房", "subtitle": "自己讀一篇" },
       "action": {
         "type": "uri",
         "label": "易經書房",
@@ -41,6 +45,7 @@
     },
     {
       "bounds": { "x": 834, "y": 843, "width": 833, "height": 843 },
+      "display": { "label": "問老易", "subtitle": "把看不懂的問懂" },
       "action": {
         "type": "message",
         "label": "問老易",
@@ -49,6 +54,7 @@
     },
     {
       "bounds": { "x": 1667, "y": 843, "width": 833, "height": 843 },
+      "display": { "label": "書僮客服", "subtitle": "查權益、訂單與售後" },
       "action": {
         "type": "message",
         "label": "書僮客服",

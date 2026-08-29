@@ -1,0 +1,99 @@
+{
+  "document_id": "MINGGE-v1.2-RC1-FUTURE-GATED-CONTRACT-v1.0",
+  "status": "FUTURE_GATED_NOT_RUNTIME",
+  "payment_provider": null,
+  "payment_environment": null,
+  "checkout_readiness_state": "not_admitted",
+  "real_checkout_enabled": false,
+  "order_mutation_enabled": false,
+  "holder_activation_runtime_enabled": false,
+  "entitlement_claim_enabled": false,
+  "checkout_preflight": {
+    "required_readback": [
+      "exact_artifact",
+      "exact_price",
+      "availability",
+      "after_sales_and_returns"
+    ],
+    "purchase_intent": [
+      "self_use",
+      "gift"
+    ],
+    "self_use": {
+      "copy": "這件商品由您自己使用；收到後由您完成啟用，藏主時間才開始。",
+      "holder_type": "buyer",
+      "activation_rule": "holder_explicit_action"
+    },
+    "gift": {
+      "copy": "這件商品由您購買、由收禮者使用。收禮者自己啟用；您不會因此看到對方的卦記、深卜、複盤或使用紀錄。",
+      "holder_type": "recipient",
+      "activation_rule": "recipient_explicit_action",
+      "buyer_private_memory_read": false
+    },
+    "primary_action": "確認並前往付款",
+    "safe_exit": "回商品詳情"
+  },
+  "buyer_holder_privacy": {
+    "buyer_can": [
+      "select_artifact",
+      "pay_when_admitted",
+      "read_own_order_and_fulfillment"
+    ],
+    "buyer_cannot": [
+      "read_holder_gua_records",
+      "read_holder_deepdive",
+      "read_holder_fupan",
+      "read_holder_usage_history"
+    ],
+    "gift_invitation_payload": [
+      "artifact_ref",
+      "entitlement_summary",
+      "duration",
+      "privacy_copy"
+    ],
+    "gift_invitation_forbidden": [
+      "buyer_private_memory",
+      "holder_private_memory",
+      "payment_payload"
+    ]
+  },
+  "holder_activation": {
+    "headline": "要現在啟用藏主嗎？",
+    "starts_at": "holder_explicit_activation",
+    "preselected_action": null,
+    "actions": [
+      "現在啟用",
+      "稍後啟用",
+      "不接受這次啟用",
+      "問書僮"
+    ],
+    "safe_exit": "稍後處理",
+    "payment_implies_active": false,
+    "delivery_implies_active": false
+  },
+  "entry_context": {
+    "allowed_fields": [
+      "source_surface_id",
+      "source_screen_id",
+      "source_record_ref",
+      "safe_return_route",
+      "expires_at"
+    ],
+    "forbidden_fields": [
+      "question_text",
+      "full_gua_record",
+      "private_decision_memory",
+      "payment_payload"
+    ]
+  },
+  "support_return": {
+    "from_product_detail": "return_product_detail",
+    "from_checkout_preflight": "return_checkout_preflight",
+    "from_holder_activation": "return_holder_activation",
+    "from_plan": "return_plan",
+    "from_gua_entitlement": "return_same_gua_record",
+    "from_article": "return_same_article",
+    "default": "return_rich_menu",
+    "display_action": "回到剛才的位置"
+  }
+}

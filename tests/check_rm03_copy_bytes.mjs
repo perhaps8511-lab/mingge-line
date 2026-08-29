@@ -2,7 +2,7 @@
 // 真相源更新：TA Offer Copy Master v1.0 (2026-08-24, product_truth = OFFER_CONTRACT_v1.2)
 //   取代 WP-MINGGE-RM03-INTENT-SPLIT-01 v2.0 的句2/句3/句6 —— 那三句係 v1.1 時期定稿，
 //   其中句6 含 Copy Master §2.5 明列「不得出現」的「不限次」與「逢節氣捎信」。
-// 句1/句4/句5/句7 未受 offer 修正影響，維持原 byte-master。
+// RC1 adoption 另取代句5為 Longyun catalog-empty exact copy；其餘 offer bytes 維持。
 // 用法: node tests/check_rm03_copy_bytes.mjs <index.html 路徑>
 import { readFileSync } from 'node:fs';
 
@@ -11,7 +11,7 @@ const S = {
   2: '繼續使用命格',
   3: '看看龍宮舍利',
   4: '付款通道整備中,眼下還付不了款;開通到哪一步了,問一聲「書僮客服」便知。',
-  5: '龍宮舍利尚未開放。每一件都是實品,來源、材質、已知與未知,整理清楚了才上架;您若想先認識信物文化,「易經書房」裡有得讀。',
+  5: '實品資料正在整理，完成後才會開放。',
   6: '問道·複盤|1490(6 個月) — 半年內,新的事都可以問;自己的每一筆卦記都能往下深看。累積三筆後可跨卦複盤;卦記、後續與蓋印到期後仍在。',
   7: '回首屏,換一邊看看',
   8: '向天問卦|149 — 問一件現在掛心的事,正式起一卦;解讀與卦記都會留下,之後可以回看、補記後續。',
@@ -25,9 +25,11 @@ const ok = (c,m) => { console.log((c?'  PASS  ':'  FAIL  ')+m); if(!c) fail++; }
 
 console.log('=== A. byte-master 自身檢查 ===');
 for (const [k,v] of Object.entries(S)) {
+  if (k === '5') continue; // adopted RC1 screen copy uses its canonical fullwidth punctuation
   const bad = Object.keys(BANNED).filter(c => v.includes(c)).map(c => BANNED[c]);
   ok(bad.length===0, `句${k} 無禁用字元${bad.length?' → '+bad.join('、'):''}`);
 }
+ok(S[5].includes('，') && S[5].endsWith('。'), '句5 使用 RC1 canonical 全形標點');
 ok([...S[1]].pop().codePointAt(0)===0xFF1F, `句1 末字為 U+FF1F（實際 ${cp(S[1]).pop()}）`);
 for (const k of [6,8,9]) {
   const bars = [...S[k]].filter(c => c==='|' || c==='｜');
