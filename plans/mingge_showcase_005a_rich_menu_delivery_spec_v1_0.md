@@ -17,9 +17,10 @@
 ### 1.1 RC1 候選圖留證（2026-08-29）
 
 - Repository path：`assets/richmenu_mingge_005a_2500x1686_v1_0.png`
-- SHA-256：`fc2b162715061ae5703c53bb8323d3d16a76204b6fa729621bc08db9d6347993`
+- SHA-256：`b68193ade39f312860f42d5ebc775c9e8d271bee670887bd904945059af517c1`
 - 像素：`2500×1686`
-- 檔案大小：`630,565 bytes`
+- 檔案大小：`601,225 bytes`
+- 手機可讀性修正：依 Owner（40–65 歲 TA）回饋，下排三格副標由 `31px` 放大為 `40px`；上排維持 `31px`。
 - 狀態：`CANDIDATE-QA / NOT ACTIVATED`；尚未上傳 LINE、綁定、切換或正式啟用。
 
 ## 2. 六格 routing 契約

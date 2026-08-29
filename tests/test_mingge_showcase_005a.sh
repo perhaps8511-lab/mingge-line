@@ -120,7 +120,7 @@ ASSET_OUT=$(node - "$ASSET" <<'NODE'
 const fs=require('fs');
 const crypto=require('crypto');
 const p=process.argv[2];
-const expectedHash='fc2b162715061ae5703c53bb8323d3d16a76204b6fa729621bc08db9d6347993';
+const expectedHash='b68193ade39f312860f42d5ebc775c9e8d271bee670887bd904945059af517c1';
 const b=fs.readFileSync(p);
 const signature=b.subarray(0,8).toString('hex');
 const width=b.readUInt32BE(16);
@@ -137,7 +137,7 @@ else
   echo "[FAIL] 候選 PNG 驗證失敗: $ASSET_OUT"; ((FAIL++))
 fi
 
-if grep -q 'assets/richmenu_mingge_005a_2500x1686_v1_0.png' "$MANIFEST" && grep -q 'fc2b162715061ae5703c53bb8323d3d16a76204b6fa729621bc08db9d6347993' "$MANIFEST"; then
+if grep -q 'assets/richmenu_mingge_005a_2500x1686_v1_0.png' "$MANIFEST" && grep -q 'b68193ade39f312860f42d5ebc775c9e8d271bee670887bd904945059af517c1' "$MANIFEST"; then
   echo "[PASS] canonical manifest 已記錄 RC1 候選圖與 hash"; ((PASS++))
 else
   echo "[FAIL] canonical manifest 候選圖留證缺失"; ((FAIL++))
