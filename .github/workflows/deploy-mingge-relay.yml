@@ -18,7 +18,7 @@ jobs:
     env:
       CLOUDFLARE_ACCOUNT_ID: 2a876d44d3cd6ee6b833272e724fb7a6
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      EXPECTED_WORKER_SHA256: 8787293114c2439aac4ac8db07e3b320cc6300c3e5874494d9b1b154173e4d11
+      EXPECTED_WORKER_SHA256: f544ba80acd2f949cdeb8731ab9be04d7e769f6ff4f42d0ee68551cddf7cdb0d
 
     steps:
       - name: Check out release source

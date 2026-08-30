@@ -115,9 +115,9 @@ echo "=== 段② Worker 402 標準 body 驗證 ==="
 
 WORKER="$(dirname "$0")/../workers/mingge-relay/worker.js"
 
-# 2a. 402 response body contains gate, credits, next
-if grep -q 'json({ gate: "zero_quota", credits: 0, next: "door_149" }, 402)' "$WORKER"; then
-  echo "[PASS] 402 body = {gate:\"zero_quota\", credits:0, next:\"door_149\"}"
+# 2a. 402 response body contains gate, credits, next and stable reason code
+if grep -q 'json({ gate: "zero_quota", credits: 0, next: "door_149", code: "QUOTA_REQUIRED" }, 402)' "$WORKER"; then
+  echo "[PASS] 402 body = zero_quota + stable QUOTA_REQUIRED code"
   ((PASS++))
 else
   echo "[FAIL] 402 body not standardized"

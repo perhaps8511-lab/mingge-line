@@ -436,8 +436,7 @@ export default {
         return json({ record: null }, 404);
       }
       if (!recRes.ok) {
-        const errBody = await recRes.text().catch(() => "");
-        console.log("Airtable trace read failed", recRes.status, errBody);
+        console.log("SECURITY_GATE", "AIRTABLE_TRACE_READ_HTTP_ERROR", recRes.status);
         return json({ error: "Airtable read failed" }, 502);
       }
 
@@ -482,8 +481,7 @@ export default {
       }
 
       if (!patchRes.ok) {
-        const errBody = await patchRes.text().catch(() => "");
-        console.log("Airtable trace write failed", patchRes.status, errBody);
+        console.log("SECURITY_GATE", "AIRTABLE_TRACE_WRITE_HTTP_ERROR", patchRes.status);
         return json({ error: "Airtable write failed" }, 502);
       }
 
@@ -784,23 +782,25 @@ export default {
       // S20260721 UAT F4:workers.dev 子域無 zone,zone WAF Rate Limiting Rules 不適用,改 code 層擋。
       // 鍵=已驗證 LINE userId(非原始 token/IP)——同一人换 token 仍算同一額度,且不把 token 值存進限流鍵。
       // 20 req/min,超過該 60 秒窗口內即回 429(等同「block 60s」:窗口未過前同 key 持續被拒)。
-      // Codex 互審 r1 指出 fail-open 對「binding 缺失」不當:binding 缺失=部署設定錯誤,不是正常降級,
-      // 此時放行等於本卡要保護的 Dify credit 唯一防線直接失效——故拆分兩種失效模式:
-      //   binding 未宣告(部署配置錯誤,理論上不該發生但防禦性檢查)→ fail-closed 回 503,比照
-      //   DIFY_LAOYI_KEY 缺鑰同款處理,逼部署方修正,不讓聊天在「無防護」狀態下悄悄公開。
-      //   binding 已就位但 .limit() 呼叫本身出錯(Cloudflare 端暫時性錯誤)→ fail-open 放行+記警告,
-      //   避免限流服務本身的暫時抖動連坐讓老易聊天全斷。
+      // 成本閘一律 fail-closed：binding 缺失、呼叫例外或 malformed result 都不得觸發 Dify。
+      // 只有明確 success:true 才放行；明確 success:false 是正常超額 429。
       if (!env.LAOYI_RATE_LIMITER) {
-        console.log("Laoyi rate limiter binding missing, refusing request (fail-closed)");
-        return json({ error: "Rate limiter not configured", code: "RATE_LIMITER_NOT_CONFIGURED" }, 503);
+        console.log("SECURITY_GATE", "RATE_LIMITER_BINDING_MISSING");
+        return json({ error: "Rate limiter unavailable", code: "RATE_LIMITER_UNAVAILABLE" }, 503);
       }
+      let limitResult;
       try {
-        const { success } = await env.LAOYI_RATE_LIMITER.limit({ key: verifiedUserId });
-        if (!success) {
-          return json({ error: "Too many requests, please slow down", code: "RATE_LIMITED" }, 429);
-        }
+        limitResult = await env.LAOYI_RATE_LIMITER.limit({ key: verifiedUserId });
       } catch (e) {
-        console.log("Laoyi rate limiter check failed, failing open", e.message || e);
+        console.log("SECURITY_GATE", "RATE_LIMITER_CHECK_FAILED");
+        return json({ error: "Rate limiter unavailable", code: "RATE_LIMITER_UNAVAILABLE" }, 503);
+      }
+      if (!limitResult || typeof limitResult !== "object" || typeof limitResult.success !== "boolean") {
+        console.log("SECURITY_GATE", "RATE_LIMITER_RESULT_MALFORMED");
+        return json({ error: "Rate limiter unavailable", code: "RATE_LIMITER_UNAVAILABLE" }, 503);
+      }
+      if (limitResult.success !== true) {
+        return json({ error: "Too many requests, please slow down", code: "RATE_LIMITED" }, 429);
       }
 
       // blocking 呼叫加 timeout,避免上游卡住無限拖住 Worker/前端 typing 泡泡
@@ -876,7 +876,12 @@ export default {
 
     if (payload.event !== "consent_granted") {
       const quotaGate = await readQuotaGate(env, verifiedUserId);
-      if (!quotaGate.allow) return json({ gate: "zero_quota", credits: 0, next: "door_149" }, 402);
+      if (!quotaGate.allow) {
+        if (quotaGate.status === 503) {
+          return json({ error: "Quota gate unavailable", code: "QUOTA_GATE_UNAVAILABLE" }, 503);
+        }
+        return json({ gate: "zero_quota", credits: 0, next: "door_149", code: "QUOTA_REQUIRED" }, 402);
+      }
     }
 
     payload.line_user_id = verifiedUserId;
@@ -1026,7 +1031,7 @@ async function airtableFetch(apiKey, base, table, opts) {
     { headers: { "Authorization": "Bearer " + apiKey } }
   );
   if (!res.ok) {
-    console.log("Airtable error", res.status, await res.text());
+    console.log("SECURITY_GATE", "AIRTABLE_HTTP_ERROR", res.status);
     return { records: [] };
   }
   return res.json();
@@ -1047,12 +1052,17 @@ async function airtableFetchStrict(apiKey, base, table, opts) {
       { headers: { "Authorization": "Bearer " + apiKey } }
     );
   } catch (e) {
-    console.log("Airtable network error", String(e && e.message));
+    console.log("SECURITY_GATE", "AIRTABLE_STRICT_NETWORK_ERROR");
     return { ok: false, reason: "upstream_unreachable", records: [] };
   }
   if (!res.ok) {
-    console.log("Airtable error", res.status, await res.text());
-    return { ok: false, reason: res.status === 401 || res.status === 403 ? "permission_denied" : "upstream_error", records: [] };
+    const reason = res.status === 401 || res.status === 403
+      ? "permission_denied"
+      : res.status === 429
+        ? "rate_limited"
+        : "upstream_error";
+    console.log("SECURITY_GATE", "AIRTABLE_STRICT_HTTP_ERROR", res.status);
+    return { ok: false, reason, records: [] };
   }
   let body;
   try { body = await res.json(); }
@@ -1065,35 +1075,43 @@ async function airtableFetchStrict(apiKey, base, table, opts) {
 
 async function readQuotaGate(env, lineUserId) {
   if (!env.AIRTABLE_API_KEY) {
-    console.log("Quota gate skipped: AIRTABLE_API_KEY not configured");
-    return { allow: true };
+    console.log("SECURITY_GATE", "QUOTA_GATE_CREDENTIAL_MISSING");
+    return { allow: false, status: 503, reason: "credential_unavailable" };
   }
 
-  let subResult;
-  try {
-    subResult = await airtableFetch(env.AIRTABLE_API_KEY, AT_BASE, AT_SUBS, {
-      filterByFormula: `{line_user_id}="${lineUserId}"`,
-      fields: ["subscriber_tier", "trial_quota_remaining", "monthly_quota_remaining"],
-      maxRecords: 1,
-    });
-  } catch (e) {
-    console.log("Quota gate Airtable read failed", e.message || e);
-    return { allow: true };
+  const subResult = await airtableFetchStrict(env.AIRTABLE_API_KEY, AT_BASE, AT_SUBS, {
+    filterByFormula: `{line_user_id}="${lineUserId}"`,
+    fields: ["subscriber_tier", "trial_quota_remaining", "monthly_quota_remaining"],
+    maxRecords: 1,
+  });
+  if (!subResult.ok) {
+    console.log("SECURITY_GATE", "QUOTA_GATE_READ_FAILED", subResult.reason);
+    return { allow: false, status: 503, reason: subResult.reason };
   }
 
-  const subRec = (subResult.records || [])[0];
+  const subRec = subResult.records[0];
   if (!subRec) {
-    return { allow: true };
+    return { allow: false, status: 402, reason: "subscriber_not_found" };
   }
 
-  const sub = subRec.fields || {};
+  if (!subRec.fields || typeof subRec.fields !== "object" || Array.isArray(subRec.fields)) {
+    console.log("SECURITY_GATE", "QUOTA_GATE_RECORD_MALFORMED");
+    return { allow: false, status: 503, reason: "upstream_malformed" };
+  }
+  const sub = subRec.fields;
   const tier = sub.subscriber_tier || "free";
-  const credits = (Number(sub.trial_quota_remaining) || 0) + (Number(sub.monthly_quota_remaining) || 0);
+  const trialCredits = sub.trial_quota_remaining === undefined ? 0 : Number(sub.trial_quota_remaining);
+  const monthlyCredits = sub.monthly_quota_remaining === undefined ? 0 : Number(sub.monthly_quota_remaining);
+  if (![trialCredits, monthlyCredits].every(n => Number.isFinite(n) && n >= 0)) {
+    console.log("SECURITY_GATE", "QUOTA_GATE_FIELDS_MALFORMED");
+    return { allow: false, status: 503, reason: "upstream_malformed" };
+  }
+  const credits = trialCredits + monthlyCredits;
   if (tier === "subscriber" || credits > 0) {
-    return { allow: true };
+    return { allow: true, status: 200, reason: tier === "subscriber" ? "subscriber" : "bounded_credit" };
   }
 
-  return { allow: false };
+  return { allow: false, status: 402, reason: "quota_exhausted" };
 }
 
 async function readSubscriberGate(env, lineUserId) {

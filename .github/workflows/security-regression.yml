@@ -1,0 +1,31 @@
+name: Security Regression
+
+on:
+  pull_request:
+    paths:
+      - "workers/mingge-relay/**"
+      - "tests/test_security_fail_closed_v1_0.mjs"
+      - "tests/test_e56_laoyi_center_v1_0.sh"
+      - "SECURITY.md"
+      - "security/**"
+      - ".github/workflows/security-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fail-closed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Validate Worker syntax
+        run: node --check workers/mingge-relay/worker.js
+      - name: Prove fail-closed behavior and zero downstream calls
+        run: node tests/test_security_fail_closed_v1_0.mjs
+      - name: Run Laoyi route regression
+        run: bash tests/test_e56_laoyi_center_v1_0.sh
