@@ -2,39 +2,57 @@
 
 ## Verdict and scope
 
-- Verdict: **BLOCKED for a new security-readiness claim; current production was not changed by this work**.
-- Repository baseline: `6f3d5709b5e115dd26b01f792be1186fa8b06a6a`.
-- Candidate branch: `codex/mingge-security-fail-closed-20260830`.
-- Reviewed code head: `f43b158171d994b8b8c0d0be9f1916f911c4f00d`; Draft PR: #22; Security Regression run 33289814484: SUCCESS.
-- Reviewed: Worker identity/quota/rate-limit paths, tests, workflows, public publishing boundary, GitHub metadata, and Cloudflare metadata/binding names.
-- Not proved: Dify key revocation, Make/Airtable/LINE provider settings, GitHub security alerts, branch protection, route response, Railway state, payment provider state, or whole-product security.
+- Verdict: **DEPLOYED AND READ BACK for PR #22 fail-closed controls; this is not a whole-product security claim**.
+- Exact resulting main: `6ee4e861fb45444a193236f9dfceb8c384f538f0`.
+- Merged PR: #22; reviewed head: `07c833e9b8adcd49cdbbff9aa1d6091eddd7c40c`.
+- Worker SHA256: `f544ba80acd2f949cdeb8731ab9be04d7e769f6ff4f42d0ee68551cddf7cdb0d`.
+- GitHub deployment workflow succeeded and Cloudflare serves version 36 at 100%.
+- Safe route readback proved the deployed Worker is reachable and rejects an unauthenticated request before any paid downstream call.
+- A valid authenticated LINE → limiter → Dify end-to-end UAT was not run.
 
 ## Evidence record
 
 ```yaml
 repository:
   visibility: public
-  main_sha: 6f3d5709b5e115dd26b01f792be1186fa8b06a6a
+  main_sha: 6ee4e861fb45444a193236f9dfceb8c384f538f0
   pr: https://github.com/perhaps8511-lab/mingge-line/pull/22
-  reviewed_code_head_sha: f43b158171d994b8b8c0d0be9f1916f911c4f00d
+  reviewed_head_sha: 07c833e9b8adcd49cdbbff9aa1d6091eddd7c40c
+  worker_sha256: f544ba80acd2f949cdeb8731ab9be04d7e769f6ff4f42d0ee68551cddf7cdb0d
 ci:
-  run_url: https://github.com/perhaps8511-lab/mingge-line/actions/runs/33289814484
-  job_id: 99199357622
-  conclusion: SUCCESS
-  tests:
-    - node --check workers/mingge-relay/worker.js
-    - node tests/test_security_fail_closed_v1_0.mjs
-    - bash tests/test_e56_laoyi_center_v1_0.sh
-  dependency_or_security_scan: targeted repository baseline; alert APIs UNKNOWN
+  security_regression:
+    run_url: https://github.com/perhaps8511-lab/mingge-line/actions/runs/33289855161
+    conclusion: SUCCESS
+    tests:
+      - node --check workers/mingge-relay/worker.js
+      - 26 synthetic fail-closed and zero-downstream-call cases
+      - 55 existing Laoyi route regression cases
+  production_deploy:
+    run_url: https://github.com/perhaps8511-lab/mingge-line/actions/runs/33299496569
+    job_id: 99224798768
+    event: workflow_dispatch
+    head_branch: main
+    head_sha: 6ee4e861fb45444a193236f9dfceb8c384f538f0
+    conclusion: SUCCESS
+    exact_worker_hash_step: SUCCESS
+    cloudflare_token_step: SUCCESS
+    deploy_step: SUCCESS
+  dependency_or_security_scan: targeted repository baseline; GitHub alert APIs remain UNKNOWN
 runtime:
   worker: mingge-relay
-  deployed_revision: Cloudflare version 35 / ff2d0dc0-bdcc-4d6e-9950-537463cc48c5
-  deployment_id: f7ee05fa-ca36-463c-b084-6ec1e36a6990
-  deployed_at: 2026-08-29T03:20:09Z
+  route: https://mingge-relay.perhaps8511.workers.dev
+  deployment_id: ab0b0792-00b1-4701-a2ff-3ae3e196a7d4
+  deployed_revision: Cloudflare version 36 / 6e067473-b11a-4db2-acb8-ed54f2dd4eaa
+  deployed_at: 2026-08-30T07:33:55Z
   deployment_source: wrangler
-  route_readback: UNKNOWN
+  traffic_percentage: 100
+  compatibility_date: 2024-12-01
   workers_dev_enabled: true
   previews_enabled: true
+  route_readback:
+    get_laoyi_chat: HTTP_405
+    unauthenticated_post_laoyi_chat: HTTP_401
+    authenticated_dify_uat: NOT_RUN
   bindings_names_only:
     - AIRTABLE_API_KEY
     - DIFY_LAOYI_KEY
@@ -46,70 +64,75 @@ runtime:
     - MAKE_WEBHOOK_URL
     - SHARED_SECRET
 secrets:
-  required_names: names confirmed in Cloudflare; values not read
-  rotation_status: UNKNOWN
-  old_key_revocation_proven: false
+  required_names: confirmed in Cloudflare; values not read
+  dify_rotation_status: OWNER_CONFIRMED
+  old_key_revocation: OWNER_CONFIRMED
+  independently_read_provider_evidence: false
+  dify_mcp_server: OWNER_CONFIRMED_DISABLED
 data:
-  identity_binding_proven: repository tests only
+  identity_binding_proven: repository tests PASS; unauthenticated production rejection PASS
   cross_user_test: synthetic repository test PASS
 cost_control:
-  quota_fail_closed: candidate tests PASS; production NOT DEPLOYED
-  limiter_fail_closed: candidate tests PASS; production NOT DEPLOYED
+  quota_fail_closed: DEPLOYED; synthetic zero-downstream-call tests PASS
+  limiter_fail_closed: DEPLOYED; synthetic zero-downstream-call tests PASS
+  unauthenticated_paid_downstream_block: production route readback PASS
+  authenticated_live_dify_uat: NOT_RUN
 payment:
   current_state: MOCK_OR_NOT_ACTIVATED
   activation_authority: OWNER_ONLY
 unknowns:
-  - Dify incident closure and old-key revocation
-  - GitHub secret/code/Dependabot alert state
+  - GitHub secret scanning, code scanning and Dependabot alert API state
   - branch protection status
-  - exact route readback
-  - Make, Airtable, LINE and Railway provider-side controls
+  - Make, Airtable and LINE provider-side controls
+  - authenticated LINE-to-Dify live UAT
+  - public Pages allowlisted artifact migration
+  - removal of the revoked Dify-shaped candidate from the public current tree
 ```
 
-Cloudflare readback confirmed that the active deployment is 100% version 35 and that the expected secret/rate-limit binding names exist. It does not prove secret values, rotation, route behavior, or that this candidate is deployed.
+## Production protection now active
 
-## Prioritized evidence checklist
+### Quota and membership
 
-### P0 — Dify credential incident closure
+- Missing Airtable key, 401/403/429/5xx, network failure, or malformed response returns `503 QUOTA_GATE_UNAVAILABLE`.
+- Missing subscribers and exhausted quota return bounded `402 QUOTA_REQUIRED`.
+- Free access requires an explicit positive bounded credit.
+- Rejected quota paths do not call Make.
 
-- Expected control: exposed key revoked; replacement active only in the owning provider and Cloudflare secret binding.
-- Current evidence: a Dify-shaped value remains in the public current tree; Cloudflare confirms a binding name only.
-- Status: **UNKNOWN / Needs Production Check**.
-- Pass condition: private Dify evidence confirms old-key revocation and rotation without exposing either value.
-- Owner: Owner in Dify/Cloudflare approved interfaces.
+### AI rate limiting
 
-### P0 — Paid downstream fail-closed behavior
+- Missing rate-limiter binding, limiter exception, or malformed limiter result returns `503 RATE_LIMITER_UNAVAILABLE`.
+- Explicit overage returns `429 RATE_LIMITED`.
+- Only explicit limiter `success: true` can reach Dify.
+- Missing `DIFY_LAOYI_KEY` returns 503.
+- Rejected limiter paths do not call Dify.
 
-- Expected control: unavailable quota/limiter truth cannot call Make or Dify.
-- Current evidence: candidate synthetic tests PASS; production still runs the pre-candidate deployment.
-- Status: **Needs Production Check after separately authorized merge/deploy**.
-- Pass condition: exact candidate SHA passes CI, is explicitly merged/deployed, and runtime readback plus safe synthetic UAT proves the same 503/429 behavior and zero paid downstream calls.
-- Owner: Codex for repository/CI; Owner for merge/deploy authorization; Cowork for bounded runtime UAT if authorized.
+### Identity, privacy, and logging
+
+- LINE identity remains server-verified and audience-bound.
+- Frontend-supplied identity, tier, quota, payment state, or entitlement is not authoritative.
+- Private reads and writes remain subject-bound.
+- Focused failure logs use fixed reason/status data without tokens, secrets, full questions, private records, full webhook URLs, or raw provider bodies.
+
+## Known remaining items
 
 ### P1 — Public Pages artifact boundary
 
-- Expected control: allowlisted `public/` or `dist/` artifact with manifest failure on unexpected files.
-- Current evidence: root `path: '.'` publishes on main pushes.
-- Status: **Needs Test / separate change**.
-- Pass condition: explicit artifact directory and allowlist manifest pass without deploying from this security PR.
+The Pages workflow still uploads repository root with `path: '.'`. Move to an allowlisted `public/` or `dist/` artifact in a separate authorized change.
+
+### P1 — Revoked Dify-shaped current-tree candidate
+
+Provider rotation and old-key revocation are Owner-confirmed. The public current-tree candidate should still be replaced with a non-secret placeholder in a separate small PR. Repository deletion does not replace provider revocation.
 
 ### P1 — GitHub protection and alerts
 
-- Expected control: PR-only main, one required CI check, secret scanning/push protection when supported, minimal workflow permissions.
-- Current evidence: no visible rulesets; branch protection and alerts are inaccessible to the integration.
-- Status: **UNKNOWN**.
-- Pass condition: Owner-visible GitHub settings evidence without changing settings in this session.
+Branch protection and GitHub native security alert APIs remain `UNKNOWN`. The consolidated Sunday security check must continue to report inaccessible evidence as `UNKNOWN`, not zero alerts.
 
-## External side effects and controls
+### P2 — Authenticated live Dify UAT
 
-- Make forwarding: quota gate required for non-consent events; candidate fail-closed only, not deployed.
-- Dify: verified LINE identity plus explicit limiter success; candidate fail-closed only, not deployed.
-- Cloudflare deployment: manual workflow with exact Worker SHA check; no deployment performed.
-- GitHub Pages: automatic on `main`; no main mutation or Pages deployment performed.
-- Payment/entitlement/refund/fulfillment: not activated; Owner-only.
+No valid LINE token or private question was used in this session. If separately authorized, perform one minimal test-account request and record only deployment/version, status, fixed reason code, and a non-sensitive request identifier.
 
-## Next actions
+## Operating boundary
 
-1. Preserve Draft PR #22 for review; code head `f43b1581…` has exact-head CI SUCCESS.
-2. Owner privately verifies Dify rotation and old-key revocation; do not paste the value into GitHub or chat.
-3. Only after review: separate authorization for merge/deploy/runtime UAT. Pages allowlisting remains a separate non-blocking hardening change unless a new secret exposure is confirmed.
+- Production fail-closed code is active.
+- The weekly security check remains read-only and cannot repair, merge, deploy, change secrets, or activate payments.
+- Real payment, subscription, entitlement, refund, and fulfillment remain inactive and Owner-only.
