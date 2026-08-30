@@ -22,9 +22,20 @@ ci:
   existing_laoyi_route_cases: 55
 runtime:
   worker: mingge-relay
-  approved_main_deployment: PENDING_MANUAL_WORKFLOW_DISPATCH
+  approved_main_deployment: PASS
+  github_actions_run: https://github.com/perhaps8511-lab/mingge-line/actions/runs/33299496569
+  github_actions_job: 99224798768
+  deployment_id: ab0b0792-00b1-4701-a2ff-3ae3e196a7d4
+  version_id: 6e067473-b11a-4db2-acb8-ed54f2dd4eaa
+  version_number: 36
+  deployed_at: 2026-08-30T07:33:55Z
+  deployment_source: wrangler
+  traffic_percentage: 100
   previous_deployment_id: f7ee05fa-ca36-463c-b084-6ec1e36a6990
-  route_readback: PENDING
+  route_readback:
+    get_laoyi_chat: HTTP_405
+    unauthenticated_post_laoyi_chat: HTTP_401
+    authenticated_dify_uat: NOT_RUN
 secrets:
   dify_new_key_rotation: OWNER_CONFIRMED
   old_key_revocation: OWNER_CONFIRMED
@@ -37,7 +48,7 @@ payment:
   activation_authority: OWNER_ONLY
 ```
 
-Production is not considered updated until the manual GitHub deployment workflow succeeds and Cloudflare readback proves the new deployment/version.
+Production deployment is proven for exact main `6ee4e861fb45444a193236f9dfceb8c384f538f0`: GitHub workflow `33299496569` succeeded, Cloudflare serves version 36 at 100%, all nine approved binding names/types remain present, `GET /laoyi/chat` returns 405, and an unauthenticated POST returns 401 before any paid downstream call. A valid authenticated Dify UAT was not run.
 
 ## 2. Implemented runtime protections
 
@@ -159,7 +170,7 @@ The weekly task never changes code, alerts, workflows, infrastructure, secrets, 
 
 These are not falsely reported as complete:
 
-- the approved `main` Worker deployment and runtime readback are pending;
+- authenticated LINE → limiter → Dify end-to-end UAT is `NOT_RUN`; deployment and unauthenticated fail-closed route readback are proven;
 - GitHub Pages still publishes from repository root `path: '.'`; move to an allowlisted `public/` or `dist/` artifact in a separate authorized change;
 - a revoked Dify-shaped candidate remains in the public current tree and should be replaced with a non-secret placeholder in a separate small PR;
 - branch protection and some GitHub alert APIs remain `UNKNOWN`;
