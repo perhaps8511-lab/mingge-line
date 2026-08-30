@@ -5,7 +5,7 @@
 - Verdict: **BLOCKED for a new security-readiness claim; current production was not changed by this work**.
 - Repository baseline: `6f3d5709b5e115dd26b01f792be1186fa8b06a6a`.
 - Candidate branch: `codex/mingge-security-fail-closed-20260830`.
-- Candidate head / Draft PR / CI: to be filled from terminal GitHub evidence after commit.
+- Reviewed code head: `f43b158171d994b8b8c0d0be9f1916f911c4f00d`; Draft PR: #22; Security Regression run 33289814484: SUCCESS.
 - Reviewed: Worker identity/quota/rate-limit paths, tests, workflows, public publishing boundary, GitHub metadata, and Cloudflare metadata/binding names.
 - Not proved: Dify key revocation, Make/Airtable/LINE provider settings, GitHub security alerts, branch protection, route response, Railway state, payment provider state, or whole-product security.
 
@@ -15,10 +15,12 @@
 repository:
   visibility: public
   main_sha: 6f3d5709b5e115dd26b01f792be1186fa8b06a6a
-  pr: PENDING
-  reviewed_head_sha: PENDING
+  pr: https://github.com/perhaps8511-lab/mingge-line/pull/22
+  reviewed_code_head_sha: f43b158171d994b8b8c0d0be9f1916f911c4f00d
 ci:
-  run_url: PENDING
+  run_url: https://github.com/perhaps8511-lab/mingge-line/actions/runs/33289814484
+  job_id: 99199357622
+  conclusion: SUCCESS
   tests:
     - node --check workers/mingge-relay/worker.js
     - node tests/test_security_fail_closed_v1_0.mjs
@@ -108,6 +110,6 @@ Cloudflare readback confirmed that the active deployment is 100% version 35 and 
 
 ## Next actions
 
-1. Finish Draft PR and exact-head CI evidence.
+1. Preserve Draft PR #22 for review; code head `f43b1581…` has exact-head CI SUCCESS.
 2. Owner privately verifies Dify rotation and old-key revocation; do not paste the value into GitHub or chat.
 3. Only after review: separate authorization for merge/deploy/runtime UAT. Pages allowlisting remains a separate non-blocking hardening change unless a new secret exposure is confirmed.
