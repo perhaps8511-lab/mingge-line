@@ -191,14 +191,16 @@ echo "$ROUTE_BLOCK" | grep -qF 'env.LAOYI_RATE_LIMITER.limit({ key: verifiedUser
 echo "$ROUTE_BLOCK" | grep -qF 'code: "RATE_LIMITED" }, 429' \
   && pass "F4 超限回 429+穩定 code 欄位(與既有錯誤回應風格一致)" \
   || fail "F4 超限回應缺失或格式不符"
-# Codex 互審 r1:binding 缺失(部署配置錯誤)不應 fail-open 悄悄放行,應 fail-closed 503;
-# 僅 binding 已就位但 .limit() 呼叫本身出錯(暫時性)才 fail-open
-echo "$ROUTE_BLOCK" | grep -qF 'if (!env.LAOYI_RATE_LIMITER)' && echo "$ROUTE_BLOCK" | grep -qF 'code: "RATE_LIMITER_NOT_CONFIGURED" }, 503' \
+# binding 缺失與 .limit() 例外都 fail-closed；只有明確 success:true 才可呼叫 Dify
+echo "$ROUTE_BLOCK" | grep -qF 'if (!env.LAOYI_RATE_LIMITER)' && echo "$ROUTE_BLOCK" | grep -qF 'code: "RATE_LIMITER_UNAVAILABLE" }, 503' \
   && pass "F4 binding 缺失 fail-closed 回 503(不讓防護悄悄失效)" \
   || fail "F4 binding 缺失處理不是 fail-closed"
-echo "$ROUTE_BLOCK" | grep -qF 'failing open' \
-  && pass "F4 binding 已就位但 .limit() 呼叫暫時性出錯時 fail-open(不因限流服務抖動連坐斷聊天)" \
-  || fail "F4 缺少 .limit() 暫時性錯誤的 fail-open 處理"
+echo "$ROUTE_BLOCK" | grep -qF 'RATE_LIMITER_CHECK_FAILED' && echo "$ROUTE_BLOCK" | grep -qF 'RATE_LIMITER_RESULT_MALFORMED' \
+  && pass "F4 limiter 例外／malformed result 均 fail-closed" \
+  || fail "F4 limiter 例外或 malformed result 仍可能放行"
+echo "$ROUTE_BLOCK" | grep -qF 'limitResult.success !== true' \
+  && pass "F4 只有明確 success:true 才可往下呼叫 Dify" \
+  || fail "F4 limiter success gate 不夠嚴格"
 
 echo ""
 echo "=== 段⑦ F5 addendum 驗證(空手點店務找書僮→打學習題,不得誤送書僮)==="
