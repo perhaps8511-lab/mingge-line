@@ -69,6 +69,9 @@ const ARTIFACT_PUBLIC_FIELDS = [
   "known_facts", "cultural_use_context", "care", "publish_blocked",
 ];
 const TRACE_MAX_BODY_BYTES = 4096;
+const TRACE_REQUEST_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// Hub R9, 2026-09-03: no completed owning-store readback. Shared by both R2 pages.
+const FUPAN_LIVE_PROVEN = false;
 const LAOYI_CONV_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 const LAOYI_UPSTREAM_TIMEOUT_MS = 30000;
 const FALSE_TOKEN_PLANS = Object.freeze({
@@ -104,18 +107,24 @@ export default {
       }
 
       const [divResult, subResult] = await Promise.all([
-        airtableFetch(env.AIRTABLE_API_KEY, AT_BASE, AT_DIV_LOG, {
+        airtableFetchStrict(env.AIRTABLE_API_KEY, AT_BASE, AT_DIV_LOG, {
           filterByFormula: `AND({line_user_id_raw}="${verifiedUserId}",{entry_type}="divination")`,
           sort: [{ field: "qigua_time", direction: "desc" }],
           fields: ["question_text", "ben_gua", "bian_gua", "dong_yao", "qigua_time", "session_id", "entry_type", "golden_seal", "golden_seal_time", "trace_text", "trace_at"],
           maxRecords: 50,
         }),
-        airtableFetch(env.AIRTABLE_API_KEY, AT_BASE, AT_SUBS, {
+        airtableFetchStrict(env.AIRTABLE_API_KEY, AT_BASE, AT_SUBS, {
           filterByFormula: `{line_user_id}="${verifiedUserId}"`,
           fields: ["subscriber_tier", "trial_quota_remaining", "monthly_quota_remaining", "subscription_start"],
           maxRecords: 1,
         }),
       ]);
+
+      if (!divResult.ok || !subResult.ok
+        || [...divResult.records, ...subResult.records].some(r => !r || typeof r.id !== "string"
+          || !r.fields || typeof r.fields !== "object" || Array.isArray(r.fields))) {
+        return json({ state: "read_error" }, 502);
+      }
 
       const records = (divResult.records || []).map(r => {
         const f = r.fields || {};
@@ -133,6 +142,7 @@ export default {
 
       return json({
         records,
+        fupan_live_proven: FUPAN_LIVE_PROVEN,
         subscriber: sub ? {
           tier:                    sub.subscriber_tier || "free",
           trial_quota_remaining:   sub.trial_quota_remaining   || 0,
@@ -164,14 +174,20 @@ export default {
         return json({ error: "AIRTABLE_API_KEY not configured" }, 503);
       }
 
-      const recRes = await fetch(
-        `https://api.airtable.com/v0/${AT_BASE}/${AT_DIV_LOG}/${encodeURIComponent(logId)}`,
-        { headers: { "Authorization": "Bearer " + env.AIRTABLE_API_KEY } }
-      );
+      let recRes, rec;
+      try {
+        recRes = await fetch(
+          `https://api.airtable.com/v0/${AT_BASE}/${AT_DIV_LOG}/${encodeURIComponent(logId)}`,
+          { headers: { "Authorization": "Bearer " + env.AIRTABLE_API_KEY } }
+        );
+        if (recRes.ok) rec = await recRes.json();
+      } catch (_) { return json({ state: "read_error" }, 502); }
       if (!recRes.ok) {
         return json({ record: null }, recRes.status === 404 ? 404 : 502);
       }
-      const rec = await recRes.json();
+      if (!rec || rec.id !== logId || !rec.fields || typeof rec.fields !== "object" || Array.isArray(rec.fields)) {
+        return json({ state: "read_error" }, 502);
+      }
       const f = rec.fields || {};
 
       if (f.line_user_id_raw !== verifiedUserId) {
@@ -193,6 +209,8 @@ export default {
           golden_seal_time: f.golden_seal_time || null,
           trace_text:     f.trace_text     || null,
           trace_at:       f.trace_at       || null,
+          deep_read_state: f.deep_read_state ?? null,
+          deep_read_output_json: f.deep_read_output_json ?? null,
         },
       });
     }
@@ -362,12 +380,12 @@ export default {
     if (request.method === "POST" && url.pathname === "/trace") {
       const contentType = request.headers.get("Content-Type") || "";
       if (!/^application\/json(?:;.*)?$/i.test(contentType.trim())) {
-        return json({ error: "Bad JSON body" }, 400);
+        return json({ state: "failed", error: "Bad JSON body" }, 400);
       }
 
       const declaredLength = Number(request.headers.get("Content-Length") || "0");
       if (declaredLength > TRACE_MAX_BODY_BYTES) {
-        return json({ error: "Payload too large" }, 413);
+        return json({ state: "failed", error: "Payload too large" }, 413);
       }
 
       let rawBody;
@@ -375,50 +393,53 @@ export default {
         rawBody = await readBodyWithLimit(request, TRACE_MAX_BODY_BYTES);
       } catch (e) {
         if (e && e.tooLarge) {
-          return json({ error: "Payload too large" }, 413);
+          return json({ state: "failed", error: "Payload too large" }, 413);
         }
-        return json({ error: "Bad JSON body" }, 400);
+        return json({ state: "failed", error: "Bad JSON body" }, 400);
       }
 
       let payload;
       try {
         payload = JSON.parse(rawBody);
       } catch (e) {
-        return json({ error: "Bad JSON body" }, 400);
+        return json({ state: "failed", error: "Bad JSON body" }, 400);
       }
 
       const accessToken = request.headers.get("X-Line-AccessToken");
       if (!accessToken) {
-        return json({ error: "Missing access token" }, 401);
+        return json({ state: "failed", error: "Missing access token" }, 401);
       }
 
       let verifiedUserId;
       try {
         ({ userId: verifiedUserId } = await resolveUserId(accessToken, LINE_CHANNEL_ID));
       } catch (e) {
-        console.log("Trace access token validation failed", e.message || e);
-        return json({ error: e.message || "Invalid access token" }, e.status || 401);
+        return json({ state: "failed", error: "Invalid access token" }, e.status || 401);
       }
 
       const payloadIsObject = payload && typeof payload === "object" && !Array.isArray(payload);
       const payloadKeys = payloadIsObject ? Object.keys(payload) : [];
-      if (payloadKeys.some(k => k !== "log_id" && k !== "trace_text")) {
-        return json({ error: "Unexpected field in payload" }, 400);
+      if (payloadKeys.some(k => k !== "log_id" && k !== "trace_text" && k !== "request_id")) {
+        return json({ state: "failed", error: "Unexpected field in payload" }, 400);
       }
 
       const logId = payloadIsObject ? payload.log_id : undefined;
       if (typeof logId !== "string" || !/^rec[a-zA-Z0-9]{14}$/.test(logId)) {
-        return json({ error: "Invalid log_id" }, 400);
+        return json({ state: "failed", error: "Invalid log_id" }, 400);
       }
 
       const rawTraceText = payloadIsObject ? payload.trace_text : undefined;
+      const requestId = payloadIsObject ? payload.request_id : undefined;
+      if (typeof requestId !== "string" || !TRACE_REQUEST_ID_RE.test(requestId)) {
+        return json({ state: "failed", error: "Invalid request_id" }, 400);
+      }
       const traceText = typeof rawTraceText === "string" ? rawTraceText.trim() : "";
       if (!traceText || traceText.length > 500) {
-        return json({ error: "Invalid trace_text" }, 400);
+        return json({ state: "failed", error: "Invalid trace_text" }, 400);
       }
 
       if (!env.AIRTABLE_API_KEY) {
-        return json({ error: "AIRTABLE_API_KEY not configured" }, 503);
+        return json({ state: "failed", error: "AIRTABLE_API_KEY not configured" }, 503);
       }
 
       let recRes;
@@ -428,64 +449,83 @@ export default {
           { headers: { "Authorization": "Bearer " + env.AIRTABLE_API_KEY } }
         );
       } catch (e) {
-        console.log("Airtable trace read failed", e.message || e);
-        return json({ error: "Airtable read failed" }, 502);
+        return json({ state: "failed", error: "Airtable read failed" }, 502);
       }
 
       if (recRes.status === 404) {
-        return json({ record: null }, 404);
+        return json({ state: "failed", record: null }, 404);
       }
       if (!recRes.ok) {
         console.log("SECURITY_GATE", "AIRTABLE_TRACE_READ_HTTP_ERROR", recRes.status);
-        return json({ error: "Airtable read failed" }, 502);
+        return json({ state: "failed", error: "Airtable read failed" }, 502);
       }
 
       let rec;
       try {
         rec = await recRes.json();
       } catch (e) {
-        console.log("Airtable trace read JSON parse failed", e.message || e);
-        return json({ error: "Airtable read failed" }, 502);
+        return json({ state: "failed", error: "Airtable read failed" }, 502);
       }
 
-      const f = rec.fields || {};
+      if (!rec || rec.id !== logId || !rec.fields || typeof rec.fields !== "object" || Array.isArray(rec.fields)) {
+        return json({ state: "failed", error: "Airtable read failed" }, 502);
+      }
+      const f = rec.fields;
       if (f.line_user_id_raw !== verifiedUserId) {
-        return json({ error: "Forbidden" }, 403);
+        return json({ state: "failed", error: "Forbidden" }, 403);
       }
       if ((f.entry_type || "divination") !== "divination") {
-        return json({ record: null }, 404);
+        return json({ state: "failed", record: null }, 404);
       }
 
+      if (f.trace_text != null && typeof f.trace_text !== "string") {
+        return json({ state: "failed", error: "Invalid stored trace" }, 502);
+      }
       const tracedAt = new Date().toISOString();
-      let patchRes;
-      try {
-        patchRes = await fetch(
-          `https://api.airtable.com/v0/${AT_BASE}/${AT_DIV_LOG}/${encodeURIComponent(logId)}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Authorization": "Bearer " + env.AIRTABLE_API_KEY,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              fields: {
-                trace_text: traceText,
-                trace_at: tracedAt,
-              },
-            }),
+      const stamp = new Date(Date.parse(tracedAt) + 8 * 3600000).toISOString().replace("Z", "+08:00");
+      const entry = `${stamp} · req:${requestId.toLowerCase()}\n${traceText}`;
+      const recordUrl = `https://api.airtable.com/v0/${AT_BASE}/${AT_DIV_LOG}/${encodeURIComponent(logId)}`;
+      const headers = { "Authorization": "Bearer " + env.AIRTABLE_API_KEY, "Content-Type": "application/json" };
+      const unconfirmed = () => json({ state: "unconfirmed", request_id: requestId }, 202);
+      const confirmed = (fields, savedEntry, idempotent) => json({
+        traced: true, trace_text: fields.trace_text, trace_at: fields.trace_at,
+        request_id: requestId, entry: savedEntry, idempotent,
+      });
+      let current = f;
+      // Hub R1 KNOWN_RESIDUAL: conditional writes are unavailable here. Verification
+      // and one repair reduce the window; they do not serialize devices or prevent a later lost update.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const oldTrace = current.trace_text || "";
+        const existing = findTraceRequestEntry(oldTrace, requestId);
+        if (existing) {
+          // Reusing an ID for different content must not turn an unrelated entry into success.
+          if (existing.slice(existing.indexOf("\n") + 1) !== traceText) return unconfirmed();
+          return confirmed(current, existing, true);
+        }
+        const next = oldTrace ? oldTrace + "\n---\n" + entry : entry;
+        try {
+          const patchRes = await fetch(recordUrl, {
+            method: "PATCH", headers,
+            body: JSON.stringify({ fields: { trace_text: next, trace_at: tracedAt } }),
+          });
+          // Once PATCH was attempted, a transport/status error does not prove no write occurred.
+          if (!patchRes.ok) return unconfirmed();
+          const verifyRes = await fetch(recordUrl, { headers, cache: "no-store" });
+          if (!verifyRes.ok) return unconfirmed();
+          const verified = await verifyRes.json();
+          if (!verified || verified.id !== logId || !verified.fields
+            || verified.fields.line_user_id_raw !== verifiedUserId
+            || (verified.fields.entry_type || "divination") !== "divination"
+            || typeof verified.fields.trace_text !== "string") return unconfirmed();
+          current = verified.fields;
+          if (current.trace_text.startsWith(next)
+            && findTraceRequestEntry(current.trace_text, requestId) === entry
+            && (current.trace_text !== next || Date.parse(current.trace_at) === Date.parse(tracedAt))) {
+            return confirmed(current, entry, false);
           }
-        );
-      } catch (e) {
-        console.log("Airtable trace write failed", e.message || e);
-        return json({ error: "Airtable write failed" }, 502);
+        } catch (_) { return unconfirmed(); }
       }
-
-      if (!patchRes.ok) {
-        console.log("SECURITY_GATE", "AIRTABLE_TRACE_WRITE_HTTP_ERROR", patchRes.status);
-        return json({ error: "Airtable write failed" }, 502);
-      }
-
-      return json({ traced: true, trace_text: traceText, trace_at: tracedAt });
+      return unconfirmed();
     }
 
     // S140(E27):深卜/複盤薄代理層 —— 前端只打這裡,Worker 驗完身分才轉發 Make webhook,
@@ -1016,6 +1056,19 @@ async function resolveUserId(accessToken, channelId) {
   return { userId: profile.userId, displayName: profile.displayName || "" };
 }
 
+function findTraceRequestEntry(text, requestId) {
+  if (typeof text !== "string") return null;
+  // Only a complete server-stamp line is a request marker, never an arbitrary substring in an answer.
+  const marker = new RegExp("(?:^|\\n---\\n)(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\+08:00 · req:"
+    + requestId.toLowerCase() + "\\n)", "g");
+  const match = marker.exec(text);
+  if (!match) return null;
+  const start = match.index + match[0].length - match[1].length;
+  const remainder = text.slice(start);
+  const next = /\n---\n(?=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+08:00 · req:[0-9a-f-]{36}\n)/.exec(remainder);
+  return next ? remainder.slice(0, next.index) : remainder;
+}
+
 async function airtableFetch(apiKey, base, table, opts) {
   const params = new URLSearchParams();
   if (opts.filterByFormula) params.set("filterByFormula", opts.filterByFormula);
@@ -1045,6 +1098,10 @@ async function airtableFetchStrict(apiKey, base, table, opts) {
   if (opts.filterByFormula) params.set("filterByFormula", opts.filterByFormula);
   if (opts.maxRecords)      params.set("maxRecords", String(opts.maxRecords));
   if (opts.fields)          opts.fields.forEach(f => params.append("fields[]", f));
+  if (opts.sort)            opts.sort.forEach((s, i) => {
+    params.set(`sort[${i}][field]`, s.field);
+    params.set(`sort[${i}][direction]`, s.direction);
+  });
   let res;
   try {
     res = await fetch(

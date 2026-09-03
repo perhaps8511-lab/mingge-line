@@ -200,22 +200,39 @@
   .return-btn:hover{background:var(--paper-card);border-color:var(--ink-soft);}
 
   /* RC1 R2-S02：延後回訪才出現的四路分流。 */
-  .delayed-actions{padding:24px 22px;background:var(--paper-card);border-bottom:1px solid var(--line);}
-  .delayed-actions h2{font-family:var(--serif);font-size:21px;line-height:1.6;margin-bottom:16px;color:var(--ink);}
-  .delayed-action-list{display:grid;gap:10px;}
+  .delayed-actions{padding:12px 18px;background:var(--paper-card);border-bottom:1px solid var(--line);scroll-margin-top:64px;}
+  .delayed-actions h2{font-family:var(--serif);font-size:21px;line-height:1.9;margin-bottom:8px;color:var(--ink);}
+  .delayed-action-list{display:grid;gap:6px;}
   .delayed-action{display:block;width:100%;text-align:left;text-decoration:none;background:#fff;color:var(--ink);
-    border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-family:var(--sans);cursor:pointer;}
-  .delayed-action strong{display:block;font-family:var(--serif);font-size:17px;line-height:1.6;color:var(--ink);}
-  .delayed-action span{display:block;margin-top:3px;font-size:14px;line-height:1.7;color:var(--ink-soft);}
+    border:1px solid var(--line);border-radius:10px;padding:6px 12px;font-family:var(--sans);cursor:pointer;}
+  .delayed-action strong{display:block;font-family:var(--serif);font-size:17px;line-height:1.9;color:var(--ink);}
+  .delayed-action span{display:block;font-size:17px;line-height:1.9;color:var(--ink);}
   .delayed-action:hover{border-color:var(--gold);background:var(--paper);}
   .delayed-actions .deepen-status{color:var(--ink-soft);}
   #delayedTracePanel[hidden]{display:none;}
+  #r2TaskView[hidden],#r2RecordView[hidden]{display:none;}
+  .r2-copy,.r2-copy p,.r2-copy button,.r2-copy a,.r2-copy summary,.r2-copy label,.r2-copy textarea{
+    font-size:17px;line-height:1.9;color:var(--ink);font-family:var(--sans);}
+  .r2-copy button,.r2-copy a{cursor:pointer;}
+  .r2-copy .r2-primary{display:block;width:100%;padding:8px 12px;background:var(--ink);color:var(--paper);border:0;border-radius:8px;}
+  .r2-copy .r2-primary:disabled{opacity:.55;cursor:default;}
+  .r2-copy .r2-exit{display:block;text-align:center;margin-top:8px;padding:4px 8px;background:none;border:0;text-decoration:underline;}
+  .r2-copy textarea{width:100%;min-height:80px;display:block;padding:8px;border:1px solid var(--ink-soft);border-radius:6px;}
+  .r2-copy label{display:block;margin-bottom:14px;}
+  .r2-copy p{margin:8px 0;}
+  .r2-copy summary{cursor:pointer;}
+  .r2-comparison{display:grid;gap:16px;}
+  .r2-comparison article{padding:12px;border:1px solid var(--line);background:var(--paper-card);}
+  .r2-comparison h3{font-size:19px;line-height:1.9;}
+  .r2-record-text{white-space:pre-wrap;overflow-wrap:anywhere;}
+  #r2TaskView{scroll-margin-top:64px;}
+  #r2DeepResult{scroll-margin-top:64px;}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <button class="back-btn" onclick="history.back()">‹</button>
+  <button class="back-btn" onclick="location.href=resolveGuaViewContext(new URLSearchParams(location.search))==='first_completion'?'./index.html':'./index.html?action=log'">‹</button>
   <span class="ttl">卦記詳情</span>
   <div class="seal">命</div>
 </div>
@@ -238,6 +255,86 @@
 <script>
 const LIFF_ID   = "2010192384-9AwjI8qH";
 const RELAY_URL = "https://mingge-relay.perhaps8511.workers.dev/";
+
+// R2 copy mechanically extracted from dispatch §2 and Hub R6–R8.
+const R2_COPY = Object.freeze({
+  "heading": "這次回來，想做什麼？",
+  "actions": [
+    [
+      "事情有變了",
+      "補記事情後來的變化。"
+    ],
+    [
+      "想把這一卦看深",
+      "從四個角度再看同一件事。"
+    ],
+    [
+      "想回看這一路",
+      "把多筆卦記與後續放在一起；符合條件才顯示。"
+    ],
+    [
+      "問另一件新的事",
+      "回到向天問卦。"
+    ]
+  ],
+  "comparison": [
+    {
+      "title": "補記後續",
+      "rows": [
+        "什麼時候用：事情有了新變化，或您已經做了決定",
+        "做什麼：把後來發生的事、您的決定、現在的卡點，記在原卦後面",
+        "不做什麼：不重新起卦；不改寫當時的原始卦"
+      ],
+      "button": "事情有變了"
+    },
+    {
+      "title": "四鏡・深卜",
+      "rows": [
+        "什麼時候用：已經問過一卦，還想知道其中的內在變化、相反角度與事情所在的階段",
+        "做什麼：不重新起卦，從互卦、綜卦、錯卦、序卦再看同一件事；結果留在原來的卦記裡",
+        "不做什麼：不重新起卦；不改寫原來的答案；不處理另一件事"
+      ],
+      "button": "想把這一卦看深"
+    },
+    {
+      "title": "複盤",
+      "rows": [
+        "什麼時候用：已經留下至少三筆卦記，想知道自己這一路怎麼走過來",
+        "做什麼：把至少三筆卦記與後續放在一起，整理事情如何演變、哪些選擇反覆出現",
+        "不做什麼：不重新起卦；不是把舊答案再說一次；不替您決定下一步"
+      ],
+      "button": "想回看這一路"
+    }
+  ],
+  "compareTitle": "這三個差在哪？",
+  "compareTail": "三個都不是新的一卦。想問另一件事，請回「向天問卦」。",
+  "backList": "回卦記",
+  "title": "事情有變了——補記一筆",
+  "questions": [
+    "後來發生什麼？",
+    "您做了什麼決定？",
+    "現在最卡的是什麼？"
+  ],
+  "note": "這一筆留在原卦後面，不會改寫當時的原始卦。",
+  "save": "記下來",
+  "cancel": "先不記",
+  "backRecord": "回這一卦",
+  "success": "已記在這一卦後面。",
+  "failure": "這一筆還沒記進去。剛才沒有保存成功，原卦沒有變。",
+  "retry": "再試一次",
+  "home": "回首頁",
+  "divine": "向天問卦",
+  "empty": "您還沒有卦記。有一件掛心的事，就從「向天問卦」開始。",
+  "readError": "目前讀取失敗，不代表卦記不存在。請稍後再試。",
+  "noTrace": "還沒有後續",
+  "originalDate": "原始日期：",
+  "recentTrace": "最近一次後續：",
+  "view": "看這一卦",
+  "pending": "這一卦的深卜還在進行中，完成後會在這裡看到。",
+  "deepError": "這一卦的深卜目前讀不到結果。請稍後再回來看，或到「書僮客服」查一下。",
+  "unconfirmed": "還沒能確認這一筆有沒有記進去。",
+  "support": "書僮客服"
+});
 
 const GUA_SYM = [
   "","䷀","䷁","䷂","䷃","䷄","䷅","䷆","䷇","䷈","䷉",
@@ -324,15 +421,18 @@ async function fetchSubscriberTier(token) {
       method: "GET",
       headers: { "X-Line-AccessToken": token },
     });
-    if (!res.ok) return { ok: false, tier: "free", recordsCount: 0 };
+    if (!res.ok) return { ok: false };
     const data = await res.json();
+    if (!data || !Array.isArray(data.records) || data.state === "read_error"
+      || data.records.some(r => !r || typeof r.log_id !== "string" || typeof r.entry_type !== "string")) return { ok: false };
     return {
       ok: true,
       tier: data.subscriber ? data.subscriber.tier : "free",
-      recordsCount: Array.isArray(data.records) ? data.records.length : 0,
+      recordsCount: new Set(data.records.filter(r => r.entry_type === "divination").map(r => r.log_id)).size,
+      fupanLive: data.fupan_live_proven === true,
     };
   } catch (e) {
-    return { ok: false, tier: "free", recordsCount: 0 };
+    return { ok: false };
   }
 }
 
@@ -486,37 +586,226 @@ function wireStampHandlers(logId, token) {
 }
 
 function buildDelayedActionsHtml(rec, tierInfo) {
-  const isSubscriber = tierInfo.ok && tierInfo.tier === "subscriber";
-  const fupanEligible = isSubscriber && tierInfo.recordsCount >= 3;
-  const fupanHtml = fupanEligible ? `
-    <a class="delayed-action" href="./index.html?action=log&amp;focus=fupan">
-      <strong>想回看這一路</strong>
-      <span>把多筆卦記與後續放在一起。</span>
-    </a>` : "";
-  return `
-    <div class="delayed-actions" id="delayedActions">
-      <h2>這次回來，想做什麼？</h2>
-      <div class="delayed-action-list">
-        <button class="delayed-action" id="delayedTraceBtn" type="button" aria-controls="delayedTracePanel" aria-expanded="false">
-          <strong>事情有變了</strong>
-          <span>補記事情後來的變化。</span>
-        </button>
-        <button class="delayed-action" id="deepdiveBtn" type="button" data-mode="${isSubscriber ? "trigger" : "purchase"}">
-          <strong>想把這一卦看深</strong>
-          <span>從四個角度再看同一件事。</span>
-        </button>
-        ${fupanHtml}
-        <a class="delayed-action" href="./index.html">
-          <strong>問另一件新的事</strong>
-          <span>回到向天問卦。</span>
-        </a>
-      </div>
-      <div class="deepen-status" id="deepdiveStatus"></div>
-    </div>
-    <div id="delayedTracePanel" hidden>${buildStampSectionHtml(rec)}</div>`;
+  // 事情有變了 / 想把這一卦看深 / 想回看這一路 / 問另一件新的事
+  const fupanEligible = tierInfo.ok && tierInfo.fupanLive === true && tierInfo.recordsCount >= 3;
+  const links = [null, null, "./index.html?action=log&focus=fupan", "./index.html?action=divine"];
+  const actions = R2_COPY.actions.map((action, i) => {
+    if (i === 2 && !fupanEligible) return "";
+    const body = `<strong>${esc(action[0])}</strong><span>${esc(action[1])}</span>`;
+    return links[i]
+      ? `<a class="delayed-action" href="${esc(links[i])}">${body}</a>`
+      : `<button class="delayed-action" type="button" id="${i ? "r2DeepBtn" : "delayedTraceBtn"}">${body}</button>`;
+  }).join("");
+  return `<section class="delayed-actions r2-copy" id="delayedActions" tabindex="-1" aria-labelledby="r2Heading">
+    <h2 id="r2Heading">${esc(R2_COPY.heading)}</h2><div class="delayed-action-list">${actions}</div>
+    <a class="r2-exit" href="./index.html?action=log">${esc(R2_COPY.backList)}</a></section>
+    ${buildR2ComparisonHtml(fupanEligible)}`;
+}
+
+function buildR2ComparisonHtml(fupanEligible) {
+  const countWord = fupanEligible ? "三" : "兩";
+  const title = R2_COPY.compareTitle.replace("三", countWord);
+  const tail = R2_COPY.compareTail.replace("三個", countWord + "個");
+  return `<details class="section r2-copy" id="r2Comparison"><summary>${esc(title)}</summary>
+    <div class="r2-comparison">${R2_COPY.comparison.filter((_, i) => i < 2 || fupanEligible).map((item, i) =>
+      `<article><h3>${esc(item.title)}</h3>${item.rows.map(row => `<p>${esc(row)}</p>`).join("")}
+       ${i === 2 ? `<a class="r2-exit" href="./index.html?action=log&focus=fupan">${esc(item.button)}</a>`
+         : `<button class="r2-exit" type="button" data-r2-action="${i}">${esc(item.button)}</button>`}</article>`).join("")}</div>
+    <p>${esc(tail)}</p></details>`;
+}
+
+function resolveGuaViewContext(params) {
+  if (params.get("src") === "log" || params.get("ctx") === "delayed"
+    || params.get("context") === "delayed_return") return "delayed_return";
+  return params.get("context") === "first_completion" || params.get("ctx") === "first"
+    || params.get("src") === "letter" ? "first_completion" : "delayed_return";
+}
+
+function r2DeepState(rec) {
+  if (!Object.prototype.hasOwnProperty.call(rec, "deep_read_state")) return "unavailable";
+  if (rec.deep_read_state === null || rec.deep_read_state === "") return "new";
+  if (rec.deep_read_state === "pending") return "pending";
+  if (rec.deep_read_state === "completed" && typeof rec.deep_read_output_json === "string"
+    && rec.deep_read_output_json.trim()) return "completed";
+  return "unavailable";
+}
+
+function buildR2SavedHtml(rec) {
+  let html = "";
+  if (typeof rec.trace_text === "string" && rec.trace_text) {
+    // Server request markers remain in owning data, not in the TA reading surface.
+    const visible = rec.trace_text.replace(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+08:00) · req:[0-9a-f-]{36}(?=\n)/g, "$1");
+    html += `<section class="section r2-copy"><h2>${esc(R2_COPY.comparison[0].title)}</h2><div class="r2-record-text">${esc(visible)}</div></section>`;
+  }
+  if (r2DeepState(rec) === "completed") html += `<section class="section r2-copy" id="r2DeepResult" tabindex="-1">
+    <h2>${esc(R2_COPY.comparison[1].title)}</h2><div class="r2-record-text">${esc(rec.deep_read_output_json)}</div></section>`;
+  return html;
+}
+
+let r2Compose = null;
+let r2ActiveRecord = null;
+let r2ActiveTier = null;
+let r2ActiveToken = null;
+let r2TaskVersion = 0;
+
+function r2Focus(id) {
+  const el = document.getElementById(id);
+  if (el) { el.focus({ preventScroll: true }); el.scrollIntoView({ block: "start" }); }
+}
+
+function r2ShowTask(html) {
+  r2TaskVersion++;
+  document.getElementById("r2RecordView").hidden = true;
+  const panel = document.getElementById("r2TaskView");
+  panel.innerHTML = html;
+  panel.hidden = false;
+  r2Focus("r2TaskView");
+}
+
+function r2ReturnRecord() {
+  r2Compose = null;
+  renderDetail(r2ActiveRecord, r2ActiveTier, r2ActiveToken, "delayed_return");
+  r2Focus("delayedActions");
+}
+
+function r2ComposeText(answers) {
+  return answers.map((answer, i) => answer.trim() ? `「${R2_COPY.questions[i]}」\n${answer.trim()}` : "").filter(Boolean).join("\n\n");
+}
+
+function r2UpdateCompose() {
+  if (!r2Compose || r2Compose.frozen) return;
+  r2Compose.answers = R2_COPY.questions.map((_, i) => document.getElementById("r2Answer" + i).value);
+  r2Compose.text = r2ComposeText(r2Compose.answers);
+  const size = new TextEncoder().encode(JSON.stringify({ log_id: r2ActiveRecord.log_id,
+    trace_text: r2Compose.text, request_id: r2Compose.requestId })).length;
+  document.getElementById("r2Count").textContent = `${r2Compose.text.length}/500`;
+  document.getElementById("r2Save").disabled = !r2Compose.text || r2Compose.text.length > 500 || size > 4096;
+}
+
+function r2OpenCompose() {
+  r2Compose = { requestId: crypto.randomUUID(), answers: ["", "", ""], text: "", inFlight: false, frozen: false,
+    oldTrace: typeof r2ActiveRecord.trace_text === "string" ? r2ActiveRecord.trace_text : "" };
+  r2ShowTask(`<h2>${esc(R2_COPY.title)}</h2>${R2_COPY.questions.map((question, i) =>
+    `<label for="r2Answer${i}">${esc(question)}<textarea id="r2Answer${i}" rows="2"></textarea></label>`).join("")}
+    <p>${esc(R2_COPY.note)}</p><output id="r2Count">0/500</output>
+    <button type="button" class="r2-primary" id="r2Save" disabled>${esc(R2_COPY.save)}</button>
+    <button type="button" class="r2-exit" id="r2Cancel">${esc(R2_COPY.cancel)}</button>`);
+  R2_COPY.questions.forEach((_, i) => document.getElementById("r2Answer" + i).addEventListener("input", r2UpdateCompose));
+  document.getElementById("r2Save").addEventListener("click", r2SubmitCompose);
+  document.getElementById("r2Cancel").addEventListener("click", r2ReturnRecord);
+}
+
+function r2FindEntry(text, requestId) {
+  if (typeof text !== "string") return null;
+  const marker = new RegExp("(?:^|\\n---\\n)(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\+08:00 · req:"
+    + requestId + "\\n)");
+  const match = marker.exec(text);
+  if (!match) return null;
+  const rest = text.slice(match.index + match[0].length - match[1].length);
+  const next = /\n---\n(?=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+08:00 · req:[0-9a-f-]{36}\n)/.exec(rest);
+  return next ? rest.slice(0, next.index) : rest;
+}
+
+async function r2Readback(compose) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { res, data } = await r2FetchJson(`${RELAY_URL}log?log_id=${encodeURIComponent(r2ActiveRecord.log_id)}`,
+        { headers: { "X-Line-AccessToken": r2ActiveToken }, cache: "no-store" });
+      if (res.ok) {
+        const rec = data && data.record;
+        const entry = rec && r2FindEntry(rec.trace_text, compose.requestId);
+        const raw = rec && rec.trace_text;
+        if (rec && rec.log_id === r2ActiveRecord.log_id && rec.entry_type === "divination"
+          && entry && entry.slice(entry.indexOf("\n") + 1) === compose.text
+          && raw.startsWith(compose.oldTrace) && raw.indexOf(entry) >= compose.oldTrace.length) return rec;
+      }
+    } catch (_) { /* Only owning-store GET can confirm success. */ }
+    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  return null;
+}
+
+async function r2FetchJson(url, options, parseJson = true) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return { res, data: parseJson ? await res.json() : null };
+  } finally { clearTimeout(timer); }
+}
+
+function r2TraceOutcome(state) {
+  const success = state === "success";
+  const message = success ? R2_COPY.success : state === "failed" ? R2_COPY.failure : R2_COPY.unconfirmed;
+  r2ShowTask(`<p role="status">${esc(message)}</p>${success ? "" :
+    `<button type="button" class="r2-primary" id="r2Retry">${esc(R2_COPY.retry)}</button>`}
+    <button type="button" class="${success ? "r2-primary" : "r2-exit"}" id="r2Cancel">${esc(success ? R2_COPY.backRecord : R2_COPY.cancel)}</button>`);
+  if (!success) document.getElementById("r2Retry").addEventListener("click", r2SubmitCompose);
+  document.getElementById("r2Cancel").addEventListener("click", r2ReturnRecord);
+}
+
+async function r2SubmitCompose() {
+  const compose = r2Compose;
+  if (!compose || compose.inFlight || !compose.text || compose.text.length > 500) return;
+  const payload = JSON.stringify({ log_id: r2ActiveRecord.log_id, trace_text: compose.text, request_id: compose.requestId });
+  if (new TextEncoder().encode(payload).length > 4096) return;
+  compose.inFlight = true; compose.frozen = true;
+  for (const id of ["r2Save", "r2Retry", "r2Cancel"]) { const el = document.getElementById(id); if (el) el.disabled = true; }
+  R2_COPY.questions.forEach((_, i) => { const el = document.getElementById("r2Answer" + i); if (el) el.disabled = true; });
+  let state = "unconfirmed";
+  try {
+    const { res, data } = await r2FetchJson(`${RELAY_URL}trace`, { method: "POST",
+      headers: { "Content-Type": "application/json", "X-Line-AccessToken": r2ActiveToken }, body: payload });
+    if (!res.ok && data && data.state === "failed") state = "failed";
+    else if (res.ok && data && data.traced === true) {
+      const rec = await r2Readback(compose);
+      if (rec) { r2ActiveRecord = rec; state = "success"; }
+    }
+  } catch (_) { /* Network / JSON failure cannot prove the write failed. */ }
+  compose.inFlight = false;
+  if (r2Compose === compose) r2TraceOutcome(state);
+}
+
+async function r2OpenDeep() {
+  const state = r2DeepState(r2ActiveRecord);
+  if (state === "completed") { r2Focus("r2DeepResult"); return; }
+  if (state === "new") {
+    if (r2ActiveTier.tier !== "subscriber") { window.location.href = "./index.html?action=pay&src=deepdive"; return; }
+    // Keep the existing entitled route and server eligibility checks, behind the same record context.
+    r2ShowTask(`<button type="button" class="r2-primary" disabled>${esc(R2_COPY.actions[1][0])}</button>
+      <button type="button" class="r2-exit" id="r2Cancel">${esc(R2_COPY.backRecord)}</button>`);
+    document.getElementById("r2Cancel").addEventListener("click", r2ReturnRecord);
+    const expectedRecord = r2ActiveRecord;
+    const expectedTaskVersion = r2TaskVersion;
+    // Mark this local UI pending before awaiting: repeated clicks cannot issue a second trigger.
+    expectedRecord.deep_read_state = "pending";
+    try {
+      const { res } = await r2FetchJson(`${RELAY_URL}trigger/deepdive`, { method: "POST",
+        headers: { "Content-Type": "application/json", "X-Line-AccessToken": r2ActiveToken },
+        body: JSON.stringify({ log_id: expectedRecord.log_id }) }, false);
+      if (!res.ok) expectedRecord.deep_read_state = "unknown";
+    } catch (_) { expectedRecord.deep_read_state = "unknown"; }
+    if (r2ActiveRecord === expectedRecord && r2TaskVersion === expectedTaskVersion
+      && !document.getElementById("r2TaskView").hidden) r2OpenDeep();
+    return;
+  }
+  r2ShowTask(`<p>${esc(state === "pending" ? R2_COPY.pending : R2_COPY.deepError)}</p>
+    <button type="button" class="r2-primary" id="r2Cancel">${esc(R2_COPY.backRecord)}</button>
+    ${state === "pending" ? "" : `<button class="r2-exit" id="r2Support" type="button">${esc(R2_COPY.support)}</button>`}`);
+  document.getElementById("r2Cancel").addEventListener("click", r2ReturnRecord);
+  document.getElementById("r2Support")?.addEventListener("click", async () => {
+    const button = document.getElementById("r2Support"); button.disabled = true;
+    try {
+      // Rich Menu ⑥ is the exact text message 書僮客服, not an index action route.
+      if (!liff.isInClient()) throw new Error("outside LINE");
+      await liff.sendMessages([{ type: "text", text: R2_COPY.support }]);
+      liff.closeWindow();
+    } catch (_) { button.disabled = false; } // Keep the supplied R6-F guidance and safe return.
+  });
 }
 
 function renderDetail(rec, tierInfo, token, viewContext) {
+  r2TaskVersion++;
   const wrap = document.getElementById("viewDetail");
 
   const benSym  = guaSymbol(rec.ben_gua  || "");
@@ -639,47 +928,49 @@ function renderDetail(rec, tierInfo, token, viewContext) {
     // 首次完成只確認、查看與離開；不立即要求後續、深卜、複盤或購買。
     html += firstCompletionReturnHtml;
   } else {
-    if (isDivination) html += buildDelayedActionsHtml(rec, tierInfo);
-    html += returnDoorHtml;
+    if (isDivination && tierInfo.ok) {
+      html = '<div id="r2RecordView">' + html + buildR2SavedHtml(rec);
+      html += buildDelayedActionsHtml(rec, tierInfo);
+      html += '</div><section class="section r2-copy" id="r2TaskView" tabindex="-1" hidden></section>';
+    } else html += returnDoorHtml;
   }
 
   wrap.innerHTML = html;
 
   if (isDivination && viewContext === "delayed_return") {
-    const traceBtn = document.getElementById("delayedTraceBtn");
-    const tracePanel = document.getElementById("delayedTracePanel");
-    if (traceBtn && tracePanel) {
-      traceBtn.addEventListener("click", () => {
-        tracePanel.hidden = false;
-        traceBtn.setAttribute("aria-expanded", "true");
-        wireStampHandlers(rec.log_id, token);
-        tracePanel.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, { once: true });
-    }
-    const deepdiveBtn = document.getElementById("deepdiveBtn");
-    if (deepdiveBtn) {
-      deepdiveBtn.addEventListener("click", () => handleDeepdiveClick(rec.log_id, token));
-    }
+    r2ActiveRecord = rec; r2ActiveTier = tierInfo; r2ActiveToken = token;
+    document.getElementById("delayedTraceBtn")?.addEventListener("click", r2OpenCompose);
+    document.getElementById("r2DeepBtn")?.addEventListener("click", r2OpenDeep);
+    document.querySelectorAll("[data-r2-action]").forEach(button =>
+      button.addEventListener("click", button.dataset.r2Action === "0" ? r2OpenCompose : r2OpenDeep));
   }
+}
+
+function r2ShowReadError() {
+  r2Compose = null;
+  document.getElementById("viewDetail").innerHTML = "";
+  show("viewError");
+  document.getElementById("viewError").innerHTML = `<div class="r2-copy"><p>${esc(R2_COPY.readError)}</p>
+    <button class="r2-primary" type="button" id="r2ReadRetry">${esc(R2_COPY.retry)}</button>
+    <a class="r2-exit" href="./index.html">${esc(R2_COPY.home)}</a></div>`;
+  document.getElementById("r2ReadRetry").addEventListener("click", init);
 }
 
 async function init() {
   const params = new URLSearchParams(window.location.search);
   const logId = params.get("log_id");
   // 現役 OA 信箋 src=letter 屬首次完成；從「我的卦記」進入才是延後回訪。
-  const viewContext = params.get("context") === "first_completion" || params.get("src") === "letter"
-    ? "first_completion" : "delayed_return";
+  const viewContext = resolveGuaViewContext(params);
+  show("viewLoading");
   if (!logId) {
-    show("viewError");
-    document.getElementById("errMsg").textContent = "缺少卦記編號，請從卦記列表進入。";
+    r2ShowReadError();
     return;
   }
 
   try {
     await liff.init({ liffId: LIFF_ID });
   } catch (e) {
-    show("viewError");
-    document.getElementById("errMsg").textContent = "LINE 初始化失敗，請從 LINE 內開啟。";
+    r2ShowReadError();
     return;
   }
 
@@ -690,8 +981,7 @@ async function init() {
 
   const token = liff.getAccessToken();
   if (!token) {
-    show("viewError");
-    document.getElementById("errMsg").textContent = "無法取得身分憑證，請重新開啟。";
+    r2ShowReadError();
     return;
   }
 
@@ -702,25 +992,24 @@ async function init() {
       headers: { "X-Line-AccessToken": token },
     });
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status}${body ? ": " + body : ""}`);
+      throw new Error("read_error");
     }
     data = await res.json();
   } catch (e) {
-    show("viewError");
-    document.getElementById("errMsg").textContent = `無法載入：${e.message}`;
+    r2ShowReadError();
     return;
   }
 
-  if (!data.record) {
-    show("viewError");
-    document.getElementById("errMsg").textContent = "找不到此卦記，或無查看權限。";
+  if (!data || !data.record || data.record.log_id !== logId || typeof data.record.entry_type !== "string") {
+    r2ShowReadError();
     return;
   }
 
-  const tierInfo = await fetchSubscriberTier(token); // E27:失敗不擋主流程,降級處理見 buildDeepdiveCtaHtml
+  const tierInfo = await fetchSubscriberTier(token);
+  if (!tierInfo.ok) { r2ShowReadError(); return; }
   renderDetail(data.record, tierInfo, token, viewContext);
   show("viewDetail");
+  if (viewContext === "delayed_return") r2Focus("delayedActions");
 }
 
 init();

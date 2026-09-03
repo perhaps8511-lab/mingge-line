@@ -411,6 +411,14 @@
   .log-card .lc-foot{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--jade);
     letter-spacing:.06em;opacity:.8;}
   .log-card .lc-arrow{margin-left:auto;color:var(--gold-soft);letter-spacing:.02em;flex-shrink:0;}
+  #logList .r2-list-card,#logList .r2-list-card p{color:var(--rice-deep);font-size:17px;line-height:1.9;}
+  .r2-list-question{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .r2-list-trace{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
+  #logList .r2-list-card .r2-list-next{display:block;margin-top:8px;text-decoration:underline;}
+  #logList .r2-list-state p,#logList .r2-list-state button,#logList .r2-list-state a{font-size:17px;line-height:1.9;color:var(--moss);}
+  #logList .r2-list-state a{display:block;margin-top:12px;}
+  #r2ListHome{display:block;text-align:center;color:var(--rice-deep);font-size:17px;line-height:1.9;margin-top:16px;}
+  #r2ListHome[hidden]{display:none;}
   /* ====================================================
      E27 複盤 CTA(格2 hub 頂部橫幅)
   ==================================================== */
@@ -897,6 +905,7 @@
       <div class="log-status" id="logStatus">載入中……</div>
       <div id="fupanBanner"></div>
       <div id="logList"><div class="log-loading" id="logLoading">讀取記錄中……</div></div>
+      <a id="r2ListHome" href="./index.html">回首頁</a>
     </div>
   </div>
 
@@ -1872,10 +1881,91 @@ function lcDate(qiguaTime){
   return m? (parseInt(m[2],10)+'/'+m[3]) : String(qiguaTime).slice(0,10);
 }
 
+// R2 copy mechanically extracted from dispatch §2 and Hub R6–R8.
+const R2_COPY = Object.freeze({
+  "heading": "這次回來，想做什麼？",
+  "actions": [
+    [
+      "事情有變了",
+      "補記事情後來的變化。"
+    ],
+    [
+      "想把這一卦看深",
+      "從四個角度再看同一件事。"
+    ],
+    [
+      "想回看這一路",
+      "把多筆卦記與後續放在一起；符合條件才顯示。"
+    ],
+    [
+      "問另一件新的事",
+      "回到向天問卦。"
+    ]
+  ],
+  "comparison": [
+    {
+      "title": "補記後續",
+      "rows": [
+        "什麼時候用：事情有了新變化，或您已經做了決定",
+        "做什麼：把後來發生的事、您的決定、現在的卡點，記在原卦後面",
+        "不做什麼：不重新起卦；不改寫當時的原始卦"
+      ],
+      "button": "事情有變了"
+    },
+    {
+      "title": "四鏡・深卜",
+      "rows": [
+        "什麼時候用：已經問過一卦，還想知道其中的內在變化、相反角度與事情所在的階段",
+        "做什麼：不重新起卦，從互卦、綜卦、錯卦、序卦再看同一件事；結果留在原來的卦記裡",
+        "不做什麼：不重新起卦；不改寫原來的答案；不處理另一件事"
+      ],
+      "button": "想把這一卦看深"
+    },
+    {
+      "title": "複盤",
+      "rows": [
+        "什麼時候用：已經留下至少三筆卦記，想知道自己這一路怎麼走過來",
+        "做什麼：把至少三筆卦記與後續放在一起，整理事情如何演變、哪些選擇反覆出現",
+        "不做什麼：不重新起卦；不是把舊答案再說一次；不替您決定下一步"
+      ],
+      "button": "想回看這一路"
+    }
+  ],
+  "compareTitle": "這三個差在哪？",
+  "compareTail": "三個都不是新的一卦。想問另一件事，請回「向天問卦」。",
+  "backList": "回卦記",
+  "title": "事情有變了——補記一筆",
+  "questions": [
+    "後來發生什麼？",
+    "您做了什麼決定？",
+    "現在最卡的是什麼？"
+  ],
+  "note": "這一筆留在原卦後面，不會改寫當時的原始卦。",
+  "save": "記下來",
+  "cancel": "先不記",
+  "backRecord": "回這一卦",
+  "success": "已記在這一卦後面。",
+  "failure": "這一筆還沒記進去。剛才沒有保存成功，原卦沒有變。",
+  "retry": "再試一次",
+  "home": "回首頁",
+  "divine": "向天問卦",
+  "empty": "您還沒有卦記。有一件掛心的事，就從「向天問卦」開始。",
+  "readError": "目前讀取失敗，不代表卦記不存在。請稍後再試。",
+  "noTrace": "還沒有後續",
+  "originalDate": "原始日期：",
+  "recentTrace": "最近一次後續：",
+  "view": "看這一卦",
+  "pending": "這一卦的深卜還在進行中，完成後會在這裡看到。",
+  "deepError": "這一卦的深卜目前讀不到結果。請稍後再回來看，或到「書僮客服」查一下。",
+  "unconfirmed": "還沒能確認這一筆有沒有記進去。",
+  "support": "書僮客服"
+});
+
 /* ===== E09 歷史卦例頁 ===== */
 /* ===== E27:複盤 CTA(裁決 3-2 需輸入框 / 3-3 Worker 薄代理層)=====
    分流依 /history 已回傳的 sub.tier + records.length,不需額外請求。 */
-function buildFupanBannerHtml(sub, recordsCount){
+function buildFupanBannerHtml(sub, recordsCount, fupanLiveProven){
+  if(fupanLiveProven !== true) return ''; // R9: shared server truth, never inferred from subscription.
   var isSubscriber = sub && sub.tier === 'subscriber';
   var credits = quotaCreditsFromSub(sub);
   var head = '<div class="fp-title">這些卦，連成了什麼路？</div>'
@@ -1883,7 +1973,8 @@ function buildFupanBannerHtml(sub, recordsCount){
   if(!isSubscriber){
     return ''; // gated-ii revert(lettertail_cta 卡邊界條款):複盤 banner 對非 subscriber 完全隱藏,不分 credits
   }
-  var enough = recordsCount >= 2;
+  var enough = recordsCount >= 3;
+  if(!enough) return '';
   if(!enough){
     return '<div class="fupan-banner">'+head
       +'<textarea class="fp-input" id="fupanInput" rows="2" placeholder="再卜幾次，複盤就能連成路" disabled></textarea>'
@@ -1940,80 +2031,73 @@ function attachFupanBannerHandlers(token){
   });
 }
 
+function r2ListDate(value){
+  var date=new Date(value);
+  if(!value || !Number.isFinite(date.getTime())) return '';
+  var parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date).map(p=>[p.type,p.value]));
+  return parts.year+'-'+parts.month+'-'+parts.day;
+}
+function r2TraceSummary(text){
+  if(typeof text!=='string' || !text) return '';
+  var entries=text.split(/\n---\n(?=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+08:00 · req:[0-9a-f-]{36}\n)/);
+  var last=entries[entries.length-1].replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+08:00 · req:[0-9a-f-]{36}\n/,'');
+  return last.split(/\r?\n/).map(s=>s.trim()).find(s=>s && s!=='---'
+    && !R2_COPY.questions.some(q=>s==='「'+q+'」' || s===q)) || '';
+}
+function buildR2ListCard(r){
+  var hasTrace=typeof r.trace_text==='string' && r.trace_text.length>0;
+  var later=hasTrace ? R2_COPY.recentTrace+r2ListDate(r.trace_at)+'｜'+r2TraceSummary(r.trace_text) : R2_COPY.noTrace;
+  return '<a class="log-card r2-list-card" href="./log.html?log_id='+encodeURIComponent(r.log_id)+'&src=log">'
+    +'<p class="r2-list-question">'+lcEsc(r.question_text||'')+'</p>'
+    +'<p>'+lcEsc(R2_COPY.originalDate+r2ListDate(r.qigua_time))+'</p>'
+    +'<p class="r2-list-trace">'+lcEsc(later)+'</p>'
+    +'<span class="r2-list-next">'+lcEsc(R2_COPY.view)+'</span></a>';
+}
+function buildR2ListState(error){
+  return '<div class="log-empty-card r2-list-state"><p>'+lcEsc(error?R2_COPY.readError:R2_COPY.empty)+'</p>'
+    +(error?'<button class="lec-btn" type="button" id="r2HistoryRetry">'+lcEsc(R2_COPY.retry)+'</button>'
+      :'<a class="lec-btn" href="./index.html?action=divine">'+lcEsc(R2_COPY.divine)+'</a>')
+    +'<a href="./index.html">'+lcEsc(R2_COPY.home)+'</a></div>';
+}
 async function initLogPage(){
   var statusEl=document.getElementById('logStatus');
   var listEl=document.getElementById('logList');
-  var loadingEl=document.getElementById('logLoading');
+  var fupanBannerEl=document.getElementById('fupanBanner');
+  var homeEl=document.getElementById('r2ListHome');
+  if(fupanBannerEl)fupanBannerEl.innerHTML='';
+  listEl.innerHTML=''; homeEl.hidden=false;
   try{
-    statusEl.textContent='驗證身分中……';
     await liff.init({liffId:LIFF_ID});
-    if(!liff.isLoggedIn()){statusEl.textContent='導向登入中……';liff.login();return;}
+    if(!liff.isLoggedIn()){liff.login();return;}
     var token=liff.getAccessToken();
-    statusEl.textContent='讀取卦記中……';
-    var resp=await fetch(RELAY_URL+'history',{method:'GET',headers:{'X-Line-AccessToken':token}});
+    var resp=await fetch(RELAY_URL+'history',{method:'GET',cache:'no-store',headers:{'X-Line-AccessToken':token}});
     if(!resp.ok){throw new Error('HTTP '+resp.status);}
     var data=await resp.json();
-    // ★ S137-R02:契約對齊 — Worker /history 回傳的是 subscriber:{tier,
-    //   trial_quota_remaining, monthly_quota_remaining, subscription_start}，
-    //   不是 subscription:{active,expires_at} / coins；原判斷永遠落到 else 分支。
+    if(!data || data.state==='read_error' || !Array.isArray(data.records)
+      || data.records.some(r=>!r || typeof r.log_id!=='string' || typeof r.entry_type!=='string'))throw new Error('read_error');
+    data.records=data.records.filter(r=>r.entry_type==='divination');
+    data.records=data.records.filter((r,i,all)=>all.findIndex(x=>x.log_id===r.log_id)===i);
     var sub=data.subscriber;
     if(sub&&sub.tier==='subscriber'){
       statusEl.textContent='訂閱中，書房為您常開。';
     }else{
-      // ★ 只陳述 owning runtime readback 回來的實際餘額,不宣稱任何贈與。
-      //   readback 若不可用,此分支根本不會執行(上方 resp.ok 失敗即進 catch)。
       var coins=quotaCreditsFromSub(sub);
       statusEl.textContent='尚餘 '+coins+' 枚問卦銅錢。';
     }
-    // E27:複盤 CTA —— 分流依剛拿到的 sub + records.length,不需額外請求
-    var fupanBannerEl=document.getElementById('fupanBanner');
     if(fupanBannerEl){
-      fupanBannerEl.innerHTML=buildFupanBannerHtml(sub, (data.records||[]).length);
+      fupanBannerEl.innerHTML=buildFupanBannerHtml(sub,data.records.length,data.fupan_live_proven);
       attachFupanBannerHandlers(token);
     }
-    if(loadingEl)loadingEl.remove();
-    if(!data.records||data.records.length===0){
-      listEl.innerHTML='<div class="log-empty-card">'
-        +'<p>這裡還空著 —— 您的第一卦,會是第一頁。<br>心裡若有件事在轉,到〔向天問卦〕把它放上心頭。</p>'
-        +'<button type="button" class="lec-btn" onclick="location.href=\'./index.html\'">🎴 向天問卦</button>'
-        +'</div>';
+    if(data.records.length===0){
+      listEl.innerHTML=buildR2ListState(false); homeEl.hidden=true;
     }else{
-      listEl.innerHTML=data.records.map(function(r){
-        // ★ S138 格2卡片版①②:大卦符(真實King Wen對照)+本卦→變卦+日期 / 事由 / 動爻+型態+查看信箋箭頭
-        var glyph=guaGlyph(r.ben_gua);
-        var guaLine=lcEsc(r.ben_gua||'')+(r.bian_gua?(' → '+lcEsc(r.bian_gua)):'');
-        var dateStr=lcDate(r.qigua_time);
-        var footBits=[
-          (r.dong_yao?('動爻 '+lcEsc(String(r.dong_yao))):''),
-          (r.entry_type&&r.entry_type!=='divination'?lcEsc(r.entry_type):'')
-        ].filter(Boolean).join(' · ');
-        var card=''
-          +(r.trace_text?'<span class="lc-traced" title="已補後續"></span>':'')
-          +'<div class="lc-head">'
-            +'<span class="lc-glyph">'+glyph+'</span>'
-            +(guaLine?('<span class="lc-gua">'+guaLine+'</span>'):'')
-            +(dateStr?('<span class="lc-date">'+dateStr+'</span>'):'')
-          +'</div>'
-          +(r.question_text?('<div class="lc-q">'+lcEsc(r.question_text)+'</div>'):'')
-          +'<div class="lc-foot">'
-            +(footBits?('<span>'+footBits+'</span>'):'')
-            +'<span class="lc-arrow">查看信箋 ›</span>'
-          +'</div>';
-        // log_id 由 Worker /history 補上(S137-R02),包成可點連結進卦記詳情頁(E23,現役已驗證,不重寫)
-        if(r.log_id){
-          return '<a class="log-card" href="./log.html?log_id='+encodeURIComponent(r.log_id)+'&src=log">'+card+'</a>';
-        }
-        return '<div class="log-card">'+card+'</div>';
-      }).join('');
+      listEl.innerHTML=data.records.map(buildR2ListCard).join('');
     }
-  }catch(e){
-    if(loadingEl)loadingEl.remove();
-    statusEl.textContent='—';
-    // ★ S137-R04 暫時診斷埋樁:把真正錯誤顯示在畫面上,方便手機端不連 devtools 也能回報。
-    //   問題定位完成後應改回原本的通用文字「載入失敗，請稍後再試。」,不留在正式版面上。
-    var __diag = (e && e.name ? e.name+': ' : '') + (e && e.message ? e.message : String(e));
-    listEl.innerHTML='<div class="log-empty">載入失敗:<br><span style="font-size:12px;opacity:.7;">'+__diag.replace(/</g,'&lt;')+'</span></div>';
-    console.warn('[log page]',e);
+  }catch(_){
+    statusEl.textContent='';
+    if(fupanBannerEl)fupanBannerEl.innerHTML='';
+    listEl.innerHTML=buildR2ListState(true); homeEl.hidden=true;
+    document.getElementById('r2HistoryRetry').addEventListener('click',initLogPage);
   }
 }
 
