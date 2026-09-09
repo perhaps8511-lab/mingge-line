@@ -1,5 +1,7 @@
 # MINGGE-SHOWCASE-005｜Showcase 手機可見路徑 Final Blueprint v1.0
 
+> **2026-09-09 Owner 設計裁決續效**：後續工程沿用原版 HTML／CSS／素材與按住滿環、放開起卦互動。R1 離線預演僅為功能核對，不取代原版設計；不得自行全面改卡片首頁／統一米白版。主要視覺調整限格③所需範圍，重大改版先交對照。舊截圖的額度、退款及私人內容不恢復。見 [完整設計裁決](mingge_original_design_owner_ruling_20260909.md) 與 [金流候選交接](payment_safety_candidate_20260909.md)。本輪無部署／切流／停 Make／真付款授權。
+
 > 日期：2026-07-18（Asia/Taipei）
 > Release Stage：`SOFT_LAUNCH_READINESS`
 > Showcase target：2026-07-20
