@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mingge-payment-safety-candidate",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-09-09",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {"INGRESS_PROFILE": "disabled", "PROVIDER_ENVIRONMENT": "unconfirmed", "MERCHANT_ALIAS": "unconfirmed"},
+  "durable_objects": {"bindings": [{"name":"RECEIPTS","class_name":"PaymentReceipt"},{"name":"ORDERS","class_name":"PaymentOrder"}]},
+  "migrations": [{"tag":"payment-inbox-v1","new_sqlite_classes":["PaymentReceipt","PaymentOrder"]}],
+  "services": [{"binding":"VERIFIER","service":"mingge-payment-verifier-unconfigured"},{"binding":"ORDER_STORE","service":"mingge-payment-order-store-unconfigured"},{"binding":"CONSUMER","service":"mingge-payment-consumer-unconfigured"}],
+  "ratelimits": [{"name":"INGRESS_LIMITER","namespace_id":"2101","simple":{"limit":30,"period":60}}],
+  "observability": {"enabled":false}
+}

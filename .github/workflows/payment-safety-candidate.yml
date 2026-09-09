@@ -1,0 +1,24 @@
+name: Payment safety candidate
+on:
+  pull_request:
+    paths: ['workers/payment-safety/**', '.github/workflows/payment-safety-candidate.yml']
+permissions:
+  contents: read
+jobs:
+  local-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: workers/payment-safety/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: workers/payment-safety
+      - run: npm test
+        working-directory: workers/payment-safety
+      - run: node --check workers/mingge-relay/worker.js
+      - run: node tests/test_security_fail_closed_v1_0.mjs
+      - run: bash tests/test_e56_laoyi_center_v1_0.sh

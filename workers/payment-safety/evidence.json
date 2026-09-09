@@ -1,0 +1,51 @@
+{
+  "date": "2026-09-09",
+  "base_sha": "3048c65c17283bb3a72a0dc530f970419986aa11",
+  "local_tests": {
+    "payment_safety": {
+      "passed": 12,
+      "failed": 0,
+      "runtime": "Miniflare/workerd SQLite DO; synthetic bindings"
+    },
+    "existing_security_fail_closed": {
+      "passed": 26,
+      "failed": 0
+    },
+    "laoyi_static_vm": {
+      "passed": 55,
+      "failed": 0,
+      "initial_attempt": "PATH missing coreutils; corrected shell, unchanged tests"
+    },
+    "press_release_vm": {
+      "passed": 9,
+      "failed": 0
+    }
+  },
+  "independent_review": {
+    "reviewer": "payment_security_review independent agent",
+    "status": "NO_REMAINING_MUST_FIX_IN_BOUNDED_REVIEW",
+    "resolved": [
+      "same-state financial duplication",
+      "private held recovery"
+    ],
+    "reviewer_reran_tests": false,
+    "reviewed_sha256": {
+      "worker.mjs": "253dbf6c8469088e116c648081bec1c35ac3dc650ba33845dd83f0c6964be492",
+      "core.mjs": "99826d0b604150d0ebd33ecc40dcf4c77a7a4e0da2d2a1c62589281d27ed81cd",
+      "test/safety.test.mjs": "998141ce1607563d58744a2e97a234e14d0bcd84da0a2a3de8df8f80eeb75fca"
+    }
+  },
+  "production": {
+    "provider_sandbox": "NOT_RUN",
+    "owning_store_UAT": "NOT_RUN",
+    "LINE_native_UAT": "NOT_RUN",
+    "deploy": "NOT_RUN",
+    "traffic_switch": "NOT_RUN",
+    "Make_stop": "NOT_RUN",
+    "real_payment": "NOT_RUN"
+  },
+  "provider_contract": "UNKNOWN exact ACK body/deadline/schema; ingress disabled",
+  "frontend_changed": false,
+  "visual_pairs": 9,
+  "visual_pair_bytes_identical": true
+}
