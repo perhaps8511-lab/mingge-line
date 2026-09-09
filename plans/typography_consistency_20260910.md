@@ -4,6 +4,8 @@ Owner 2026-09-10 指示：套用命格產品原版各頁，保留原有配色、
 
 涵蓋 `index.html`（進場、起卦、等待、書房、老易、卦記列表、方案等子頁）、`log.html`、`pay_success.html`、`pay_failure.html`。四頁在原樣式後引用同一份 `assets/typography.css`。
 
+Owner 同日補充「新網頁也請一致」：本規範持續適用於後續新增的命格網頁、子頁及元件。新頁優先引用共用 stylesheet；新元件以 `--mg-font` 及四個字級 tokens 定義文字角色，不複製另一套數值。跨技術框架時亦沿用相同字型備援及級距。新增頁驗收需檢查實際 computed style、窄螢幕溢出及觸控可用性；固定頁尾的90px避讓僅用於有此頁尾的版面，不強加於其他新頁。
+
 | 用途 | 統一設定 |
 |---|---|
 | 網頁文字 | Noto Sans TC → PingFang TC → Microsoft JhengHei → sans-serif；不指定新細明體／宋體作 fallback |

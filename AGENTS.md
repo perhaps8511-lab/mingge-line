@@ -16,6 +16,8 @@
 完成交付與必要驗證即結案；只有本次已授權目標仍有必要工作時繼續，不為「續卡」製造新任務。
 
 ## Mingge 專案指標與界線
+Owner 2026-09-10 補充：既有與後續新增的命格網頁，都沿用同一套字體規範。優先引用 `assets/typography.css`；新元件使用其 `--mg-font`、`--mg-page`、`--mg-section`、`--mg-body`、`--mg-caption` tokens，不自行另訂同層級字級或改回新細明體／宋體 fallback。細節及品牌圖示例外見 [字體規範](plans/typography_consistency_20260910.md)。保留原配色、素材與互動；此要求不授權發布或改動金流。
+
 Repository：`perhaps8511-lab/mingge-line`。
 本機 Product Basis 搜尋起點：`D:\CBD_Lab_OS\001_mingge\00J_canon\Product_Basis`。這是 locator，不是現役版本證明。
 
