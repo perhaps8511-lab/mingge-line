@@ -1,5 +1,7 @@
 # MINGGE-SHOWCASE-005｜Showcase 手機可見路徑 Final Blueprint v1.0
 
+> 2026-09-10 Owner 字體修訂：原版各網頁採一致黑體字型及標題／內文級距；原配色、素材、版面安排與起卦互動沿用，僅補文字放大後必要的捲動／頁尾避讓。見 [字體統一候選](typography_consistency_20260910.md)。本機候選不改金流 PR #25，不授權推送、部署或真付款。
+
 > 日期：2026-07-18（Asia/Taipei）
 > Release Stage：`SOFT_LAUNCH_READINESS`
 > Showcase target：2026-07-20
