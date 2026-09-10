@@ -33,3 +33,5 @@ html:has(.ly-candidate){height:auto;overflow:auto;}
 .asset-slot>div{aspect-ratio:4/3;}
 .card-slot>div{aspect-ratio:1.6;}
 .asset-slot figcaption{font:17px/1.9 var(--mg-font);padding:12px 16px;color:var(--rice-deep);border-top:1px solid rgba(184,134,11,.2);}
+
+.ly-candidate select{width:100%;padding:14px;font:17px/1.9 var(--mg-font);background:var(--moss);color:var(--rice);border:1px solid var(--gold);}.consent-row{display:block;font:17px/1.9 var(--mg-font);padding:16px 0;}.consent-row input{width:24px;height:24px;margin-right:12px;vertical-align:middle;}#app{overflow-wrap:anywhere;}

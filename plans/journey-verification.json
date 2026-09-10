@@ -1,0 +1,37 @@
+{
+  "status": "PASS",
+  "scope": "synthetic UI only",
+  "human_comprehension": "NOT_RUN",
+  "formal_security_payment_uat": "NOT_RUN",
+  "zoomMethod": "CSS zoom 2 at 760px approximates 380px CSS viewport; not native browser zoom certification",
+  "checks": [
+    "unknown period and unverified cannot activate",
+    "buyer no consent/private records",
+    "consent required; submit and query remain pending without confirmation",
+    "confirmed only then two next actions",
+    "source article readable",
+    "eligibility period",
+    "eligibility single",
+    "eligibility free",
+    "eligibility none",
+    "eligibility error",
+    "invalid recovery no success",
+    "claimed recovery no success",
+    "pending recovery no success",
+    "later/decline cannot falsely cancel pending",
+    "reload clears fixture and direct ask gated",
+    "18 affected routes 380px zoom 1",
+    "18 affected routes 320px zoom 1",
+    "18 affected routes 760px zoom 2"
+  ],
+  "fonts": [
+    {
+      "familyName": "Noto Sans TC",
+      "postScriptName": "Noto-Sans-TC-Bold",
+      "isCustomFont": false,
+      "glyphCount": 9
+    }
+  ],
+  "errors": [],
+  "externalRequests": 0
+}

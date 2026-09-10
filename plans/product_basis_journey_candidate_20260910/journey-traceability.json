@@ -1,0 +1,114 @@
+{
+  "status": "CANDIDATE_LOCAL_ONLY",
+  "baseline": {
+    "criteria": 126,
+    "screens": 31,
+    "edges": 20,
+    "evidence": "retained_not_promoted"
+  },
+  "increment": {
+    "checks": [
+      {
+        "id": "JY-01",
+        "acceptance": "隨貨卡不含實際 token，逐件期間未核不填數",
+        "route": "parcel",
+        "source": "Owner 20260910 + Offer v1.2"
+      },
+      {
+        "id": "JY-02",
+        "acceptance": "未驗證或未同意或期間未核不得啟用",
+        "route": "activate-consent",
+        "source": "Owner 20260910 + Offer v1.2"
+      },
+      {
+        "id": "JY-03",
+        "acceptance": "買家不能代同意／讀紀錄",
+        "route": "gift-buyer",
+        "source": "Owner 20260910 + Offer v1.2"
+      },
+      {
+        "id": "JY-04",
+        "acceptance": "稍後與不接受不啟用；pending 不偽稱撤销",
+        "route": "later",
+        "source": "Owner 20260910 + Offer v1.2"
+      },
+      {
+        "id": "JY-05",
+        "acceptance": "提交後 pending；只有確認後成功",
+        "route": "activation-result",
+        "source": "Owner 20260910 + Offer v1.2"
+      },
+      {
+        "id": "JY-06",
+        "acceptance": "失效／已領取／待確認都有查詢及求助",
+        "route": "activation-result",
+        "source": "Owner 20260910 + Offer v1.2"
+      },
+      {
+        "id": "JY-07",
+        "acceptance": "成功提供問一件事與已有來源全文閱讀",
+        "route": "read",
+        "source": "Owner 20260910 + Offer v1.2"
+      },
+      {
+        "id": "JY-08",
+        "acceptance": "期間／單次／免費／無權益／read_error 五態",
+        "route": "eligibility",
+        "source": "Owner 20260910 + Offer v1.2"
+      },
+      {
+        "id": "JY-09",
+        "acceptance": "期間無額度用完；read_error 無購買入口",
+        "route": "eligibility",
+        "source": "Owner 20260910 + Offer v1.2"
+      },
+      {
+        "id": "JY-10",
+        "acceptance": "完整 Offer 權益、起算／到期／送禮",
+        "route": "rights",
+        "source": "Owner 20260910 + Offer v1.2"
+      },
+      {
+        "id": "JY-11",
+        "acceptance": "空目錄來源／返回／詢問，無上架通知",
+        "route": "catalog",
+        "source": "Owner 20260910 + Offer v1.2"
+      },
+      {
+        "id": "JY-12",
+        "acceptance": "手機 100% 正常尺寸、200% 明確區分、無外連",
+        "route": "all",
+        "source": "Owner 20260910 + Offer v1.2"
+      }
+    ],
+    "routes": [
+      "parcel",
+      "rights",
+      "activate",
+      "gift-buyer",
+      "activate-consent",
+      "later",
+      "declined",
+      "activation-result",
+      "activation-help",
+      "activation-fixtures",
+      "eligibility",
+      "eligibility-fixtures",
+      "ask",
+      "read"
+    ]
+  },
+  "implementation": [
+    "longyun.html",
+    "assets/longyun.js",
+    "assets/longyun-journey.js",
+    "assets/longyun.css"
+  ],
+  "human_comprehension": "NOT_RUN",
+  "formal_security_payment_uat": "NOT_RUN",
+  "source_hashes": {
+    "MINGGE_PRODUCT_BASIS_INDEX_vNEXT_CANDIDATE_20260909.md": "ed6df978f35798cc462280c7220f03a4087edda16b073fedb02c74eb02021574",
+    "MINGGE_OFFER_CONTRACT_v1_2_20260824.md": "c5f1c59ade85dba9683bd4f4543bf7b745b9b1da132c697d7d1df754026c0126",
+    "MINGGE_CORE_TA_COPY_AND_CONTENT_ENRICHMENT_v0_2_20260902.md": "3f29582c40fb1f6b13e2c3000dd9ad7cc380a88547d0816dbbc554cc26d8586c"
+  }
+}
