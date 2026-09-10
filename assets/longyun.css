@@ -27,3 +27,9 @@ html:has(.ly-candidate){height:auto;overflow:auto;}
 .ly-candidate .missing{color:var(--rice-deep);}.ly-candidate li{font-size:17px;line-height:1.9;margin:8px 0;} .ly-candidate ul{padding-left:24px;}
 @media(max-width:380px){.ly-shell{padding:0 18px;}#app .panel,.ly-candidate .source-card{padding:16px;}.ly-header span{letter-spacing:0;}}
 @media(prefers-reduced-motion:reduce){.ly-candidate *{animation:none!important;scroll-behavior:auto!important;}}
+
+/* Owner-approved visual direction; neutral empty media slots, no invented product art. */
+.asset-slot{margin:24px 0;border:1px solid rgba(184,134,11,.3);background:rgba(44,62,45,.12);}
+.asset-slot>div{aspect-ratio:4/3;}
+.card-slot>div{aspect-ratio:1.6;}
+.asset-slot figcaption{font:17px/1.9 var(--mg-font);padding:12px 16px;color:var(--rice-deep);border-top:1px solid rgba(184,134,11,.2);}
