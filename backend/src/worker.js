@@ -259,7 +259,30 @@ async function runIncrementalAirtableToPostgresSync() {
 
     for (const r of result.rows) {
       if (!r.entryType || r.entryType !== "divination") continue; // 深卜/複盤走既有回填腳本的邏輯,增量同步只顧「新卦」
-      const gid = existingByAirtableId.get(r.airtableId);
+      let gid = existingByAirtableId.get(r.airtableId);
+
+      // 二次比對(修 bug:第一次實測時發現的重複列問題,不是只靠 legacy_source_airtable_id 就夠)：
+      // Postgres 先建、之後才鏡射到 Airtable 的卦記,若「回寫 legacy_source_airtable_id」那一步
+      // 還沒發生或曾經失敗過,單靠 airtableId 比對會找不到,誤判成新卦而插入第二筆。
+      // syncToAirtable() 把 Postgres 的 request_id 寫進 Airtable 的 session_id 欄位，
+      // 所以 (subject, request_id)==(lineUserIdRaw, sessionId) 這組合就是原本 gua_records
+      // 的唯一鍵——用它補抓「已存在但還沒連上 legacy_source_airtable_id」的同一筆卦記，
+      // 抓到就補連結，不新插入，這樣才是真正對得回同一筆，不是靠時間點僥倖對上。
+      if (!gid && r.lineUserIdRaw && r.sessionId) {
+        const byKey = await pool.query(
+          `SELECT id FROM gua_records WHERE subject = $1 AND request_id = $2 AND legacy_source_airtable_id IS NULL`,
+          [r.lineUserIdRaw, r.sessionId]
+        );
+        if (byKey.rows.length > 0) {
+          gid = byKey.rows[0].id;
+          await pool.query(
+            `UPDATE gua_records SET legacy_source_airtable_id = $1 WHERE id = $2`,
+            [r.airtableId, gid]
+          );
+          log.info("incremental_sync_linked_existing_row", { gid, airtableId: r.airtableId });
+        }
+      }
+
       if (gid) {
         matchedCount++;
         await pool.query(
