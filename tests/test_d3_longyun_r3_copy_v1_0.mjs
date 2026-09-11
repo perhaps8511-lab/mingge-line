@@ -11,6 +11,9 @@ const longyunJs = readFileSync(new URL('../assets/longyun.js', import.meta.url),
 const journeyJs = readFileSync(new URL('../assets/longyun-journey.js', import.meta.url), 'utf8');
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const cardHtml  = readFileSync(new URL('../activation-card-preview.html', import.meta.url), 'utf8');
+const cardJs    = readFileSync(new URL('../assets/activation-card.js', import.meta.url), 'utf8');
+const longyunHtml = readFileSync(new URL('../longyun.html', import.meta.url), 'utf8');
+const shipped = { longyunHtml, longyunJs, journeyJs, cardHtml, cardJs, indexHtml };
 
 // D1-B/D2-B（Owner 2026-09-11）
 check(longyunJs.includes('先看清一件收藏，再決定要不要留下。'), 'D2-B-1', 'longyun.js 首摺 H1 用「一件收藏」');
@@ -64,6 +67,20 @@ for (const f of [longyunJs, journeyJs, cardHtml]) {
   check(!/Payment_Orders/i.test(f), 'NO-PAYMENT-ORDERS', 'Payment_Orders 不出現於本輪新增/修改檔');
   check(!/fetch\s*\(/.test(f), 'NO-FETCH', '本輪新增/修改檔零 network fetch（inert candidate 維持）');
 }
+
+// S-20260911 稽核修正：正式檔案零內部審閱工具、零未上架 SKU／參考價格、零可點擊 fixture 切換
+// （沒有 query 參數、沒有 hash route、沒有 localStorage 旗標可以打開——這些路徑本身已從檔案移除）。
+const internalTokens = ['XTVSSPvA', 'agmh9hhJ', 'S9j544BD', '審閱', 'review-bar', 'data-route', 'toggle-error',
+  "id=\"reset\"", 'eligibility-fixtures', 'activation-fixtures', "route==='review'", "route==='missing'",
+  "route.startsWith('item/')"];
+for (const [name, content] of Object.entries(shipped)) {
+  for (const tok of internalTokens) {
+    check(!content.includes(tok), `NO-INTERNAL-${tok}`, `${name} 不含內部審閱／fixture 字樣「${tok}」`);
+  }
+}
+// longyun.html 預設路徑（無 hash）＝ split，不出現任何商品卡；catalog() 只有 empty／read_error 兩態
+check(longyunJs.includes("let catalogState='empty'"), 'CATALOG-DEFAULT', 'catalogState 預設為 empty（無合成 open/demo 態）');
+check(!/open_demo|working\s*=\s*\[/.test(longyunJs), 'CATALOG-NO-DEMO', 'longyun.js 不含 open_demo 或內部 working[] SKU 陣列');
 
 console.log(`PASS=${pass} FAIL=${fail}`);
 process.exit(fail === 0 ? 0 : 1);

@@ -59,10 +59,28 @@ reuse_branch: feat/d3-longyun-experience-20260910（同一 base，18 組合成�
 - 不建立任何 Payment_Orders／entitlement 寫入
 - 不新增 Make/Dify 側 LINE 原生 quick reply 接線（記為缺口）
 
+## S-20260911 稽核修正（Perth 三項查證後追加）
+
+Perth 三項查證揪出真正漏洞，修正如下：
+
+1. **內部審閱工具外洩**：`longyun.html` 的 `<aside class="review-bar">`（「待核商品與缺項」「模擬目錄讀取失敗」「重設預演」）在正式檔案裡無條件渲染、任何訪客點得到；`#review`／`#item/*`／`#missing` 三個內部 route 會列出未上架 SKU 工作編號與來源參考價格（`XTVSSPvA`／`agmh9hhJ`／`S9j544BD`／`NT$6,000`／`NT$6,800`）。**已全部從 shipped 檔案移除**（`longyun.html` 的 review-bar aside、`assets/longyun.js` 的 `working[]`、`review`／`item/*`／`missing` route、`open_demo` 態）。
+2. **R1-S00／R6-LY fixture 可被公開訪客點開**：`assets/longyun-journey.js` 內建的「審閱：切換资格情境」「審閱：選擇合成狀態」「審閱：模擬查詢回覆」三個連結直接嵌在正式畫面上，任何訪客可自行把資格切成「已核實免費」、把啟用結果切成「已確認」。**已移除三個連結與其對應 route（`eligibility-fixtures`／`activation-fixtures`）及全部按鈕綁定**。移除後：
+   - R1-S00 在沒有真後端時，唯一可達狀態＝`read_error`（`目前無法確認您的資格，不代表沒有。`）。
+   - R6-LY 在沒有真後端時，唯一可達終點＝`deferred`／`declined`／`pending`（`稍後／不接受／待確認`三態）；`confirmed` 分支保留程式碼供未來真後端接上，但本輪無任何點擊路徑可達。
+   - fixture 邏輯只留在本機測試（Browser pane 互動走查），shipped 檔案沒有 query 參數、hash route 或 localStorage 旗標可以打開這些態。
+3. `tests/test_d3_longyun_r3_copy_v1_0.mjs` 新增 60+ 項斷言，逐一確認上述字樣／route／內部 SKU 在 6 個 shipped 檔案（`longyun.html`／`longyun.js`／`longyun-journey.js`／`activation-card-preview.html`／`activation-card.js`／`index.html`）中皆不存在；另手動 grep 全量核對 `XTVSSPvA`／`agmh9hhJ`／`S9j544BD`／`6,800`／`審閱`＝0 命中，`6,000`＝1 命中且為 LP-S07 exact copy（`NT$6,000–14,999`，Offer Copy Master v1.0 §3 半年藏主價格帶，非內部參考價，合法保留）。
+
+## Perth 2026-09-11 裁決（回覆本卡稽核後）
+
+- **本波不動現役付費入口**：M-090/M-092「動能框」文案與 RM03 三方案面板文案維持原樣、測試鎖定不改；r3 的 R1-S00「none」／R3-S02 四級定價文案只用在龍宮舍利新流程，不覆蓋 `payMinggeBranch`／`renderZeroQuotaGate`。上方「既有凍結衝突」第 1 點就此定案：**保留現狀，不是待裁決**。
+- **下一波待辦**（登記於此，不在本輪處理）：
+  1. main 上既有紅燈 `[FAIL] 149 卡 M-092 A 案缺失或錯字`（`tests/test_zero_quota_gate.sh`，與本 WP 無關、本 WP 之前即存在）——下一波先查根因。
+  2. free-grant（D4-C，3 次免費贈與）後端建好後，同步更新正式付費入口文案（`payMinggeBranch`／`renderZeroQuotaGate`），讓「畫面有、資料也有」。
+  3. 格③「看看龍宮舍利」目前是兩層（先到既有 inline `payRelicBranch`／`longyunEntry`，再點「收藏、來源與購買說明」才到 `longyun.html`）——先保留，待 Owner 看過正式頁後裁決是否合併成一層。
+
 <!-- CODEX-REVIEW: BLOCKED-B1 codex-cli-unavailable
 2026-09-11：codex exec 回報 "You've hit your usage limit"（額度至 2026-09-16 恢復），
 無法完成互審循環。依 Skill 共通鐵律標記為 B1 工具限制，不冒充 APPROVED、不跳過此閘門。
-本輪工程判斷（尤其「不動既有 zero-quota 閘門／fail-open 邏輯」一節）僅為 writer 單方判斷，
-未經 Codex 交叉驗證，於交付報告中如實註記為 NOT_RUN。
+本輪工程判斷僅為 writer 單方判斷，未經 Codex 交叉驗證，於交付報告中如實註記為 NOT_RUN。
 -->
 
