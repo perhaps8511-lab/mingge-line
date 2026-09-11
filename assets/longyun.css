@@ -1,0 +1,41 @@
+.ly-candidate {height:auto;min-height:100%;overflow:auto;}
+html:has(.ly-candidate){height:auto;overflow:auto;}
+.ly-candidate .cosmos {position:fixed;pointer-events:none;}
+.ly-shell{position:relative;max-width:680px;margin:auto;padding:0 24px;z-index:1;}
+.review-bar{position:relative;z-index:2;padding:10px 18px;background:var(--moss);font:14px/1.7 var(--mg-font);border-bottom:1px solid var(--gold);}
+.review-bar details{max-width:680px;margin:0 auto;}.review-bar summary{font-size:17px;cursor:pointer;}
+.ly-header{display:flex;align-items:center;gap:16px;padding:26px 0;border-bottom:1px solid rgba(184,134,11,.25);}
+.ly-header .brand-seal{width:48px;height:48px;margin:0;animation:none;}.ly-header span{font-size:17px;color:var(--gold-lit);}
+#app{padding:30px 0 50px;outline:none;}#app:focus-visible{outline:1px solid var(--gold);}
+#app h1{font-size:26px;letter-spacing:.12em;line-height:1.5;margin:10px 0 22px;color:var(--rice);}
+#app h2,#app h3,#app h4{font:600 20px/1.6 var(--mg-font);color:var(--gold-lit);margin:0 0 14px;}
+#app p{margin:12px 0;color:var(--rice-deep);}#app .eyebrow{font-size:17px!important;color:var(--gold-lit);}
+#app .hero{text-align:center;padding:20px 0 30px;}#app .hero p{color:var(--gold-lit);}
+#app section{margin:28px 0;padding:24px 0;border-top:1px solid rgba(184,134,11,.25);}
+#app .panel{border:1px solid rgba(184,134,11,.38);border-radius:6px;padding:22px;margin:18px 0;background:rgba(44,62,45,.22);}
+.ly-candidate button,.ly-candidate .action{display:block;width:100%;padding:13px 18px;border:1px solid var(--gold);border-radius:3px;background:transparent;color:var(--rice);font:17px/1.9 var(--mg-font);text-align:center;text-decoration:none;cursor:pointer;white-space:normal;overflow-wrap:anywhere;margin:12px 0;}
+.ly-candidate button:hover,.ly-candidate .action:hover{background:rgba(184,134,11,.13);}
+.ly-candidate button:focus-visible,.ly-candidate a:focus-visible,.ly-candidate summary:focus-visible{outline:2px solid var(--gold-lit);outline-offset:3px;}
+.ly-candidate button:disabled{cursor:not-allowed;color:var(--jade);border-color:var(--jade);}
+.ly-candidate a{color:var(--gold-lit);}.ly-candidate .text-link{border:0;text-decoration:underline;text-underline-offset:5px;}
+.ly-candidate details{padding:14px 0;border-top:1px solid rgba(184,134,11,.25);}.ly-candidate summary{font-size:17px;line-height:1.9;cursor:pointer;color:var(--gold-lit);}
+.ly-candidate .source-card{background:var(--moss);border:1px solid var(--gold);padding:24px;margin:20px 0;}
+.ly-candidate dl{margin:12px 0;}.ly-candidate dt{font-size:17px;color:var(--gold-lit);margin-top:14px;}.ly-candidate dd{font-size:17px;line-height:1.9;margin:0;overflow-wrap:anywhere;}
+.ly-candidate textarea{width:100%;min-height:180px;padding:14px;color:var(--rice);background:var(--moss);border:1px solid var(--gold);font:17px/1.9 var(--mg-font);}
+.ly-candidate .status{padding:14px;border-left:3px solid var(--gold);font-size:17px;line-height:1.9;}
+.ly-footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px;padding:24px 0;border-top:1px solid var(--gold);font-size:14px;}.ly-footer a{font-size:17px;}
+.ly-candidate .missing{color:var(--rice-deep);}.ly-candidate li{font-size:17px;line-height:1.9;margin:8px 0;} .ly-candidate ul{padding-left:24px;}
+@media(max-width:380px){.ly-shell{padding:0 18px;}#app .panel,.ly-candidate .source-card{padding:16px;}.ly-header span{letter-spacing:0;}}
+@media(prefers-reduced-motion:reduce){.ly-candidate *{animation:none!important;scroll-behavior:auto!important;}}
+
+/* Owner-approved visual direction; neutral empty media slots, no invented product art. */
+.asset-slot{margin:24px 0;border:1px solid rgba(184,134,11,.3);background:rgba(44,62,45,.12);}
+.asset-slot>div{aspect-ratio:4/3;}
+.card-slot>div{aspect-ratio:1.6;}
+.asset-slot figcaption{font:17px/1.9 var(--mg-font);padding:12px 16px;color:var(--rice-deep);border-top:1px solid rgba(184,134,11,.2);}
+
+.ly-candidate select{width:100%;padding:14px;font:17px/1.9 var(--mg-font);background:var(--moss);color:var(--rice);border:1px solid var(--gold);}.consent-row{display:block;font:17px/1.9 var(--mg-font);padding:16px 0;}.consent-row input{width:24px;height:24px;margin-right:12px;vertical-align:middle;}#app{overflow-wrap:anywhere;}
+.ly-candidate .footnote{font-size:14px;line-height:1.8;color:var(--jade);margin:12px 0;}
+.ly-candidate blockquote{margin:16px 0;padding:14px 18px;border-left:3px solid var(--gold);background:rgba(184,134,11,.06);font-size:17px;line-height:1.9;color:var(--rice-deep);}
+.ly-candidate .longyun-actions{display:block;}
+.ly-candidate .longyun-actions>*{margin:10px 0;}
