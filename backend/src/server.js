@@ -240,10 +240,12 @@ async function createFupanReview(req, res) {
       );
       const reviewId = review.rows[0].id;
 
-      // 來源卦記:依 qigua_time 明確排序(修正現役複盤鏈「maxRecords=6 無排序」的落差),
+      // 來源卦記:依建立時間明確排序(修正現役複盤鏈「maxRecords=6 無排序」的落差),
       // 讀不到/非本人擁有的 id 標 orphan,不硬湊(Owner 裁定①)。
+      // 注:本骨架 gua_records 目前用 created_at 當時間軸;若第2段以後接回真正 Airtable qigua_time
+      // 語意(起卦當下時間，可能與寫入時間不同)，這裡要跟著換欄位，不能假設兩者恆等。
       const ownedRes = await client.query(
-        `SELECT id, qigua_time FROM gua_records WHERE id = ANY($1::uuid[]) AND subject = $2 ORDER BY qigua_time ASC NULLS LAST`,
+        `SELECT id, created_at FROM gua_records WHERE id = ANY($1::uuid[]) AND subject = $2 ORDER BY created_at ASC`,
         [source_gua_record_ids, holder_id]
       );
       const ownedIds = new Set(ownedRes.rows.map((r) => r.id));
