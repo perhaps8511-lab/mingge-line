@@ -6,6 +6,58 @@ import { log } from "./log.js";
 
 const PORT = Number(process.env.PORT || 8080);
 
+// 給 Owner 手機在 LINE 裡點開用的一次性測試頁(P2B item1)。不是給一般使用者的產品頁,
+// 只做一件事:liff.init → 拿真實 access token → 打 staging Worker /history → 把結果整段顯示在畫面上,
+// 讓 Owner 截圖就是「真實 LINE 帳號 token 打通新系統」的證據。token 全程留在 Owner 手機瀏覽器裡,
+// 不會被送到這個 Postgres/Node 服務以外的任何地方(這支頁面本身也不記錄它)。
+// 用法:LINE Developers Console 新建一個 LIFF app,Endpoint URL 直接設成
+//   https://<這個api服務的網址>/staging-liff-test?liffId=<那個新LIFF app自己的ID>
+// (liffId 不是密鑰,是公開識別碼,寫在網址裡沒關係;此頁不需要知道任何 LINE channel secret)。
+function stagingLiffTestPage(liffId) {
+  const safeId = String(liffId || "").replace(/[^0-9a-zA-Z-]/g, "");
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MAKE_EXIT staging LIFF 測試(非產品頁)</title>
+<style>body{font-family:sans-serif;padding:16px;background:#111;color:#eee;word-break:break-all}
+.ok{color:#7CFC00}.bad{color:#FF6B6B}pre{white-space:pre-wrap;background:#000;padding:12px;border-radius:6px}</style>
+</head><body>
+<h2>MAKE_EXIT 第2b段 staging 測試頁</h2>
+<p>這不是命格產品頁,只是驗證「真實 LINE token 打通新系統」用的一次性測試頁。</p>
+<div id="status">初始化中…</div>
+<pre id="out"></pre>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+(async function () {
+  const statusEl = document.getElementById('status');
+  const outEl = document.getElementById('out');
+  const liffId = ${JSON.stringify(safeId)};
+  if (!liffId) { statusEl.textContent = '缺 liffId query param'; statusEl.className='bad'; return; }
+  try {
+    await liff.init({ liffId });
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+    const token = liff.getAccessToken();
+    statusEl.textContent = '已取得 LINE token,打 staging Worker /history …';
+    const res = await fetch('https://mingge-relay-staging.perhaps8511.workers.dev/history', {
+      headers: { 'X-Line-AccessToken': token },
+    });
+    const text = await res.text();
+    statusEl.textContent = 'HTTP ' + res.status + (res.ok ? '（成功）' : '（失敗）');
+    statusEl.className = res.ok ? 'ok' : 'bad';
+    outEl.textContent = text;
+  } catch (e) {
+    statusEl.textContent = '發生錯誤：' + (e && e.message || e);
+    statusEl.className = 'bad';
+  }
+})();
+</script>
+</body></html>`;
+}
+
+function html(res, status, body) {
+  res.writeHead(status, { "content-type": "text/html; charset=utf-8" });
+  res.end(body);
+}
+
 function json(res, status, body) {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
@@ -423,6 +475,9 @@ const server = http.createServer(async (req, res) => {
   });
 
   if (req.method === "GET" && url.pathname === "/health") return health(res);
+  if (req.method === "GET" && url.pathname === "/staging-liff-test") {
+    return html(res, 200, stagingLiffTestPage(url.searchParams.get("liffId")));
+  }
   if (req.method === "POST" && url.pathname === "/gua-records") return createGuaRecord(req, res);
   if (req.method === "GET" && url.pathname === "/gua-records/by-key") {
     return getGuaRecordByKey(res, url.searchParams.get("subject"), url.searchParams.get("request_id"));
