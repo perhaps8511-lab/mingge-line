@@ -26,7 +26,10 @@ check((mingge.match(/role="button" tabindex="0"/g) || []).length === 3 && html.i
 check(html.includes("status.classList.add('pc-status--activated');status.focus()") && /\.pc-status--activated\s*\{[^}]*border:[^;}]+;[^}]*background:[^;}]+;/.test(html), 'R302-c/R302-d behavior', 'activation adds a distinct, visibly styled fail-honest response state');
 check((mingge.match(/付款通道整備中,眼下還付不了款;開通到哪一步了,問一聲「書僮客服」便知。/g) || []).length === 3, 'R302-d', 'all offers expose exact fail-honest next step');
 check(relic.includes('運好氣旗下｜龍宮舍利選藏')
-  && relic.includes('先看清一件物，再決定要不要留下。')
+  /* D2-B（Owner 2026-09-11，00D_spec/mingge_d3_final_r3_20260911/03_..._v0_2_20260910.md LP-S01）：
+     「一件物」→「一件收藏」。舊字面斷言同步更新，非弱化驗收。 */
+  && relic.includes('先看清一件收藏，再決定要不要留下。')
+  && !relic.includes('先看清一件物')
   && relic.includes('實品資料正在整理，完成後才會開放。')
   && relic.includes('id="longyunPrimary">先認識龍宮舍利</button>')
   && !relic.includes('pay-plan'), 'B1/B2', 'relic branch is content-first and 0 SKU honest');

@@ -258,11 +258,14 @@ check(html.includes("entry_context=article&content_ref=")
   'R4/R5-context', '文章 context 可帶入⑤並回原文章');
 
 const relicMarkup = html.slice(html.indexOf('<div id="payRelicBranch"'), html.indexOf('<!-- P-STUDY'));
+/* D2-B（Owner 2026-09-11，00D_spec/mingge_d3_final_r3_20260911/03_..._v0_2_20260910.md LP-S01）：
+   「一件物」→「一件收藏」。舊字面斷言同步更新，非弱化驗收。 */
 for (const copy of [
-  '運好氣旗下｜龍宮舍利選藏', '龍運藏', '先看清一件物，再決定要不要留下。',
+  '運好氣旗下｜龍宮舍利選藏', '龍運藏', '先看清一件收藏，再決定要不要留下。',
   '龍運藏整理龍宮舍利的收藏與逐件資料。卦象不替您挑商品。',
   '實品資料正在整理，完成後才會開放。', '先認識龍宮舍利',
 ]) check(relicMarkup.includes(copy), `R3-08/09-${copy}`, `龍運藏入口包含「${copy}」`);
+check(!relicMarkup.includes('先看清一件物'), 'R3-08/09-D2B', '舊「一件物」字面已由 D2-B 取代');
 check(relicMarkup.includes('龍宮舍利，是這批收藏沿用的名稱')
   && (relicMarkup.match(/<details>/g) || []).length === 4,
   'R3-08', '自有知識頁與四個可展開章節在位');

@@ -1,38 +1,64 @@
-/* Inert product rehearsal: memory-only synthetic state, no identity/token/network/store. */
+/* Inert product rehearsal: memory-only synthetic state, no identity/token/network/store.
+   Copy source of record: 00D_spec/mingge_d3_final_r3_20260911/{03,04}_*.md
+   (R1-S00 五態、R6-LY-00/01/02、LP-S07=Offer Copy Master v1.0 §3 exact). Do not paraphrase. */
 'use strict';
-window.lyJourney={verified:false,consent:false,submitted:false,status:'unactivated',months:null,eligibility:'error'};
+window.lyJourney={verified:false,consent:false,submitted:false,status:'unactivated',months:null,eligibility:'error',freeRemaining:null};
 const jl=(r,t)=>`<a class="action" href="#${r}">${t}</a>`;
-const jb=(id,t)=>`<button id="${id}" type="button">${t}</button>`;
+const jb=(id,t,disabled)=>`<button id="${id}" type="button"${disabled?' disabled':''}>${t}</button>`;
 const jp=t=>`<p>${t}</p>`;
-window.lyRights=()=>`<section><h2>實品與命格使用期間</h2>${jp('「藏主」是留下實品、並可自行啟用所附命格使用期間的人。買的是實品；命格使用權益由實際使用者本人決定是否啟用。')}${jp('依 Offer v1.2，正式實品售價 NT$3,000–5,999 附 3 個月、NT$6,000–14,999 附 6 個月、NT$15,000 以上附 24 個月。逐件期間須以該商品核實的權益為準；目前待核商品尚未確認適用期間，不能用來源參考價當成已核實權益。')}${jp('三種期間的每一個有效月都享有同一套權益，差別只有多久。半年藏主的數位權益與 1490 半年方案相同；實品價值仍由物件與來源資料支撐。')}<ul><li>期間內有新的事情可正式問卦，不另逐次計費，供正常個人使用；沒有月額度、歸零或次數結轉。</li><li>自己的既有或新卦記，尚未完成深卜的，每卦可完成一次四鏡・深卜。</li><li>至少 3 筆不同卦記後可複盤；有新卦或新後續，才可再次複盤。</li><li>到期停止新增期間服務；既有卦記、深卜、複盤、後續與蓋印仍保留可讀。獨立購買的權益不因此撤回；新增深卜或複盤可另按適用方案購買。</li></ul>${jp('由本人啟用並確認權益後起算，未啟用不倒數；付款、出貨或送達都不代替啟用。已有有效方案時可稍後啟用；重疊權益保留各自來源，不疊加成雙倍次數。')}${jp('送禮時，把實品與隨貨卡交給收禮者，由收禮者自行驗證及同意。買家不能代替同意，也不能讀取收禮者的私人卦記。退款須核對原購買適用政策；本頁不新增退換天數或保證。')}${jp('這是產品權益說明。本候選僅展示流程，並未開通正式問卦、深卜、複盤或領取服務。')}${jl('parcel','閱讀隨貨卡與啟用說明')}</section>`;
-window.renderJourney=function(route){const s=window.lyJourney;const notice='<div class="status">離線示意・沒有真實領取能力。本人驗證與權益結果皆為合成情境，不代表正式服務通過。</div>';const nav=jl('home','回龍運藏')+jl('activation-help','啟用需要協助');let content;
+/* §9 LP-S07／藏主共同權益 — MINGGE_TA_OFFER_COPY_MASTER_v1_0_20260824.md §3 逐字，
+   不改寫、不加新數字。相應功能與 entitlement 未 live readback 前，仍是產品說明，非已開通服務。 */
+window.lyRights=()=>`<section><h2>實品與命格使用期間｜藏主共同權益</h2>${jp('三個月、半年、兩年，每一個有效月都有相同的藏主權益。差別只有陪伴多久，不是每個月拿到不同次數。')}${jp('這段時間裡，新的事情都可以問；自己的每一筆卦記都能往下深看；累積三筆卦記後，也能把一路的變化放在一起複盤。')}<ul><li><strong>三個月藏主</strong> — 適用於 NT$3,000–5,999 的龍宮舍利；從您完成啟用那一天起，連續三個月享有完整藏主權益。</li><li><strong>半年藏主</strong> — 適用於 NT$6,000–14,999 的龍宮舍利；數位權益與命格 1490 半年方案相同，從您完成啟用那一天起算。</li><li><strong>兩年藏主</strong> — 適用於 NT$15,000 以上的龍宮舍利；每一個有效月享有相同權益，從您完成啟用那一天起連續兩年。</li></ul>${jp('藏主時間從實際使用者完成啟用那一天開始，不從付款或出貨那一天算。東西還在路上的日子，不算進去。')}${jp('如果是送禮，由收禮者自己啟用；購買的人不會因此看見對方的卦記或複盤。')}${jp('如果您已經在使用命格半年方案，可以等現有方案結束後再啟用藏主權益。還沒有啟用以前，藏主時間不會開始倒數。')}${jp('這是產品權益說明。只有相應功能與 entitlement 已 live readback 後，對應句子才可公開；本候選僅展示流程，並未開通正式問卦、深卜、複盤或領取服務。')}${jl('parcel','閱讀隨貨卡與啟用說明')}</section>`;
+window.renderJourney=function(route){const s=window.lyJourney;const notice='<div class="status">離線示意・沒有真實領取能力。本人驗證與權益結果皆為合成情境，不代表正式服務通過。</div>';const nav=jl('home','回龍運藏')+jl('shutong','問書僮');let content;
 switch(route){
-case 'parcel':content=`<h1>隨物而來的一段陪伴</h1><div class="source-card">${jp('這件實品附有命格使用期間，由實際使用者自行決定是否啟用，未啟用不倒數。')}${jp('本件期間：待商品權益核實後填入。')}${jp('您可以現在啟用，也可以先把實品留下，等想使用時再來。若是收到禮物，是否啟用與同意都由您自己決定。')}${jp('啟用後，既有內容到期仍可回看；完整範圍請先閱讀權益說明。')}</div>${jl('rights','看完整使用權益')}${jl('activate','進入啟用示意')}${jp('隨貨卡候選文案；正式卡片、商品期間與正式入口尚待確認。此處沒有 QR token 或真正領取連結。')}`;break;
+/* R6-LY-00：隨貨入口。只驗 claim 參考有效性，不讀私人資料；驗本人後才進 R6-LY-01。 */
+case 'parcel':content=`<h1>這件實品附有一段命格的使用時間。</h1>${jp('命格：一件掛心的事，用一卦看清楚。')}${jp('「藏主」就是這件實品的實際使用者。是否啟用、什麼時候開始，由您自己決定；沒有啟用不會倒數。')}${jl('verify','我要看啟用說明')}${jl('home','先放著')}${jp('隨貨卡樣式見 activation-card-preview.html；此處沒有 QR token 或真正領取連結。')}`;break;
 case 'rights':content='<h1>藏主使用權益</h1>'+window.lyRights();break;
-case 'activate':content=`<h1>由您決定何時開始</h1>${jp('先確認您是實際使用者。送禮買家不能代替收禮者啟用；驗證不代表已同意啟用。')}${jp(s.verified?'本人驗證：示意已完成。':'本人驗證：尚未完成。')}${jp(s.months?`示意權益：${s.months} 個月（純合成，未綁定任何商品）。`:'本件期間尚未核實；可以先閱讀，不能完成啟用。')}${jb('verify-holder','本人驗證（示意）')}${jl('gift-buyer','我是送禮買家')}${jl('activate-consent','查看並決定是否現在啟用')}${jl('later','稍後再說')}${jl('declined','不接受啟用')}${jl('activation-fixtures','審閱：選擇合成狀態')}`;break;
+/* 本人驗證（進入 R6-LY-01 前的必要步驟）。 */
+case 'verify':content=`<h1>由您決定何時開始</h1>${jp('先確認您是實際使用者。送禮買家不能代替收禮者啟用；驗證不代表已同意啟用。')}${jp(s.verified?'本人驗證：示意已完成。':'本人驗證：尚未完成。')}${jp(s.months?`示意權益：${s.months} 個月（純合成，未綁定任何商品）。`:'本件期間尚未核實；可以先閱讀，不能完成啟用。')}${jb('verify-holder','本人驗證（示意）')}${jl('gift-buyer','我是送禮買家')}${s.verified?jl('activate','查看並決定是否現在啟用'):''}${jl('activation-fixtures','審閱：選擇合成狀態')}`;break;
 case 'gift-buyer':content=`<h1>把選擇留給收禮者</h1>${jp('請將實品與隨貨卡交給收禮者。您不能代替其本人驗證、同意或啟用，也不能讀取其私人紀錄。')}${jl('parcel','回隨貨說明')}`;break;
-case 'activate-consent':content=`<h1>現在開始這段期間？</h1>${jp(s.months?`示意期間：${s.months} 個月；確認成功後起算。`:'本件期間待核實，暫不能啟用。')}${jp('未啟用不倒數；到期後既有卦記等內容仍可回看。請先閱讀完整權益，再由本人選擇。')}${jl('rights','閱讀完整權益')}<label class="consent-row"><input id="holder-consent" type="checkbox" ${s.consent?'checked':''}>我是實際使用者，已閱讀權益，願意現在啟用。</label>${jb('activate-now','現在啟用')}${jp(!s.verified?'請先完成本人驗證（示意）。':'本人已驗證（示意）。')}${jl('activate','返回本人驗證')}${jl('later','稍後')}${jl('declined','不接受')}`;break;
-case 'later':case 'declined':s.consent=false;content=`<h1>${route==='later'?'先留著，之後再決定':'尊重您的選擇'}</h1>${jp(s.status==='confirmed'?'先前示意權益已確認；本次離開不會撤回該結果。':s.status==='pending'?'先前啟用結果仍待確認；離開或不再勾選，不代表撤銷已送出的處理。請查詢結果或求助。':'這次沒有啟用，也不開始倒數。您仍可閱讀實品與來源說明。')}${jl('activate','回啟用入口')}${jl('activation-result','查詢先前結果')}`;break;
-case 'activation-result':content=s.status==='confirmed'?`<h1>權益已確認（示意）</h1>${jp(`示意使用期間：${s.months} 個月，自本次合成確認起算；不是真實生效日期。`)}${jl('eligibility','問一件事')}${jl('read','先讀一篇')}`:`<h1>${s.status==='invalid'?'入口已失效':s.status==='claimed'?'這份權益已有領取紀錄':s.status==='pending'?'啟用結果待確認':'尚未確認啟用'}</h1>${jp(s.status==='claimed'?'先核對是否使用原領取帳號；本頁不顯示領取人的身分或私人紀錄。':s.status==='invalid'?'請核對隨貨入口，保留實品與隨貨卡，向書僮詢問。不要公開領取碼。':s.status==='pending'?'目前還不能確認是否啟用成功。請勿重複啟用；可以查詢結果或求助。':'未取得權益成功確認，尚不能顯示已可使用。')}${jb('query-result','查詢權益結果（示意）')}${jl('activation-help','查詢仍有問題，求助')}${jl('activation-fixtures','審閱：模擬查詢回覆')}`;break;
-case 'activation-help':content=`<h1>啟用需要協助</h1>${jp('請說明目前看到「失效」、「已有領取紀錄」或「結果待確認」，並先核對原來使用的帳號。不要提供密碼、完整領取碼、付款資料或私人卦記。')}${jp('本頁只整理求助文字，不送出訊息、不建立案件，也不承諾即時回覆。正式申請請回原 LINE 對話。')}${jl('contact','整理詢問文字')}${jl('activation-result','回查詢結果')}`;break;
+/* R6-LY-01：啟用選擇。 */
+case 'activate':content=`<h1>要現在開始您的藏主時間嗎？</h1>${jp('啟用前，請確認這件商品、使用時間與隱私說明。啟用成功後才開始計時。')}${jp(s.months?`示意期間：${s.months} 個月；確認成功後起算。`:'本件期間待核實，暫不能啟用。')}${jl('rights','閱讀完整權益')}<label class="consent-row"><input id="holder-consent" type="checkbox" ${s.consent?'checked':''}>我是實際使用者，已閱讀權益，願意現在啟用。</label>${jb('activate-now','現在啟用')}${jl('later','稍後再說')}${jl('declined','不接受這份權益')}${jl('shutong','問書僮')}`;break;
+/* R6-LY-02：deferred／declined 直接呈現結果（doc04 §11 四態之二），不重播已離開的中繼文字。 */
+case 'later':s.status='deferred';s.consent=false;content=`<h1>好。想啟用的時候，從「書僮客服」進來就可以。</h1>${jl('home','回首頁')}`;break;
+case 'declined':s.status='declined';s.consent=false;content=`<h1>好的，這份權益不會啟用。實品和訂單不受影響。</h1>${jl('home','回首頁')}`;break;
+/* R6-LY-02：active／pending-read_error（doc04 §11 四態之一、之三）。invalid／claimed 為入口 claim 參考安全性補充態，非 doc04 四態本身，另標。 */
+case 'activation-result':{
+  if(s.status==='confirmed')content=`<h1>藏主時間已開始。</h1>${jp(`示意使用期間：${s.months} 個月，自本次合成確認起算；不是真實生效日期。`)}${jl('eligibility','開始問卦')}${jl('read','先自己讀一篇')}`;
+  else if(s.status==='deferred')content=`<h1>好。想啟用的時候，從「書僮客服」進來就可以。</h1>${jl('home','回首頁')}`;
+  else if(s.status==='declined')content=`<h1>好的，這份權益不會啟用。實品和訂單不受影響。</h1>${jl('home','回首頁')}`;
+  else if(s.status==='invalid')content=`<h1>入口已失效（補充態・非 R6-LY-02 四態）</h1>${jp('請核對隨貨入口，保留實品與隨貨卡，向書僮詢問。不要公開領取碼。')}${jl('shutong','問書僮')}${jl('home','回首頁')}`;
+  else if(s.status==='claimed')content=`<h1>這份權益已有領取紀錄（補充態・非 R6-LY-02 四態）</h1>${jp('先核對是否使用原領取帳號；本頁不顯示領取人的身分或私人紀錄。')}${jl('shutong','問書僮')}${jl('home','回首頁')}`;
+  else content=`<h1>目前還無法確認啟用結果，請再查一次。</h1>${jb('query-result','再查一次')}${jl('shutong','問書僮')}${jl('activation-fixtures','審閱：模擬查詢回覆')}`;
+  break;}
+case 'activation-help':content=`<h1>啟用需要協助</h1>${jp('請說明目前看到「失效」、「已有領取紀錄」或「結果待確認」，並先核對原來使用的帳號。不要提供密碼、完整領取碼、付款資料或私人卦記。')}${jp('本頁只整理求助文字，不送出訊息、不建立案件，也不承諾即時回覆。正式申請請回原 LINE 對話。')}${jl('shutong','整理詢問文字')}${jl('activation-result','回查詢結果')}`;break;
 case 'activation-fixtures':content=`<h1>啟用情境・審閱工具</h1>${jp('所有選項都是合成資料，與待核商品無關。重新載入即清空；不保存身分、同意或權益。')}<label for="fixture-months">合成期間</label><select id="fixture-months"><option value="">未核實</option><option value="3">3 個月示意</option><option value="6">6 個月示意</option><option value="24">24 個月示意</option></select>${jb('set-months','套用並返回本人驗證')}${jb('fixture-invalid','模擬入口失效')}${jb('fixture-claimed','模擬已領取')}${jb('fixture-pending','模擬結果待確認')}${jb('fixture-confirmed','模擬權益查詢確認成功')}${jp('只有已完成本人驗證、同意、有效合成期間及送出啟用後，才可模擬確認成功。')}`;break;
-case 'eligibility':{const kind=s.status==='confirmed'?'period':s.eligibility;const texts={period:'目前有有效期間權益；期間內這次新問題不另逐次計費，沒有月額度。',single:'已核實有可用單次權益；本次使用該單次權益，不另收費。',free:'已核實本次有免費資格；本次不收費。不推定下一次是否免費。',none:'已確認目前沒有可用權益；可以先閱讀，或查看適用方案。',error:'目前讀不到資格，無法確認費用。請重試或求助；不要因讀取失敗而購買。'};content=`<h1>起卦前，先看清楚</h1><div class="status">${texts[kind]}</div>${['period','single','free'].includes(kind)?jl('ask','繼續寫下想問的事'):kind==='none'?jl('offers','查看方案')+jl('read','先讀一篇'):jb('retry-eligibility','重新讀取（示意）')+jl('activation-help','資格查詢求助')}${jl('eligibility-fixtures','審閱：切換资格情境')}`;break;}
-case 'eligibility-fixtures':content='<h1>資格情境・審閱工具</h1>'+['period','single','free','none','error'].map((k,i)=>jb('elig-'+k,['有效期間','可用單次','已核實免費','無可用權益','資格讀取失敗'][i])).join('');break;
+/* R1-S00：起卦前資格五態（doc04 §B，D4-C 已拍板：免費 3 次，remaining 由 truth 讀回）。 */
+case 'eligibility':{const kind=s.status==='confirmed'?'period':s.eligibility;
+  let body;
+  if(kind==='period')body=jp('這一卦在您的方案期間內，不另計費。')+jl('ask','開始問卦');
+  else if(kind==='single')body=jp('您有一次可用的問卦。')+jl('ask','使用這一次');
+  else if(kind==='free'){const n=s.freeRemaining;const text=n===1?'這一卦不收費。這是最後一次不收費的問卦。':`這一卦不收費。您還有 ${n==null?'{n}':n} 次不收費的問卦。`;body=jp(text)+jl('ask','開始問卦');}
+  else if(kind==='none')body=jp('要問這一卦，先選一個方案。')+jp('您可以先看看方案，也可以先不問。這裡不會用卦象替您推薦商品。')+jl('offers','看命格方案');
+  else body=jp('目前無法確認您的資格，不代表沒有。')+jb('retry-eligibility','再試一次')+jl('shutong','問書僮');
+  content=`<h1>起卦前，先看清楚</h1><div class="status">${body}</div>${jl('home','先不問')}${jl('eligibility-fixtures','審閱：切換资格情境')}`;break;}
+case 'eligibility-fixtures':content='<h1>資格情境・審閱工具</h1>'+['period','single','free','none','error'].map((k,i)=>jb('elig-'+k,['有效期間','可用單次','已核實免費','無可用權益','資格讀取失敗'][i])).join('')+'<label for="fixture-free-n">免費剩餘次數（D4-C＝3）</label><select id="fixture-free-n"><option value="3">3</option><option value="2">2</option><option value="1">1</option><option value="0">0</option></select>';break;
 case 'ask':{const allowed=s.status==='confirmed'||['period','single','free'].includes(s.eligibility);content=`<h1>問一件具體的事</h1>${allowed?`${jp('資格已在合成情境確認。這裡只預演寫下問題，不扣次、不收費、不送出問卦。')}<label for="question-draft">此刻想問的事（請勿填私人資料）</label><textarea id="question-draft" placeholder="寫一段示意問題"></textarea>${jb('preview-question','預覽這次問題')}<p id="question-feedback" role="status"></p>`:jp('尚未確認可用資格，請先查詢。')}${jl('eligibility','回資格與費用')}`;break;}
 case 'read':content='<h1>時候到了沒——潛龍與見龍</h1>'+window.lyStarterArticle+jl('eligibility','想問一件事，先查資格');break;
 default:return null;
 }return notice+content+nav;};
 window.bindJourney=function(){const s=window.lyJourney;const on=(id,fn)=>{const e=document.getElementById(id);if(e)e.onclick=fn;};const go=r=>{if(location.hash==='#'+r)window.dispatchEvent(new HashChangeEvent('hashchange'));else location.hash=r;};
-on('verify-holder',()=>{s.verified=true;go('activate');});
+on('verify-holder',()=>{s.verified=true;go('verify');});
 const consent=document.getElementById('holder-consent');if(consent)consent.onchange=()=>{s.consent=consent.checked;const b=document.getElementById('activate-now');b.disabled=!(s.verified&&s.months&&s.consent&&s.status==='unactivated');};
 const activate=document.getElementById('activate-now');if(activate)activate.disabled=!(s.verified&&s.months&&s.consent&&s.status==='unactivated');
 on('activate-now',()=>{if(s.verified&&s.months&&s.consent&&s.status==='unactivated'){s.submitted=true;s.status='pending';go('activation-result');}});
-on('set-months',()=>{s.months=Number(document.getElementById('fixture-months').value)||null;s.status='unactivated';s.verified=false;s.consent=false;s.submitted=false;go('activate');});
+on('set-months',()=>{s.months=Number(document.getElementById('fixture-months').value)||null;s.status='unactivated';s.verified=false;s.consent=false;s.submitted=false;go('verify');});
 for(const k of ['invalid','claimed','pending'])on('fixture-'+k,()=>{s.status=k;go('activation-result');});
 on('fixture-confirmed',()=>{if(s.verified&&s.submitted&&s.months&&s.status==='pending'){s.status='confirmed';s.eligibility='period';go('activation-result');}});
 const confirm=document.getElementById('fixture-confirmed');if(confirm)confirm.disabled=!(s.verified&&s.submitted&&s.months&&s.status==='pending');
 on('query-result',()=>go('activation-result'));on('retry-eligibility',()=>go('eligibility'));
 for(const k of ['period','single','free','none','error'])on('elig-'+k,()=>{s.status='unactivated';s.eligibility=k;go('eligibility');});
+const freeN=document.getElementById('fixture-free-n');if(freeN)freeN.onchange=()=>{s.freeRemaining=Number(freeN.value);};
 on('preview-question',()=>{const t=document.getElementById('question-draft').value.trim();document.getElementById('question-feedback').textContent=t?'問題預覽：'+t+'（僅在本頁顯示，未送出、未保存、未扣次）':'請先寫下示意問題。';});
 };
 
