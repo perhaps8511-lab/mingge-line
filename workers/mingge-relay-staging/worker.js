@@ -1,19 +1,20 @@
 /**
- * mingge-relay-staging — MAKE_EXIT 第2段 item4：Worker 端點對接(staging only)
+ * mingge-relay-staging — MAKE_EXIT 第2段 item4 ＋ 第2b段 item1：Worker 端點對接(staging only)
  * =====================================================================
- * 對齊現役 mingge-relay 的 /trace、/log/seal、/history 三個端點的對外契約,
+ * 對齊現役 mingge-relay 的 /history、/log、/trace、/log/seal、/trigger/deepdive 端點對外契約,
  * 但內部改打新的 Postgres 後端 API(env.API_BASE_URL),不碰 Airtable、不碰正式資料。
  *
- * 刻意簡化(僅限本 staging Worker,非正式做法)：
- * - 不驗證真實 LINE access token(那需要正式 LINE channel 身分,不該讓 staging 元件依賴它)。
- *   改用 header `X-Staging-Subject` 直接帶「已驗證的 subject」,由呼叫端(測試腳本)提供合成值。
- *   正式對接時這裡要換回 resolveUserId()+LINE_CHANNEL_ID 的驗證邏輯(見 mingge-relay/worker.js)。
- * - 沒有 quota/entitlement gate,因為 staging 端點只做「讀寫語意對不對」的驗證,不重測商業規則
- *   (商業規則已經在新 API 那一層測過,見 MAKE_EXIT_P2 交付報告)。
+ * 第2b段更新：拿掉 `X-Staging-Subject` 簡化,換回跟 mingge-relay(main)完全相同的
+ * resolveUserId()+LINE_CHANNEL_ID 真實 LINE access token 驗證。用測試 LINE 帳號的真實
+ * access token 打這個 Worker,跟正式 mingge-relay 認證邏辯輯一致，只是資料層換成新 API。
  *
- * 部署:npx wrangler deploy --name mingge-relay-staging(本目錄下),
- * 需要設定 API_BASE_URL 變數指向 Railway staging API 的公開網址。
+ * 沒有 quota/entitlement gate,因為 staging 端點只做「讀寫語意對不對」的驗證,不重測商業規則
+ * (商業規則已經在新 API 那一層測過,見 MAKE_EXIT_P2 交付報告)。
+ *
+ * 部署:npx wrangler deploy(本目錄下),需要設定 API_BASE_URL 變數指向 Railway staging API 網址。
  */
+
+const LINE_CHANNEL_ID = "2010192384"; // 與 mingge-relay(main)相同,這是公開 channel ID,非機密。
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
@@ -22,8 +23,35 @@ function json(obj, status = 200) {
   });
 }
 
-function getStagingSubject(request) {
-  return request.headers.get("X-Staging-Subject") || null;
+// 與 mingge-relay/worker.js 的 resolveUserId() 逐字相同,故意重複而非共用模組——
+// 這是獨立部署的 staging Worker,保持自我完備,不建立對正式 repo 模組結構的隱性依賴。
+async function resolveUserId(accessToken, channelId) {
+  const verifyRes = await fetch(
+    "https://api.line.me/oauth2/v2.1/verify?access_token=" + encodeURIComponent(accessToken),
+    { method: "GET" }
+  );
+  if (!verifyRes.ok) throw { message: "Invalid or expired access token", status: 401 };
+  const verifyData = await verifyRes.json();
+  if (verifyData.client_id !== channelId) throw { message: "Token not for this channel", status: 401 };
+
+  const profRes = await fetch("https://api.line.me/v2/profile", {
+    method: "GET",
+    headers: { Authorization: "Bearer " + accessToken },
+  });
+  if (!profRes.ok) throw { message: "Cannot resolve user", status: 401 };
+  const profile = await profRes.json();
+  return { userId: profile.userId, displayName: profile.displayName || "" };
+}
+
+async function verifiedSubject(request) {
+  const accessToken = request.headers.get("X-Line-AccessToken");
+  if (!accessToken) return { error: json({ error: "Missing access token" }, 401) };
+  try {
+    const { userId } = await resolveUserId(accessToken, LINE_CHANNEL_ID);
+    return { subject: userId };
+  } catch (e) {
+    return { error: json({ error: e.message || "Invalid access token" }, e.status || 401) };
+  }
 }
 
 export default {
@@ -33,13 +61,13 @@ export default {
     if (!apiBase) return json({ error: "API_BASE_URL not configured" }, 503);
 
     if (request.method === "GET" && url.pathname === "/health") {
-      return json({ ok: true, service: "mingge-relay-staging", api_base: apiBase });
+      return json({ ok: true, service: "mingge-relay-staging", api_base: apiBase, auth: "real_line_token" });
     }
 
     // GET /history —— 對齊現役 mingge-relay /history:回傳該 subject 的卦記列表。
     if (request.method === "GET" && url.pathname === "/history") {
-      const subject = getStagingSubject(request);
-      if (!subject) return json({ error: "Missing X-Staging-Subject" }, 401);
+      const { subject, error } = await verifiedSubject(request);
+      if (error) return error;
       let upstream;
       try {
         upstream = await fetch(`${apiBase}/gua-records?subject=${encodeURIComponent(subject)}`);
@@ -62,8 +90,8 @@ export default {
     if (request.method === "GET" && url.pathname === "/log") {
       const logId = url.searchParams.get("log_id");
       if (!logId) return json({ error: "Missing log_id" }, 400);
-      const subject = getStagingSubject(request);
-      if (!subject) return json({ error: "Missing X-Staging-Subject" }, 401);
+      const { subject, error } = await verifiedSubject(request);
+      if (error) return error;
       let upstream;
       try {
         upstream = await fetch(`${apiBase}/gua-records/${encodeURIComponent(logId)}`);
@@ -79,8 +107,8 @@ export default {
 
     // POST /trace  body: {log_id, trace_text, request_id} —— 對齊現役 /trace:owner 驗證後轉發。
     if (request.method === "POST" && url.pathname === "/trace") {
-      const subject = getStagingSubject(request);
-      if (!subject) return json({ state: "failed", error: "Missing X-Staging-Subject" }, 401);
+      const { subject, error } = await verifiedSubject(request);
+      if (error) return error;
       let payload;
       try { payload = await request.json(); } catch { return json({ state: "failed", error: "Bad JSON body" }, 400); }
       const { log_id, trace_text, request_id } = payload || {};
@@ -109,8 +137,8 @@ export default {
 
     // POST /log/seal  body: {log_id} —— 對齊現役 /log/seal。
     if (request.method === "POST" && url.pathname === "/log/seal") {
-      const subject = getStagingSubject(request);
-      if (!subject) return json({ error: "Missing X-Staging-Subject" }, 401);
+      const { subject, error } = await verifiedSubject(request);
+      if (error) return error;
       let payload;
       try { payload = await request.json(); } catch { return json({ error: "Bad JSON body" }, 400); }
       const logId = payload && payload.log_id;
@@ -135,8 +163,8 @@ export default {
     // POST /trigger/deepdive  body: {log_id, request_id} —— 對齊現役 /trigger/deepdive,
     // 但直接打新 API 的深卜端點(現役版本轉發到 Make webhook;staging 版本轉發到新 API)。
     if (request.method === "POST" && url.pathname === "/trigger/deepdive") {
-      const subject = getStagingSubject(request);
-      if (!subject) return json({ error: "Missing X-Staging-Subject" }, 401);
+      const { subject, error } = await verifiedSubject(request);
+      if (error) return error;
       let payload;
       try { payload = await request.json(); } catch { return json({ error: "Bad JSON body" }, 400); }
       const { log_id, request_id, external_event_id } = payload || {};
