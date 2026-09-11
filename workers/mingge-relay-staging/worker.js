@@ -16,10 +16,26 @@
 
 const LINE_CHANNEL_ID = "2010192384"; // 與 mingge-relay(main)相同,這是公開 channel ID,非機密。
 
+// staging 測試頁(`/staging-liff-test`)跑在 Railway `api` service 的 origin 上,不是正式
+// GitHub Pages,所以跟正式 mingge-relay 的 ALLOWED_ORIGIN 不同。這裡放行的是 staging 測試頁
+// 自己的 origin;正式 mingge-relay 的 CORS 白名單不受本檔影響(兩份程式碼各自獨立部署)。
+// 修 bug 記錄(2026-09-11):第一版沒帶任何 CORS header,瀏覽器對帶自訂 header(X-Line-AccessToken)
+// 的跨源請求會先送 OPTIONS 預檢,本檔原本落到 404 沒有 CORS header,預檢失敗 → fetch 直接
+// 回「Failed to fetch」,連 401/200 都到不了。對照正式 mingge-relay 的 corsHeaders() 補上。
+const ALLOWED_ORIGIN = "https://api-production-b892.up.railway.app";
+
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Line-AccessToken",
+  };
+}
+
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8" },
+    headers: { ...corsHeaders(), "content-type": "application/json; charset=utf-8" },
   });
 }
 
@@ -56,6 +72,13 @@ async function verifiedSubject(request) {
 
 export default {
   async fetch(request, env) {
+    // CORS 預檢:瀏覽器對帶自訂 header(X-Line-AccessToken)的跨源請求會先送 OPTIONS,
+    // 必須在碰任何路由判斷之前、用 2xx + CORS header 回覆,否則瀏覽器直接判定 fetch 失敗
+    // (不會有 404 這種「至少呼叫到了」的訊號)。對齊正式 mingge-relay 的做法。
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders() });
+    }
+
     const url = new URL(request.url);
     const apiBase = env.API_BASE_URL;
     if (!apiBase) return json({ error: "API_BASE_URL not configured" }, 503);
