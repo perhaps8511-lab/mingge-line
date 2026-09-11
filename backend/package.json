@@ -1,0 +1,18 @@
+{
+  "name": "mingge-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MAKE_EXIT 第1段｜命格後端骨架(API+jobs骨架)。隔離 staging 用，不接正式 LINE/Dify/Airtable。",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "migrate": "node src/migrate.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}
