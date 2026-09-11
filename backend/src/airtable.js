@@ -77,7 +77,10 @@ export async function listAirtableSourceRows() {
   const rows = [];
   let offset;
   do {
-    const params = new URLSearchParams({ pageSize: "100" });
+    // returnFieldsByFieldId=true 是必要的:Airtable 原生 REST API 預設用「欄位名稱」當
+    // fields 物件的 key,只有加這個參數才會改成用「欄位 ID」當 key——這裡的 cfg.fields.xxx
+    // 全部是欄位 ID,沒有這個參數會全部查不到值(見下方 bug 記錄)。
+    const params = new URLSearchParams({ pageSize: "100", returnFieldsByFieldId: "true" });
     if (offset) params.set("offset", offset);
     const res = await fetch(
       `https://api.airtable.com/v0/${cfg.baseId}/${cfg.tableId}?${params.toString()}`,
