@@ -25,6 +25,90 @@ export function airtableConfigured() {
   return !!(AIRTABLE_API_KEY && AIRTABLE_TEST_BASE_ID && AIRTABLE_TEST_TABLE_ID);
 }
 
+// ── 增量同步(Airtable→Postgres，item2)的來源端設定 ──────────────────────────
+// 正式 Divination_Log 的真實 base/table/欄位 ID(見 backend/scripts/backfill_from_airtable.mjs
+// 的同一份欄位對照，這裡只挑增量同步需要的欄位，不含合規敏感欄位)。
+// 本卡授權仍是 staging-only：AIRTABLE_SYNC_SCHEMA 預設 'test'，只有正式切換第3步經 Owner
+// 另發 GO 才會有人把它設成 'production' 並指向真正的 Divination_Log。
+const SYNC_SCHEMAS = {
+  production: {
+    baseId: "apptFfyVBYE4ygW3E",
+    tableId: "tblVyf8WfTQxvtpEg",
+    fields: {
+      session_id: "fld67Yn6ogmsQJ6Hn",
+      entry_type: "fldXW48ZTDcrwnA0k",
+      line_user_id_raw: "fldqFGVohUrJFRYX9",
+      ben_gua: "fldmIF4i5o9sOflZX",
+      question_text: "fldXIHjsI3yimw7IP",
+      qigua_time: "fldHxJQcy4q6cSb1g",
+      golden_seal: "fldXH6MZGcbhyc4ZG",
+      golden_seal_time: "fldDzkTIZLTp76rpm",
+      trace_text: "fldrZzWVA0pS9gASk",
+    },
+  },
+  test: {
+    // 指向本次演練的測試 base，欄位對照見上面 FIELDS(session_id/entry_type/line_user_id_raw/
+    // ben_gua/question_text)。測試 base 沒有 qigua_time/golden_seal/trace_text 欄位，同步時視為缺值。
+    baseId: AIRTABLE_TEST_BASE_ID,
+    tableId: AIRTABLE_TEST_TABLE_ID,
+    fields: {
+      session_id: FIELDS.session_id,
+      entry_type: FIELDS.entry_type,
+      line_user_id_raw: FIELDS.line_user_id_raw,
+      ben_gua: FIELDS.ben_gua,
+      question_text: FIELDS.question_text,
+    },
+  },
+};
+
+export function incrementalSyncConfigured() {
+  const schema = process.env.AIRTABLE_SYNC_SCHEMA || "test";
+  const cfg = SYNC_SCHEMAS[schema];
+  return !!(AIRTABLE_API_KEY && cfg && cfg.baseId && cfg.tableId);
+}
+
+// 全表掃描(本次規模 ~126-200 筆，全表掃描比另外維護 lastModifiedTime 過濾簡單且不會漏更新;
+// 量大到需要真正增量過濾時，需另外在來源表加 lastModifiedTime 欄位，這裡先誠實記錄這個限制)。
+export async function listAirtableSourceRows() {
+  const schema = process.env.AIRTABLE_SYNC_SCHEMA || "test";
+  const cfg = SYNC_SCHEMAS[schema];
+  if (!incrementalSyncConfigured()) return { skipped: true, reason: "not_configured" };
+
+  const rows = [];
+  let offset;
+  do {
+    const params = new URLSearchParams({ pageSize: "100" });
+    if (offset) params.set("offset", offset);
+    const res = await fetch(
+      `https://api.airtable.com/v0/${cfg.baseId}/${cfg.tableId}?${params.toString()}`,
+      { headers: { Authorization: "Bearer " + AIRTABLE_API_KEY } }
+    );
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`airtable_list_failed_${res.status}:${text.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    for (const rec of data.records || []) {
+      const f = rec.fields || {};
+      const et = f[cfg.fields.entry_type];
+      rows.push({
+        airtableId: rec.id,
+        sessionId: f[cfg.fields.session_id] || null,
+        entryType: (et && et.name) || et || null,
+        lineUserIdRaw: f[cfg.fields.line_user_id_raw] || null,
+        benGua: f[cfg.fields.ben_gua] || null,
+        questionText: f[cfg.fields.question_text] || null,
+        qiguaTime: cfg.fields.qigua_time ? f[cfg.fields.qigua_time] || null : null,
+        goldenSeal: cfg.fields.golden_seal ? !!f[cfg.fields.golden_seal] : false,
+        goldenSealTime: cfg.fields.golden_seal_time ? f[cfg.fields.golden_seal_time] || null : null,
+        traceText: cfg.fields.trace_text ? f[cfg.fields.trace_text] || null : null,
+      });
+    }
+    offset = data.offset;
+  } while (offset);
+  return { skipped: false, schema, baseId: cfg.baseId, tableId: cfg.tableId, rows };
+}
+
 // payload: { entry_type, line_user_id_raw, session_id, ben_gua, question_text, source_table, source_id }
 export async function syncToAirtable(payload) {
   if (!airtableConfigured()) return { skipped: true, reason: "not_configured" };

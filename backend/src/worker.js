@@ -1,14 +1,22 @@
 // MAKE_EXIT 第2段｜背景 worker：jobs lease/重試/死信 + outbox 消化(先落地再通知)。
 // 獨立 entrypoint(npm run worker / node src/worker.js),與 API 共用同一個 DATABASE_URL,
 // 部署為 Railway 的第二個 service,持續跑(poll loop),不是一次性 script。
+import crypto from "node:crypto";
 import { getPool, withTransaction } from "./db.js";
 import { log } from "./log.js";
-import { syncToAirtable, airtableConfigured } from "./airtable.js";
+import { syncToAirtable, airtableConfigured, listAirtableSourceRows, incrementalSyncConfigured } from "./airtable.js";
 
 const MAX_ATTEMPTS = 3;
 const LEASE_SECONDS = 30;
 const POLL_IDLE_MS = 1500;
 const API_BASE_URL = process.env.API_BASE_URL; // 內部呼叫「假 LINE 通知端點」用,staging 專屬,不打正式 LINE。
+
+// 獨立審 HOLD 修正(發現1.1)：Airtable→Postgres 常駐增量同步。預設關閉(ENABLE_INCREMENTAL_SYNC
+// 未設或非 'true' 就完全不跑),第3步切換前才由施工席/Owner 決定開啟,且開啟時 AIRTABLE_SYNC_SCHEMA
+// 預設仍是 'test'(指向 staging 測試 base),只有正式切換才會有人把它設成 'production'。
+const ENABLE_INCREMENTAL_SYNC = process.env.ENABLE_INCREMENTAL_SYNC === "true";
+const INCREMENTAL_SYNC_INTERVAL_MS = Number(process.env.INCREMENTAL_SYNC_INTERVAL_MS || 60_000);
+let lastIncrementalSyncAt = 0;
 
 if (!API_BASE_URL) {
   log.error("worker_boot_failed", { reason: "API_BASE_URL not set" });
@@ -198,6 +206,17 @@ async function runAirtableSyncLoop() {
       `UPDATE airtable_sync_log SET status = 'sent', payload = payload || jsonb_build_object('airtable_record_id', $1::text) WHERE id = $2`,
       [result.airtableRecordId, row.id]
     );
+    // Owner 裁定(獨立審 HOLD 修正②)：Postgres 先建的卦記回寫 Airtable 後，把新產生的 Airtable
+    // record id 記回同一筆 Postgres 列(legacy_source_airtable_id)。這樣之後的 Airtable→Postgres
+    // 增量同步認得出「這筆 Airtable 記錄其實就是這筆 Postgres 記錄的鏡像」，不會誤判成一筆新卦
+    // 而在 Postgres 端多長出第二筆——同一筆卦記兩個方向都對得回同一個 id，不會變兩筆。
+    if (row.source_table === "gua_records") {
+      await pool.query(
+        `UPDATE gua_records SET legacy_source_airtable_id = $1
+         WHERE id = $2 AND legacy_source_airtable_id IS NULL`,
+        [result.airtableRecordId, row.source_id]
+      );
+    }
     log.info("airtable_sync_sent", { syncLogId: row.id, airtableRecordId: result.airtableRecordId });
   } catch (err) {
     log.error("airtable_sync_failed_will_retry", { syncLogId: row.id, error: String(err && err.message || err) });
@@ -205,8 +224,113 @@ async function runAirtableSyncLoop() {
   return true;
 }
 
+// Airtable→Postgres 常駐增量同步(獨立審 HOLD 修正①，「新卦消失」問題)。
+// 全表掃描(見 airtable.js 註解:本次規模全表掃描比維護 lastModifiedTime 過濾簡單，
+// 量大後應該換成真正的增量過濾，這裡誠實記錄這個限制，不假裝這是最終規模解)。
+// 對每一筆 Airtable 來源列，用 legacy_source_airtable_id 當比對鍵：
+//   - Postgres 沒有這筆 → 這是「現役鏈在 Airtable 建立、新系統還不知道」的新卦 → INSERT
+//   - Postgres 已經有 → 用 Airtable 現況覆寫可變欄位(補記/蓋印可能在 Airtable 端發生)→ UPDATE
+// 同時輸出這一輪的對帳結果(筆數+差異清單)到 incremental_sync_runs，差異只記錄不自動修
+// (跟 Postgres→Airtable 方向的既定規則一致)。
+async function runIncrementalAirtableToPostgresSync() {
+  if (!ENABLE_INCREMENTAL_SYNC) return false;
+  if (Date.now() - lastIncrementalSyncAt < INCREMENTAL_SYNC_INTERVAL_MS) return false;
+  lastIncrementalSyncAt = Date.now();
+  if (!incrementalSyncConfigured()) {
+    log.info("incremental_sync_skip_not_configured");
+    return false;
+  }
+
+  const pool = getPool();
+  const runId = crypto.randomUUID();
+  const startedAt = new Date();
+  let airtableRowCount = 0, matchedCount = 0, insertedCount = 0, updatedCount = 0;
+  const missingInPostgres = [];
+  try {
+    const result = await listAirtableSourceRows();
+    if (result.skipped) return false;
+    airtableRowCount = result.rows.length;
+
+    const existing = await pool.query(
+      `SELECT id, legacy_source_airtable_id FROM gua_records WHERE legacy_source_airtable_id = ANY($1::text[])`,
+      [result.rows.map((r) => r.airtableId)]
+    );
+    const existingByAirtableId = new Map(existing.rows.map((r) => [r.legacy_source_airtable_id, r.id]));
+
+    for (const r of result.rows) {
+      if (!r.entryType || r.entryType !== "divination") continue; // 深卜/複盤走既有回填腳本的邏輯,增量同步只顧「新卦」
+      const gid = existingByAirtableId.get(r.airtableId);
+      if (gid) {
+        matchedCount++;
+        await pool.query(
+          `UPDATE gua_records SET
+             ben_gua = COALESCE($1, ben_gua),
+             question_text = COALESCE($2, question_text),
+             qigua_time = COALESCE($3, qigua_time),
+             golden_seal = COALESCE($4, golden_seal),
+             golden_seal_time = COALESCE($5, golden_seal_time),
+             trace_text = COALESCE($6, trace_text),
+             updated_at = now()
+           WHERE id = $7`,
+          [r.benGua, r.questionText, r.qiguaTime, r.goldenSeal, r.goldenSealTime, r.traceText, gid]
+        );
+        updatedCount++;
+      } else {
+        missingInPostgres.push(r.airtableId);
+        const subject = r.lineUserIdRaw || `UNKNOWN-${r.airtableId}`;
+        await pool.query(
+          `INSERT INTO gua_records
+             (subject, request_id, ben_gua, question_text, qigua_time, golden_seal, golden_seal_time,
+              trace_text, is_legacy_import, legacy_source_airtable_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9)
+           ON CONFLICT (legacy_source_airtable_id) WHERE legacy_source_airtable_id IS NOT NULL DO NOTHING`,
+          [subject, `incr-${r.airtableId}`, r.benGua || "UNKNOWN", r.questionText, r.qiguaTime,
+           r.goldenSeal, r.goldenSealTime, r.traceText, r.airtableId]
+        );
+        insertedCount++;
+      }
+    }
+
+    // missing_in_airtable:Postgres 側有 legacy_source_airtable_id,但這輪 Airtable 掃描沒看到
+    // (可能是刪除、也可能是分頁/篩選漏掉)——只記錄,不自動處理。
+    const seenIds = result.rows.map((r) => r.airtableId);
+    const orphanCheck = await pool.query(
+      `SELECT id, legacy_source_airtable_id FROM gua_records
+       WHERE legacy_source_airtable_id IS NOT NULL AND NOT (legacy_source_airtable_id = ANY($1::text[]))`,
+      [seenIds]
+    );
+    const missingInAirtable = orphanCheck.rows.map((r) => r.id);
+
+    await pool.query(
+      `INSERT INTO incremental_sync_runs
+         (id, source, started_at, finished_at, airtable_row_count, matched_count, inserted_count,
+          updated_count, missing_in_postgres, missing_in_airtable)
+       VALUES ($1,$2,$3,now(),$4,$5,$6,$7,$8::jsonb,$9::jsonb)`,
+      [runId, `airtable_divination_log(${result.schema})`, startedAt, airtableRowCount, matchedCount,
+       insertedCount, updatedCount, JSON.stringify(missingInPostgres), JSON.stringify(missingInAirtable)]
+    );
+    log.info("incremental_sync_run_done", {
+      runId, airtableRowCount, matchedCount, insertedCount, updatedCount,
+      missingInAirtableCount: missingInAirtable.length,
+    });
+  } catch (err) {
+    await pool.query(
+      `INSERT INTO incremental_sync_runs (id, source, started_at, finished_at, error)
+       VALUES ($1,'airtable_divination_log',$2,now(),$3)`,
+      [runId, startedAt, String(err && err.message || err)]
+    ).catch(() => {});
+    log.error("incremental_sync_run_failed", { runId, error: String(err && err.message || err) });
+  }
+  return true;
+}
+
 async function mainLoop() {
-  log.info("worker_boot_start", { apiBaseUrl: API_BASE_URL, airtableConfigured: airtableConfigured() });
+  log.info("worker_boot_start", {
+    apiBaseUrl: API_BASE_URL,
+    airtableConfigured: airtableConfigured(),
+    incrementalSyncEnabled: ENABLE_INCREMENTAL_SYNC,
+    incrementalSyncConfigured: incrementalSyncConfigured(),
+  });
   // 開機先跑一次 migration 讀取確認 schema 存在(不重跑;server.js 已跑過,這裡只是保險，冪等)。
   for (;;) {
     let didWork = false;
@@ -224,6 +348,11 @@ async function mainLoop() {
       if (await runAirtableSyncLoop()) didWork = true;
     } catch (err) {
       log.error("airtable_sync_loop_iteration_failed", { error: String(err && err.message || err) });
+    }
+    try {
+      if (await runIncrementalAirtableToPostgresSync()) didWork = true;
+    } catch (err) {
+      log.error("incremental_sync_loop_iteration_failed", { error: String(err && err.message || err) });
     }
     if (!didWork) await new Promise((r) => setTimeout(r, POLL_IDLE_MS));
   }
