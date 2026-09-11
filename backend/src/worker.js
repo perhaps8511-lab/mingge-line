@@ -232,6 +232,18 @@ async function runAirtableSyncLoop() {
 //   - Postgres 已經有 → 用 Airtable 現況覆寫可變欄位(補記/蓋印可能在 Airtable 端發生)→ UPDATE
 // 同時輸出這一輪的對帳結果(筆數+差異清單)到 incremental_sync_runs，差異只記錄不自動修
 // (跟 Postgres→Airtable 方向的既定規則一致)。
+// 第二個重複列(ebad8068,獨立審後實測發現)根因排查:對照 Airtable 該筆記錄的 session_id
+// 與 Postgres 原始列的 request_id,兩者逐字相同("p2b-autosync-req-0001")——代表二次比對
+// SQL 本身邏輯正確,問題不在比對條件,而在「同一時間有一個以上的 worker process 在跑這個
+// function」:本次演練期間反覆呼叫 connect-service-source 觸發滾動部署,Railway 在新舊
+// container 交接的短暫重疊窗口內,舊版(尚無二次比對修正)進程仍可能跑完最後一輪,
+// 與新版進程的輪次交錯,兩邊都判斷「還沒連上 legacy_source_airtable_id」而各自插入一筆。
+// 這是真實的並行缺口,不是只在本次除錯才會發生——只要 worker 曾經跑過兩個 replica,或滾動
+// 部署交接的瞬間,就可能重演。修法:整個函式包一個 Postgres advisory lock,同一時間只允許
+// 一個 process 執行這個同步輪次,拿不到鎖就直接跳過這一輪(等下一次 tick 再試),不會卡住
+// 其他 loop(jobs/outbox 仍照跑)。
+const INCREMENTAL_SYNC_LOCK_KEY = 727383001n; // 任意固定值,只要全庫唯一即可,無業務意義。
+
 async function runIncrementalAirtableToPostgresSync() {
   if (!ENABLE_INCREMENTAL_SYNC) return false;
   if (Date.now() - lastIncrementalSyncAt < INCREMENTAL_SYNC_INTERVAL_MS) return false;
@@ -242,6 +254,28 @@ async function runIncrementalAirtableToPostgresSync() {
   }
 
   const pool = getPool();
+  const lockClient = await pool.connect();
+  let gotLock = false;
+  try {
+    const lockRes = await lockClient.query(
+      `SELECT pg_try_advisory_lock($1::bigint) AS locked`,
+      [INCREMENTAL_SYNC_LOCK_KEY.toString()]
+    );
+    gotLock = lockRes.rows[0].locked === true;
+    if (!gotLock) {
+      log.info("incremental_sync_skip_lock_held_elsewhere");
+      return false;
+    }
+    return await runIncrementalAirtableToPostgresSyncLocked(pool);
+  } finally {
+    if (gotLock) {
+      await lockClient.query(`SELECT pg_advisory_unlock($1::bigint)`, [INCREMENTAL_SYNC_LOCK_KEY.toString()]).catch(() => {});
+    }
+    lockClient.release();
+  }
+}
+
+async function runIncrementalAirtableToPostgresSyncLocked(pool) {
   const runId = crypto.randomUUID();
   const startedAt = new Date();
   let airtableRowCount = 0, matchedCount = 0, insertedCount = 0, updatedCount = 0;
