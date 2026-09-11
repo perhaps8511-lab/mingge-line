@@ -119,7 +119,7 @@ async function main() {
             golden_seal, golden_seal_time, qigua_time, created_at,
             is_legacy_import, legacy_source_airtable_id)
          VALUES ($1,$2,$3,$4,$5,$6,1,$7,$8,$9,$10,true,$11)
-         ON CONFLICT (legacy_source_airtable_id) DO NOTHING
+         ON CONFLICT (legacy_source_airtable_id) WHERE legacy_source_airtable_id IS NOT NULL DO NOTHING
          RETURNING id`,
         [
           subject, `legacy-${r.airtableId}`, r.benGua || "UNKNOWN",
