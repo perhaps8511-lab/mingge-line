@@ -125,6 +125,101 @@ async function getGuaRecordByKey(res, subject, requestId) {
   }
 }
 
+// GET /gua-records?subject=xxx — 列表(供 staging Worker 的 /history 對接用)
+async function listGuaRecordsBySubject(res, subject) {
+  if (!subject) return json(res, 400, { error: "missing_query_param", required: ["subject"] });
+  try {
+    const { rows } = await getPool().query(
+      "SELECT * FROM gua_records WHERE subject = $1 ORDER BY created_at DESC LIMIT 50",
+      [subject]
+    );
+    return json(res, 200, { records: rows });
+  } catch (err) {
+    log.error("gua_record_list_failed", { subject, error: String(err && err.message || err) });
+    return json(res, 500, { error: "internal_error" });
+  }
+}
+
+// POST /gua-records/:id/seal — 冪等蓋印,對齊現役 Worker `/log/seal` 語意。
+async function sealGuaRecord(res, id) {
+  try {
+    const outcome = await withTransaction(async (client) => {
+      const recRes = await client.query("SELECT * FROM gua_records WHERE id = $1 FOR UPDATE", [id]);
+      if (recRes.rows.length === 0) return { notFound: true };
+      const rec = recRes.rows[0];
+      if (rec.golden_seal) return { row: rec, already_sealed: true };
+      const sealedAt = new Date();
+      const updated = await client.query(
+        "UPDATE gua_records SET golden_seal = true, golden_seal_time = $1 WHERE id = $2 RETURNING *",
+        [sealedAt, id]
+      );
+      return { row: updated.rows[0], already_sealed: false };
+    });
+    if (outcome.notFound) return json(res, 404, { error: "not_found" });
+    return json(res, 200, { sealed: true, sealed_at: outcome.row.golden_seal_time, already_sealed: outcome.already_sealed });
+  } catch (err) {
+    log.error("gua_record_seal_failed", { id, error: String(err && err.message || err) });
+    return json(res, 500, { error: "internal_error" });
+  }
+}
+
+// POST /gua-records/:id/trace — 冪等補記(append),真正的關聯表冪等鍵,取代現役 Worker
+// 把 request_id 塞進單一欄位字串再解析比對的權宜寫法(見 GUA_RECORD_LIFECYCLE_20260911.md 階段B)。
+async function traceGuaRecord(req, res, id) {
+  let body;
+  try {
+    body = JSON.parse((await readBody(req)) || "{}");
+  } catch {
+    return json(res, 400, { error: "invalid_json_body" });
+  }
+  const { request_id, trace_text } = body || {};
+  if (!request_id || !trace_text) return json(res, 400, { error: "missing_required_field", required: ["request_id", "trace_text"] });
+  const trimmed = String(trace_text).trim();
+  if (!trimmed || trimmed.length > 500) return json(res, 400, { error: "invalid_trace_text" });
+
+  try {
+    const outcome = await withTransaction(async (client) => {
+      const recRes = await client.query("SELECT id FROM gua_records WHERE id = $1", [id]);
+      if (recRes.rows.length === 0) return { notFound: true };
+
+      const existing = await client.query(
+        "SELECT * FROM trace_entries WHERE gua_record_id = $1 AND request_id = $2",
+        [id, request_id]
+      );
+      let idempotent = false;
+      if (existing.rows.length > 0) {
+        if (existing.rows[0].entry_text !== trimmed) return { conflict: true };
+        idempotent = true;
+      } else {
+        await client.query(
+          "INSERT INTO trace_entries (gua_record_id, request_id, entry_text) VALUES ($1, $2, $3)",
+          [id, request_id, trimmed]
+        );
+      }
+      const all = await client.query(
+        "SELECT entry_text, created_at FROM trace_entries WHERE gua_record_id = $1 ORDER BY created_at ASC",
+        [id]
+      );
+      const combined = all.rows.map((r) => r.entry_text).join("\n---\n");
+      const tracedAt = new Date();
+      await client.query("UPDATE gua_records SET trace_text = $1, trace_at = $2 WHERE id = $3", [combined, tracedAt, id]);
+      return { idempotent, trace_text: combined, trace_at: tracedAt };
+    });
+    if (outcome.notFound) return json(res, 404, { error: "not_found" });
+    if (outcome.conflict) return json(res, 409, { state: "unconfirmed", error: "request_id_reused_with_different_content" });
+
+    // 寫後 readback 驗證(承接現役 Worker /trace 的紀律:寫入後真的讀回來確認,不假裝成功)。
+    const verify = await getPool().query("SELECT trace_text, trace_at FROM gua_records WHERE id = $1", [id]);
+    if (!verify.rows[0] || verify.rows[0].trace_text !== outcome.trace_text) {
+      return json(res, 500, { state: "unconfirmed", error: "readback_mismatch" });
+    }
+    return json(res, 200, { traced: true, trace_text: outcome.trace_text, trace_at: outcome.trace_at, request_id, idempotent: outcome.idempotent });
+  } catch (err) {
+    log.error("gua_record_trace_failed", { id, error: String(err && err.message || err) });
+    return json(res, 500, { error: "internal_error" });
+  }
+}
+
 // ── 深卜：接回原卦記(Owner 2026-09-11 裁定①)。inbox 去重(Owner 卡§2 item3)+ jobs 背景處理(item2)。
 // POST /gua-records/:id/deep-read  body: { request_id, external_event_id? }
 async function triggerDeepRead(req, res, id) {
@@ -332,9 +427,18 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url.pathname === "/gua-records/by-key") {
     return getGuaRecordByKey(res, url.searchParams.get("subject"), url.searchParams.get("request_id"));
   }
+  if (req.method === "GET" && url.pathname === "/gua-records") {
+    return listGuaRecordsBySubject(res, url.searchParams.get("subject"));
+  }
   if (req.method === "POST" && /^\/gua-records\/[^/]+\/deep-read$/.test(url.pathname)) {
     const id = url.pathname.split("/")[2];
     return triggerDeepRead(req, res, id);
+  }
+  if (req.method === "POST" && /^\/gua-records\/[^/]+\/seal$/.test(url.pathname)) {
+    return sealGuaRecord(res, url.pathname.split("/")[2]);
+  }
+  if (req.method === "POST" && /^\/gua-records\/[^/]+\/trace$/.test(url.pathname)) {
+    return traceGuaRecord(req, res, url.pathname.split("/")[2]);
   }
   if (req.method === "GET" && url.pathname.startsWith("/gua-records/")) {
     const id = url.pathname.slice("/gua-records/".length);
