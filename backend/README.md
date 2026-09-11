@@ -48,6 +48,12 @@ npm start
 見 `migrations/001_init.sql`：`gua_records`、`outbox_messages`、`inbox_events`、`jobs`、`audit_events`。
 `schema_migrations` 表由 migration runner 自動建立，記錄哪些檔案已套用。
 
+## 備援演練腳本
+
+`scripts/dump-restore-drill.mjs`：對一個 staging Postgres 做邏輯 dump，在另一個全新 Postgres 套用同一份
+migration 建 schema，把 dump 的資料原樣插回去，readback 後用 SHA-256 比對筆數與內容是否一致。
+用法見腳本檔頭註解。每次做備援演練前先確認 `TARGET_DATABASE_URL` 指向的是可覆蓋的空庫，不是正式庫。
+
 ## 重播證據 / 備援演練
 
 見上一層目錄 `../00F_report/MAKE_EXIT_P1_DELIVERY_20260911.md`（第1段交付報告），
