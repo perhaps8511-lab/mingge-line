@@ -8,12 +8,18 @@
   "scripts": {
     "start": "node src/server.js",
     "worker": "node src/worker.js",
-    "migrate": "node src/migrate.js"
+    "migrate": "node src/migrate.js",
+    "w1:start": "node src/w1/start.js",
+    "w1:migrate": "node scripts/w1-migrate.mjs",
+    "w1:test": "node --test test/w1-*.test.js"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.14"
   }
 }
