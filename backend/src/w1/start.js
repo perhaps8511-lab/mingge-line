@@ -55,7 +55,7 @@ async function boot() {
    tokenSha256:env.W1_LEGACY_PAT_SHA256,base:env.W1_LEGACY_BASE_ID,table:env.W1_LEGACY_TABLE_ID,
    isOwnerTestGrant:subject=>store.isOwnerTestGrant(subject),
  });
- const files={'/':'index.html','/app.js':'app.js','/copy.js':'copy.js','/qigua.js':'qigua.js','/w1.css':'w1.css','/typography.css':'typography.css'};
+ const files={'/':'index.html','/app.js':'app.js','/copy.js':'copy.js','/qigua.js':'qigua.js','/w1.css':'w1.css','/typography.css':'typography.css','/w1-qa.html':'w1-qa.html','/w1-qa.js':'w1-qa.js'};
  const server=createW1Server({service,legacyReader,
   authenticate:createSubjectVerifier({publicKey:env.W1_SUBJECT_PUBLIC_KEY,kid:env.W1_SUBJECT_KID,consumeJti:postgresJtiConsumer(pool)}),
   enrollment:env.W1_ENROLLMENT_TOKEN?{token:env.W1_ENROLLMENT_TOKEN,quota:Number(env.W1_GRANT_QUOTA),
