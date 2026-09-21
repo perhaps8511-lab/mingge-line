@@ -15,7 +15,7 @@ for name in files:
  if name not in exact and not name.startswith(prefixes):continue
  data=git('show',head+':'+name);target=out/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data)
  manifest[name]=hashlib.sha256(data).hexdigest()
-for name in ['Dockerfile','railway.json']:
+for name in ['Dockerfile']:
  data=git('show',head+':deploy/w1/'+name);(out/name).write_bytes(data);manifest[name]=hashlib.sha256(data).hexdigest()
 (out/'W1_BUILD.json').write_text(json.dumps({'source_revision':head,'files':manifest},indent=2),encoding='utf-8')
 print(json.dumps({'revision':head,'files':len(manifest),'output':str(out)}))

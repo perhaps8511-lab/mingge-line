@@ -1,0 +1,11 @@
+{
+  "projectId": "929a5f5f-94dc-41d8-8efb-ee07e69ce53e",
+  "environmentId": "3e2dfd38-3296-4b38-b9de-b8d42eb03c0a",
+  "serviceId": "6619ddc3-4f66-4c5d-b780-11373430d189",
+  "preDeployCommand": [
+    "node backend/scripts/w1-migrate.mjs"
+  ],
+  "healthcheckPath": "/health",
+  "healthcheckTimeout": 120,
+  "restartPolicyMaxRetries": 3
+}
