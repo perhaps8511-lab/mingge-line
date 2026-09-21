@@ -14,6 +14,8 @@ import {BASIS,A11} from './admission.js';
 import {copy} from '../../public/copy.js';
 import {randomUUID} from 'node:crypto';
 const env=process.env;
+let build={source_revision:'LOCAL_UNPACKAGED'};
+try{build=JSON.parse(readFileSync(new URL('../../../W1_BUILD.json',import.meta.url),'utf8'));}catch{}
 const emit=error_code=>process.stdout.write(JSON.stringify({error_code})+'\n');
 async function boot() {
  if(env.W1_ENVIRONMENT!=='staging'||!env.W1_DATABASE_URL||!env.W1_SUBJECT_PUBLIC_KEY||!env.W1_SUBJECT_KID)throw new Error('W1_BINDINGS_REQUIRED');
@@ -44,7 +46,7 @@ async function boot() {
   classifySafety=async(subject,input)=>{const claim=await store.reserveSafetyCall(subject,budget,input);if(claim.cached)return claim.result.detection;try{const result=await classify(input.question_text);await pool.query('UPDATE w1.safety_calls SET runtime_json=$2,result_json=$3 WHERE id=$1',[claim.id,JSON.stringify(result.runtime),JSON.stringify({detection:result.detection})]);return result.detection;}catch{await store.alert(null,'SAFETY_CLASSIFICATION_FAILED');throw new Error('SAFETY_NO_DELIVERY');}};
  }
  const service=new W1Service({store,generate,push,buildPrompt,classifySafety,
-  manifest:{service:'mingge-w1',environment:'staging',basis:BASIS,prompt:{id:prompt.id,sha256:prompt.sha256},
+  manifest:{service:'mingge-w1',environment:'staging',source_revision:build.source_revision,basis:BASIS,prompt:{id:prompt.id,sha256:prompt.sha256},
     prefix_sha256:PREFIX_SHA,classics_sha256:CLASSICS_SHA,classics_edition:'CANDIDATE_EDITION_UNVERIFIED',
     runtime_status:runtimeStatus,runtime_binding:binding??null,A11,waves:{replay:'W2',backfill:'W3'}}});
  let legacyReader=null;

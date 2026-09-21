@@ -24,7 +24,7 @@ export function createW1Server({service,authenticate,legacyReader=null,enrollmen
   return http.createServer(async(req,res)=>{
     try {
       const url=new URL(req.url,'http://localhost');
-      if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{service:'mingge-w1',environment:'staging'});
+      if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{service:'mingge-w1',environment:'staging',source_revision:service.manifest?.source_revision??'LOCAL_UNPACKAGED',runtime_status:service.manifest?.runtime_status??'UNKNOWN'});
       if(staticHandler && await staticHandler(req,res,url))return;
       const body=await bodyOf(req);
       const auth=await authenticate({token:req.headers['x-mingge-subject-token'],
