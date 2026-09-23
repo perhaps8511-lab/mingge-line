@@ -25,13 +25,23 @@ export class W1Service {
     validateInput(body);
     // reused tells a runner whether this request triggered new work; it never changes the record.
     const old=await this.store.existingRequest(subject,body);if(old)return {...recordView(old),reused:true};
-    const safety=detectSafety(body.question_text)??(this.classifySafety?await this.classifySafety(subject,body):null);
-    if(safety) {
+    // Narrow SAFETY_BYPASS (GPT bounded ruling 2026-09-23): the fixed v34 self-harm template is used only
+    // for clear keyword self-harm. Keyword hits with mixed/overseas signs and classifier-only positives go
+    // to the safety-only model route, where the adopted v34 branch is produced and gated (charge 0).
+    const keyword=detectSafety(body.question_text);
+    if(keyword?.clear) {
       if(!await this.store.isOwnerTestGrant(subject))throw fail('OWNER_GRANT_REQUIRED',403);
       let result;
-      try {result=safetyDelivery(standardSafety(safety));}
+      try {result=safetyDelivery(standardSafety(keyword));}
       catch {await this.store.alert(null,'SAFETY_NO_DELIVERY');throw fail('SAFETY_NO_DELIVERY');}
       const saved=await this.store.createSafety(subject,body,result);return {...recordView(saved),reused:saved.reused===true};
+    }
+    const source=keyword?'keyword':(this.classifySafety&&await this.classifySafety(subject,body))?'classifier':null;
+    if(source) {
+      if(!await this.store.isOwnerTestGrant(subject))throw fail('OWNER_GRANT_REQUIRED',403);
+      if(!this.generate) throw fail('RUNTIME_BINDING_UNVERIFIED');
+      await this.buildPrompt(body);
+      const saved=await this.store.createSafetyJob(subject,body,{source});return {...recordView(saved),reused:saved.reused===true};
     }
     if(!this.generate) throw fail('RUNTIME_BINDING_UNVERIFIED');
     // Deterministic lookup must succeed before reserving a coin or spending.
@@ -44,19 +54,30 @@ export class W1Service {
     if(pending){await this.repush(pending.subject,pending.id);return true;}
     if(!this.generate) return false;
     const row=await this.store.claim(); if(!row) return false;
-    let result;
+    const route=await this.store.routeOf(row.id);
+    const safetyRoute=route==='SAFETY_MODEL';
+    const settle=(r,code,ev)=>safetyRoute?this.store.settleSafetyModel(row.id,r,code,ev):this.store.settle(row.id,r,code,ev);
+    const base={route,runtime_revision:this.manifest?.source_revision??null};
+    // Inconsistent route markers never generate: fail closed on whichever settlement applies.
+    if(route==='UNKNOWN'){
+      await this.store.alert(row.id,'ROUTE_UNKNOWN',base);
+      if(!await this.store.settle(row.id,null,'ROUTE_UNKNOWN',base))await this.store.settleSafetyModel(row.id,null,'ROUTE_UNKNOWN',base);
+      return true;
+    }
+    let result,last=null;
     try {
       const prompt=await this.buildPrompt(row.input_json);
       result=await generateChecked(attempt=>this.generate({prompt,recordId:row.id,attempt}),
-        code=>this.store.alert(row.id,code));
+        (code,detail)=>{last={...base,...detail};return this.store.alert(row.id,code,last);},
+        safetyRoute?{accept:v=>v.hasSR?[]:['SAFETY_ROUTE_NOT_SR']}:{});
     } catch(e) {
       // Budget stops keep their own code so a runner can halt instead of scoring them as failures.
       const code=['COST_HARD_CAP_REACHED','COST_REVIEW_STOP_REACHED','COST_RESERVE_EXCEEDED','PROVIDER_BUDGET_EXHAUSTED'].includes(e?.message)?e.message:'GENERATION_FAILED';
-      await this.store.settle(row.id,null,code); return true;
+      await settle(null,code,last??base); return true;
     }
     // If persistence fails, leave the reservation unresolved. Never publish or
     // classify a DB failure as an ordinary generated failure and overwrite it.
-    if(!await this.store.settle(row.id,result))return true;
+    if(!await settle(result))return true;
     await this.store.get(row.subject,row.id); // owning-store readback before push
     await this.repush(row.subject,row.id);
     return true;

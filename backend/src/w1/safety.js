@@ -9,7 +9,14 @@ export function detectSafety(question) {
     .replace(/(?:工作|專案|會議|關係)(?:快)?(?:結束|解脫)/g,'');
   const weak=/(整理保單|安排後事|把事情交代好|寫好遺書|把帳戶密碼留給家人)/.test(q)&&/(公司倒了|倒閉|破產|一無所有|走投無路|失去一切|沒有退路)/.test(q);
   const imminent=/(現在站在橋邊|藥已經吞了|東西都準備好了.*就今晚)/.test(q);
-  return weak||imminent||/(不想活|活不下去|輕生|自殺|自殘|傷害自己|想離開這個世界|想死)/.test(q)?{level:'crisis',category:'self_harm',imminent}:null;
+  if(!(weak||imminent||/(不想活|活不下去|輕生|自殺|自殘|傷害自己|想離開這個世界|想死)/.test(q)))return null;
+  // GPT bounded ruling 2026-09-23 (narrow SAFETY_BYPASS): the fixed Taiwan self-harm template may only be
+  // used for clear self-harm. Signs of another person at risk (v34 mixed crisis) or of being outside
+  // Taiwan (v34 overseas branch) route to the safety-only model path instead. Broad on purpose: a false
+  // positive costs one safety-only model call; a miss overrides the adopted branch with the wrong text.
+  const othersAtRisk=/(一起走|一起死|帶(著)?(他|她|孩子|小孩|家人|寶寶|媽媽|爸爸)|讓(他|她|它)[^。，,]{0,8}(別醒|不要醒|醒不來|消失|死)|同歸於盡|殺(了|掉|死)?(他|她|人|全家)|傷害(他|她|別人|家人|孩子))/.test(question);
+  const overseas=/(國外|海外|出國|美國|日本|英國|加拿大|澳洲|紐西蘭|德國|法國|歐洲|韓國|新加坡|香港|澳門|中國|大陸|越南|泰國|馬來西亞|菲律賓|印尼|印度|杜拜|在外國|不在台灣|不在臺灣)/.test(question);
+  return {level:'crisis',category:'self_harm',imminent,clear:!othersAtRisk&&!overseas};
 }
 export function standardSafety(detection) {
   const bytes=readFileSync(new URL('../../../prompts/jiegua/v34.md',import.meta.url));

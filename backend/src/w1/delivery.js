@@ -10,6 +10,23 @@ const enums = {
 const checked = new WeakSet();
 const ORDER = ['GZ','J5','J2','J3','J4','J1','J6','ZY','NEXT'];
 const HOTLINES = new Set(['1925','119','110','1995','1980','1966','0800507272','113']);
+// v34 §4.0.3 overseas branch replaces every Taiwan dial instruction with this sentence (§9.3 1925 rule
+// then does not apply). The urgent-harm-to-others branch opens with a fixed line and has no 113.
+const OVERSEAS_MARK = '所在地的緊急救援電話';
+const URGENT_HARM_MARK = '先停下來';
+export function requiredHotlineErrors(meta, raw) {
+  if (raw.includes(OVERSEAS_MARK)) return [];
+  if (meta.category === 'self_harm') return raw.includes('1925') ? [] : ['HOTLINE_MISSING'];
+  if (meta.category === 'violence') {
+    const missing = [];
+    if (!raw.includes('110')) missing.push('HOTLINE_MISSING');
+    // Violence-safety branch (victim, incl. proxy asking) lists 113; urgent-harm-to-others does not.
+    if (!raw.includes(URGENT_HARM_MARK) && !raw.includes('113')) missing.push('HOTLINE_MISSING');
+    return missing;
+  }
+  // No adopted v34 crisis branch exists for any other category: fail closed.
+  return meta.level === 'crisis' ? ['CRISIS_CATEGORY_UNSUPPORTED'] : [];
+}
 export function checkConsistency(raw, finishReason = 'STOP') {
   const errors = [];
   if (typeof raw !== 'string' || raw.length > 200000) return { ok: false, errors: ['OUTPUT_INVALID'] };
@@ -41,8 +58,13 @@ export function checkConsistency(raw, finishReason = 'STOP') {
   if (sr ? !segments.SR : [...j.map(i => `J${i}`), 'ZY', 'NEXT'].some(k => !segments[k])) errors.push('EMPTY_SECTION');
   if (meta.level === 'yellow' && !sr && !has('GZ')) errors.push('YELLOW_GZ_MISSING');
   if ((['red','crisis'].includes(meta.level)||meta.category==='self_harm') && !sr) errors.push('BOUNDARY_FULL_BODY');
+  // Scope unchanged from the prior gate: crisis level, or any self-harm. Non-crisis violence (e.g. red
+  // harm-intent standard response) carries no hotline and is not checked here.
   if (meta.level === 'crisis' || meta.category === 'self_harm') {
-    if (!raw.includes('1925')) errors.push('HOTLINE_MISSING');
+    // Category-aware required resources (GPT bounded ruling 2026-09-23, restoring adopted v34 §4.0.3/§9.3):
+    // 1925 is the self-harm resource, not a universal crisis requirement. Requirements are a subset of
+    // each v34 branch's exact text and never contradict the frozen battery.
+    for (const code of requiredHotlineErrors(meta, raw)) errors.push(code);
     const patterns = [/【\s*(\d{3,4})\s*】/g,
       /(?:專線|熱線|撥打|請撥|快撥|電話|打給|打)[^0-9]{0,6}(\d{3,4})(?![0-9\-－—–])/g,
       /(?<![0-9])(0800-?\d{3}-?\d{3})(?![0-9])/g];
@@ -63,12 +85,23 @@ export function classifyDelivery(value) {
   });
 }
 
-export async function generateChecked(generate, alert) {
+// Evidence for a rejected attempt: fixed codes, finish reason and token counts only — never the question,
+// the model text or any identity (GPT bounded ruling 2026-09-23, minimal observability).
+export function attemptEvidence(attempt, output, errors) {
+  const u = output?.runtime?.usage ?? {};
+  const n = v => Number.isInteger(v) ? v : null;
+  return { attempt, finish_reason: typeof output?.finishReason === 'string' ? output.finishReason : null,
+    consistency_error_codes: errors,
+    usage: { prompt: n(u.input), cached: n(u.cached), candidates: n(u.output), thoughts: n(u.thinking) } };
+}
+// accept(value) may add route-specific rejection codes to an otherwise consistent output.
+export async function generateChecked(generate, alert, { accept } = {}) {
   for (let attempt = 0; attempt < 2; attempt++) {
     const output = await generate(attempt);
     const result = checkConsistency(output.text, output.finishReason);
-    if (result.ok) return { output, delivery: classifyDelivery(result.value) };
-    await alert('CONSISTENCY_FAILED');
+    const errors = result.ok ? (accept ? accept(result.value) : []) : result.errors;
+    if (!errors.length) return { output, delivery: classifyDelivery(result.value) };
+    await alert('CONSISTENCY_FAILED', attemptEvidence(attempt, output, errors));
   }
   throw new Error('NO_DELIVERY');
 }

@@ -30,8 +30,10 @@ test('SAFETY_BYPASS at zero quota: SR only, no reserve, no model, immutable enti
  assert.equal(await snapshot(),before);
  const classifier=createSafetyClassifier(async({prompt})=>{assert.doesNotMatch(prompt.system,/J1/);return {text:'{"self_harm":true,"imminent":false}',finishReason:'STOP',runtime:{synthetic:true}};});
  service.classifySafety=async(s,q)=>{await store.reserveSafetyCall(s,{campaign:'safety-test',budgetUsd:1,upperUsd:.1,hardCapUsd:1000,reviewStopUsd:1000});return (await classifier(q.question_text)).detection;};
+ // Classifier-only positive: safety-only model route (GPT ruling 2026-09-23), queued, no reservation, no model call yet.
  const indirect=await service.create(subject,{...input,request_id:'indirect',question_text:'合成間接危機語意'});
- assert.equal(indirect.letter.charge,0);assert.equal(await snapshot(),before);assert.equal(calls,0);
+ assert.deepEqual([indirect.state,indirect.reused,indirect.letter],['queued',false,null]);assert.equal(await snapshot(),before);assert.equal(calls,0);
+ assert.equal((await query('SELECT * FROM w1.reservations')).rows.length,0);
  const countBefore=(await query('SELECT * FROM w1.safety_calls')).rows.length;
  assert.equal((await service.create(subject,{...input,request_id:'indirect',question_text:'合成間接危機語意'})).id,indirect.id);
  await assert.rejects(service.create(subject,{...input,request_id:'indirect',question_text:'changed'}),/REQUEST_CONTENT_CONFLICT/);

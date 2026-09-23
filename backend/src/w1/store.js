@@ -126,7 +126,8 @@ export class W1Store {
       return (await c.query("UPDATE w1.gua_records SET state='generating',started_at=now() WHERE id=$1 RETURNING *",[id])).rows[0];
     });
   }
-  async settle(id,result,errorCode=null) {
+  // evidence (failures only): route/revision/finish/error codes/usage — no question or model text.
+  async settle(id,result,errorCode=null,evidence=null) {
     return this.tx(async c => {
       const {rows} = await c.query('SELECT * FROM w1.reservations WHERE record_id=$1 FOR UPDATE',[id]);
       const reservation=rows[0];
@@ -137,13 +138,64 @@ export class W1Store {
       await c.query(`UPDATE w1.gua_records SET state=$2,output_json=$3,raw_output=$4,runtime_json=$5,charge=$6,
         notice=$7,push_state=$8,completed_at=now(),error_code=$9 WHERE id=$1`,
         [id,result?'completed':'failed',result?JSON.stringify(result.delivery):null,result?.output.text??null,
-          result?JSON.stringify(result.output.runtime):null,charge,result?.delivery.notice??'failure',result?'pending':'not_ready',errorCode]);
+          result?JSON.stringify(result.output.runtime):(evidence?JSON.stringify(evidence):null),charge,result?.delivery.notice??'failure',result?'pending':'not_ready',errorCode]);
       await c.query("UPDATE w1.jobs SET state='done' WHERE record_id=$1",[id]);
       await this.audit(c,charge?'CONFIRMED':'RELEASED',id,reservation.source_kind==='test_grants'?grant:null);
       return true;
     });
   }
-  async alert(id,code) { await this.audit(this.pool,code,id); }
+  // detail is stored as JSON in audit_events.reason (existing column; no migration).
+  async alert(id,code,detail=null) {
+    if(!detail){await this.audit(this.pool,code,id);return;}
+    await this.pool.query('INSERT INTO w1.audit_events(id,record_id,code,reason) VALUES($1,$2,$3,$4)',[randomUUID(),id,code,JSON.stringify(detail)]);
+  }
+  // Safety-only v34 model route (GPT bounded ruling 2026-09-23, Ruling B): no entitlement reservation,
+  // charge 0, [[SR]]-only output. The route marker is an audit event, so no schema change is needed.
+  async createSafetyJob(subject,input,{source}) {
+    if(!['keyword','classifier'].includes(source))throw fail('SAFETY_ROUTE_INVALID');
+    const hash=createHash('sha256').update(JSON.stringify(canonical(input))).digest('hex');
+    const {id,reused}=await this.tx(async c=>{
+      await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[subject]);
+      const previous=(await c.query('SELECT id,input_sha FROM w1.gua_records WHERE subject=$1 AND request_id=$2',[subject,input.request_id])).rows[0];
+      if(previous){if(previous.input_sha!==hash)throw fail('REQUEST_CONTENT_CONFLICT',409);return {id:previous.id,reused:true};}
+      const active=await c.query("SELECT id FROM w1.test_grants WHERE subject=$1 AND environment='staging' AND expires_at>now() AND revoked_at IS NULL AND reason='w1_owner_uat' FOR SHARE",[subject]);
+      if(!active.rows.length)throw fail('OWNER_GRANT_REQUIRED',403);
+      const id=randomUUID();
+      await c.query('INSERT INTO w1.gua_records(id,subject,request_id,input_sha,input_json,push_key) VALUES($1,$2,$3,$4,$5,$6)',
+        [id,subject,input.request_id,hash,JSON.stringify(input),randomUUID()]);
+      await c.query('INSERT INTO w1.jobs(record_id) VALUES($1)',[id]);
+      await c.query('INSERT INTO w1.audit_events(id,record_id,code,reason) VALUES($1,$2,$3,$4)',
+        [randomUUID(),id,'SAFETY_MODEL_QUEUED',JSON.stringify({route:'SAFETY_MODEL',source})]);
+      return {id,reused:false};
+    });
+    try {const row=await this.get(subject,id);if(row.input_sha!==hash)throw fail('WRITE_UNCONFIRMED');return {...row,readback_verified:true,reused};}
+    catch {throw fail('WRITE_UNCONFIRMED');}
+  }
+  // A record is on the safety model route only with its marker AND no entitlement reservation.
+  async routeOf(id) {
+    const marked=(await this.pool.query("SELECT 1 FROM w1.audit_events WHERE record_id=$1 AND code='SAFETY_MODEL_QUEUED'",[id])).rows.length>0;
+    const reserved=(await this.pool.query('SELECT 1 FROM w1.reservations WHERE record_id=$1',[id])).rows.length>0;
+    if(marked&&!reserved)return 'SAFETY_MODEL';
+    if(!marked&&reserved)return 'GENERATED';
+    return 'UNKNOWN';
+  }
+  async settleSafetyModel(id,result,errorCode=null,evidence=null) {
+    return this.tx(async c=>{
+      const row=(await c.query("SELECT state FROM w1.gua_records WHERE id=$1 FOR UPDATE",[id])).rows[0];
+      if(!row||row.state!=='generating')return false;
+      if((await c.query('SELECT 1 FROM w1.reservations WHERE record_id=$1',[id])).rows.length)return false;
+      // Defense in depth: only a charge-0 [[SR]] delivery may complete on this route.
+      const ok=result&&result.delivery.charge===0&&result.delivery.sections.every(s=>s.tag==='SR');
+      await c.query(`UPDATE w1.gua_records SET state=$2,output_json=$3,raw_output=$4,runtime_json=$5,charge=0,
+        notice=$6,push_state=$7,completed_at=now(),error_code=$8 WHERE id=$1`,
+        [id,ok?'completed':'failed',ok?JSON.stringify(result.delivery):null,ok?result.output.text:null,
+          ok?JSON.stringify(result.output.runtime):(evidence?JSON.stringify(evidence):null),ok?result.delivery.notice:'failure',ok?'pending':'not_ready',ok?null:(errorCode??'SAFETY_ROUTE_NOT_SR')]);
+      await c.query("UPDATE w1.jobs SET state='done' WHERE record_id=$1",[id]);
+      await c.query('INSERT INTO w1.audit_events(id,record_id,code,reason) VALUES($1,$2,$3,$4)',
+        [randomUUID(),id,ok?'SAFETY_MODEL_DELIVERED':'SAFETY_MODEL_FAILED',JSON.stringify({route:'SAFETY_MODEL',error_code:ok?null:(errorCode??'SAFETY_ROUTE_NOT_SR')})]);
+      return true;
+    });
+  }
   async claimPush(subject,id) {
     const row=await this.get(subject,id);
     if(row.state!=='completed') throw fail('NOT_DELIVERABLE',409);
@@ -247,7 +299,17 @@ export class W1Store {
     for(const {id} of expired) {
       await this.tx(async c=>{
         const {rows}=await c.query('SELECT * FROM w1.reservations WHERE record_id=$1 FOR UPDATE',[id]);
-        const r=rows[0];if(!r||r.state!=='reserved')return;
+        const r=rows[0];
+        if(!r){
+          // Safety model route holds no reservation: mark the unresolved provider outcome, charge 0.
+          const marked=(await c.query("SELECT 1 FROM w1.audit_events WHERE record_id=$1 AND code='SAFETY_MODEL_QUEUED'",[id])).rows.length>0;
+          if(!marked)return;
+          await c.query("UPDATE w1.gua_records SET state='generation_unknown',charge=0,error_code='GENERATION_UNRESOLVED' WHERE id=$1 AND state='generating'",[id]);
+          await c.query("UPDATE w1.jobs SET state='unknown' WHERE record_id=$1",[id]);
+          await this.audit(c,'GENERATION_UNRESOLVED',id);
+          return;
+        }
+        if(r.state!=='reserved')return;
         await c.query(`UPDATE ${sourceTable(r.source_kind)} SET reserved=reserved-1 WHERE id=$1`,[r.source_id]);
         await c.query("UPDATE w1.reservations SET state='released' WHERE record_id=$1",[id]);
         await c.query("UPDATE w1.gua_records SET state='generation_unknown',charge=0,error_code='GENERATION_UNRESOLVED' WHERE id=$1",[id]);
