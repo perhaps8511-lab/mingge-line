@@ -6,7 +6,7 @@ import {randomUUID} from 'node:crypto';
 import {W1Store} from '../src/w1/store.js';
 import {W1Service} from '../src/w1/service.js';
 import {checkConsistency,classifyDelivery,generateChecked} from '../src/w1/delivery.js';
-import {letterMessage,ALT_TEXT} from '../src/w1/line.js';
+import {letterMessages,ALT_TEXT} from '../src/w1/line.js';
 import {createW1Server} from '../src/w1/http.js';
 import {migrateW1,seedYaoci} from '../src/w1/schema.js';
 import {loadClassics} from '../src/w1/classics.js';
@@ -24,7 +24,7 @@ test('consistency gate, one regeneration, charge/notice and legacy order',async(
     ['green',true,0,'guidance'],['red',true,0,'boundary'],['crisis',true,0,'none']]) {
     const gate=checkConsistency(text(level,sr));assert.equal(gate.ok,true);
     const classified=classifyDelivery(gate.value);assert.equal(classified.charge,charge);assert.equal(classified.notice,notice);
-    assert.equal(letterMessage(classified).altText,ALT_TEXT);
+    assert.equal(letterMessages(classified).every(m=>m.altText===ALT_TEXT),true);
     if(!sr)assert.deepEqual(classified.sections.map(s=>s.tag),[...(level==='yellow'?['GZ']:[]),'J5','J2','J3','J4','J1','J6','ZY','NEXT']);
   }
   assert.throws(()=>classifyDelivery({j:[1,2,3,4,5,6]}),/CONSISTENCY_REQUIRED/);

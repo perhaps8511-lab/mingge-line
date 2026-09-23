@@ -5,52 +5,65 @@ const GUA_NO=Object.freeze({"乾為天":1,"坤為地":2,"水雷屯":3,"山水蒙
 // 〔查看我的卦記〕; drop the 深讀 line/button. Only full letters use it; SR/STATUS stay plain.
 const GOLD='#C9A84C',CREAM='#F5F1E8',SAGE='#A8B5A0',GREEN='#2C3E2D';
 const FOOTER='已收進「我的卦記」。',SIGNATURE='善為易者不占 · 命格';
-const MAX_BUBBLE_BYTES=24000;
+// LINE Flex wire limits, measured as serialized UTF-8 bytes (decimal KB, the stricter reading):
+// bubble 30 KB, carousel 50 KB and 12 bubbles; one push request carries at most 5 messages.
+const BUBBLE_MAX_BYTES=30000,CONTAINER_MAX_BYTES=50000,MAX_BUBBLES=12,MAX_MESSAGES=5;
+const bytes=value=>Buffer.byteLength(JSON.stringify(value),'utf8');
 const chunk=text=>{const chars=Array.from(text),out=[];for(let i=0;i<chars.length;i+=1800)out.push(chars.slice(i,i+1800).join(''));return out;};
-function plainMessage(letter) {
-  // Flex text objects have limits; split without truncating or changing order.
-  const chunks=letter.sections.flatMap(s=>chunk(s.text));
-  const bubbles=[];
-  for(let i=0;i<chunks.length;i+=4) bubbles.push({type:'bubble',body:{type:'box',layout:'vertical',
-    contents:chunks.slice(i,i+4).map(text=>({type:'text',text,wrap:true,size:'md'}))}});
-  if(bubbles.length>12) throw new Error('PUSH_PAYLOAD_TOO_LARGE');
-  return {type:'flex',altText:ALT_TEXT,contents:bubbles.length===1?bubbles[0]:{type:'carousel',contents:bubbles}};
+const tooLarge=()=>new Error('PUSH_PAYLOAD_TOO_LARGE');
+// Lossless packing: items fill bubbles, bubbles fill carousels, carousels become separate
+// messages. Text is never truncated or reordered; anything beyond LINE limits fails loudly.
+function pack(items,makeBubble,{liffUrl}={}) {
+  const bubbles=[];let current=[];
+  for(const item of items){
+    if(current.length&&bytes(makeBubble([...current,item],!bubbles.length))>BUBBLE_MAX_BYTES){bubbles.push(makeBubble(current,!bubbles.length));current=[];}
+    current.push(item);
+    if(bytes(makeBubble(current,!bubbles.length))>BUBBLE_MAX_BYTES)throw tooLarge();
+  }
+  bubbles.push(makeBubble(current,!bubbles.length));
+  const container=list=>list.length===1?list[0]:{type:'carousel',contents:list};
+  const groups=[];let group=[];
+  for(const bubble of bubbles){
+    if(group.length&&(group.length>=MAX_BUBBLES||bytes(container([...group,bubble]))>CONTAINER_MAX_BYTES)){groups.push(group);group=[];}
+    group.push(bubble);
+  }
+  groups.push(group);
+  if(groups.length>MAX_MESSAGES||groups.some(g=>bytes(container(g))>CONTAINER_MAX_BYTES))throw tooLarge();
+  // LINE shows the quick reply of the last message only.
+  return groups.map((g,i)=>({type:'flex',altText:ALT_TEXT,contents:container(g),
+    ...(liffUrl&&i===groups.length-1?{quickReply:{items:[{type:'action',action:{type:'uri',label:'查看我的卦記',uri:liffUrl}}]}}:{})}));
 }
-function sectionItems(s) {
+function plainMessages(letter) {
+  const items=letter.sections.flatMap(s=>chunk(s.text)).map(text=>({type:'text',text,wrap:true,size:'md'}));
+  return pack(items,contents=>({type:'bubble',body:{type:'box',layout:'vertical',contents}}));
+}
+// M17 margins: separators, 卦旨, the first J section and 贈言 open with lg; the rest md.
+function sectionItems(s,first) {
   const style=s.tag==='GZ'?{size:'md',color:GOLD}:s.tag==='ZY'?{size:'md',color:GOLD,style:'italic'}:
     s.tag==='NEXT'?{size:'sm',color:SAGE}:{size:'lg',color:CREAM};
-  const items=chunk(s.text).map(text=>({type:'text',text,wrap:true,margin:'md',...style}));
+  const items=chunk(s.text).map((text,i)=>({type:'text',text,wrap:true,margin:i===0&&first?'lg':'md',...style}));
   return s.tag==='ZY'?[{type:'separator',color:GOLD,margin:'lg'},...items]:items;
 }
 function letterCard(letter,{benGua,liffUrl}) {
   const items=[{type:'separator',color:GOLD,margin:'lg'}];
+  const firstJ=letter.sections.find(s=>/^J[1-6]$/.test(s.tag))?.tag;
   for(const s of letter.sections){
     // M17 places the footer line between 贈言 and NEXT.
     if(s.tag==='NEXT')items.push({type:'text',text:FOOTER,wrap:true,size:'md',color:GOLD,margin:'md',weight:'bold'});
-    items.push(...sectionItems(s));
+    items.push(...sectionItems(s,['GZ','ZY',firstJ].includes(s.tag)));
   }
   if(!letter.sections.some(s=>s.tag==='NEXT'))items.push({type:'text',text:FOOTER,wrap:true,size:'md',color:GOLD,margin:'md',weight:'bold'});
   items.push({type:'text',text:SIGNATURE,wrap:true,size:'sm',align:'end',color:SAGE,margin:'md'});
   const no=GUA_NO[benGua];
   const hero=Number.isInteger(no)?{type:'image',url:`https://perhaps8511-lab.github.io/mingge-line/${String(no).padStart(2,'0')}.png`,
     size:'full',aspectMode:'cover',aspectRatio:'2:1'}:null;
-  // Split into several same-styled bubbles only if one bubble would exceed the Flex size limit.
-  const bubbles=[];let current=[];
-  const make=(contents,first)=>({type:'bubble',size:'mega',...(first&&hero?{hero}:{}),
-    body:{type:'box',layout:'vertical',paddingAll:'20px',backgroundColor:GREEN,contents}});
-  for(const item of items){
-    if(current.length&&JSON.stringify(make([...current,item],!bubbles.length)).length>MAX_BUBBLE_BYTES){bubbles.push(make(current,!bubbles.length));current=[];}
-    current.push(item);
-  }
-  bubbles.push(make(current,!bubbles.length));
-  if(bubbles.length>12) throw new Error('PUSH_PAYLOAD_TOO_LARGE');
-  return {type:'flex',altText:ALT_TEXT,contents:bubbles.length===1?bubbles[0]:{type:'carousel',contents:bubbles},
-    ...(liffUrl?{quickReply:{items:[{type:'action',action:{type:'uri',label:'查看我的卦記',uri:liffUrl}}]}}:{})};
+  return pack(items,(contents,first)=>({type:'bubble',size:'mega',...(first&&hero?{hero}:{}),
+    body:{type:'box',layout:'vertical',paddingAll:'20px',backgroundColor:GREEN,contents}}),{liffUrl});
 }
-export function letterMessage(letter,{benGua,liffUrl}={}) {
+export function letterMessages(letter,{benGua,liffUrl}={}) {
   if(!letter || !Array.isArray(letter.sections) || !letter.sections.length) throw new Error('LETTER_INVALID');
   const full=['J1','J2','J3','J4','J5','J6'].every(tag=>letter.sections.some(s=>s.tag===tag));
-  return full?letterCard(letter,{benGua,liffUrl}):plainMessage(letter);
+  return full?letterCard(letter,{benGua,liffUrl}):plainMessages(letter);
 }
 export function createLinePush({token,liffId,fetchImpl=fetch}) {
   if(!token) throw new Error('LINE_PUSH_UNCONFIGURED');
@@ -60,7 +73,7 @@ export function createLinePush({token,liffId,fetchImpl=fetch}) {
       const response=await fetchImpl('https://api.line.me/v2/bot/message/push',{
         method:'POST',redirect:'error',signal:AbortSignal.timeout(15000),
         headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json','X-Line-Retry-Key':row.push_key},
-        body:JSON.stringify({to:row.subject,messages:[letterMessage(row.output_json,{benGua:row.input_json?.ben_gua,liffUrl})]}),
+        body:JSON.stringify({to:row.subject,messages:letterMessages(row.output_json,{benGua:row.input_json?.ben_gua,liffUrl})}),
       });
       // 409 only proves accepted when LINE supplies the original request ID.
       if(!response.ok && !(response.status===409 && response.headers.get('x-line-accepted-request-id'))) throw new Error();
