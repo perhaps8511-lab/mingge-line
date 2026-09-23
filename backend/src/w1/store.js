@@ -94,10 +94,14 @@ export class W1Store {
     const {rows} = await this.pool.query('SELECT * FROM w1.gua_records WHERE subject=$1 AND id=$2',[subject,id]);
     if (!rows.length) throw fail('NOT_FOUND',404); return rows[0];
   }
-  async createSafety(subject,input,result) {
+  // Create-stage safety fallback only (the safety model route could not be set up): the adopted v34
+  // fallback, completed at once, charge 0, error_code = the cause so it is never mistaken for a model reply.
+  async createSafety(subject,input,result,{cause}={}) {
+    if(!/^[A-Z0-9_]{2,64}$/.test(cause??''))throw fail('SAFETY_FALLBACK_CAUSE_REQUIRED');
     // Gate again at the persistence boundary; no caller can insert a full letter.
     const {safetyDelivery}=await import('./safety.js');
-    result=safetyDelivery(result.output.text);
+    const gated=safetyDelivery(result.output.text,'SAFETY_FALLBACK');
+    result={...gated,output:{...gated.output,runtime:{...result.output.runtime,...gated.output.runtime,route:'SAFETY_FALLBACK'}}};
     const hash=createHash('sha256').update(JSON.stringify(canonical(input))).digest('hex');
     const {id,reused}=await this.tx(async c=>{
       await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[subject]);
@@ -106,10 +110,12 @@ export class W1Store {
       const active=await c.query("SELECT id FROM w1.test_grants WHERE subject=$1 AND environment='staging' AND expires_at>now() AND revoked_at IS NULL AND reason='w1_owner_uat' FOR SHARE",[subject]);
       if(!active.rows.length)throw fail('OWNER_GRANT_REQUIRED',403);
       const id=randomUUID();
-      await c.query(`INSERT INTO w1.gua_records(id,subject,request_id,input_sha,input_json,push_key,state,output_json,raw_output,runtime_json,charge,notice,push_state,completed_at)
-        VALUES($1,$2,$3,$4,$5,$6,'completed',$7,$8,$9,0,'none','pending',now())`,
-        [id,subject,input.request_id,hash,JSON.stringify(input),randomUUID(),JSON.stringify(result.delivery),result.output.text,JSON.stringify(result.output.runtime)]);
-      await this.audit(c,'SAFETY_BYPASS',id);return {id,reused:false};
+      await c.query(`INSERT INTO w1.gua_records(id,subject,request_id,input_sha,input_json,push_key,state,output_json,raw_output,runtime_json,charge,notice,push_state,completed_at,error_code)
+        VALUES($1,$2,$3,$4,$5,$6,'completed',$7,$8,$9,0,'none','pending',now(),$10)`,
+        [id,subject,input.request_id,hash,JSON.stringify(input),randomUUID(),JSON.stringify(result.delivery),result.output.text,JSON.stringify(result.output.runtime),cause]);
+      await c.query('INSERT INTO w1.audit_events(id,record_id,code,reason) VALUES($1,$2,$3,$4)',
+        [randomUUID(),id,'SAFETY_MODEL_FALLBACK',JSON.stringify({route:'SAFETY_FALLBACK',stage:'create',error_code:cause,runtime_revision:result.output.runtime.runtime_revision??null})]);
+      return {id,reused:false};
     });
     try {const row=await this.get(subject,id);if(row.input_sha!==hash)throw fail('WRITE_UNCONFIRMED');return {...row,readback_verified:true,reused};}
     catch {throw fail('WRITE_UNCONFIRMED');}
@@ -117,12 +123,15 @@ export class W1Store {
   async list(subject) {
     return (await this.pool.query('SELECT * FROM w1.gua_records WHERE subject=$1 ORDER BY created_at DESC LIMIT 50',[subject])).rows;
   }
-  async claim() {
+  // lane 'safety' / 'ordinary' lets the safety model route run in its own loop, never queued behind an
+  // ordinary letter; no lane (single loop) claims safety jobs first.
+  async claim({lane}={}) {
+    if(![undefined,'safety','ordinary'].includes(lane))throw fail('CLAIM_LANE_INVALID');
+    const marked="EXISTS(SELECT 1 FROM w1.audit_events a WHERE a.record_id=j.record_id AND a.code='SAFETY_MODEL_QUEUED')";
+    const where=lane==='safety'?` AND ${marked}`:lane==='ordinary'?` AND NOT ${marked}`:'';
     return this.tx(async c => {
-      // Safety model route (crisis) jobs are claimed before ordinary letters.
-      const {rows} = await c.query(`SELECT j.record_id FROM w1.jobs j WHERE j.state='pending'
-        ORDER BY EXISTS(SELECT 1 FROM w1.audit_events a WHERE a.record_id=j.record_id AND a.code='SAFETY_MODEL_QUEUED') DESC,
-        j.record_id LIMIT 1 FOR UPDATE OF j SKIP LOCKED`);
+      const {rows} = await c.query(`SELECT j.record_id FROM w1.jobs j WHERE j.state='pending'${where}
+        ORDER BY ${marked} DESC, j.record_id LIMIT 1 FOR UPDATE OF j SKIP LOCKED`);
       if (!rows.length) return null;
       const id=rows[0].record_id;
       await c.query("UPDATE w1.jobs SET state='claimed',claimed_at=now() WHERE record_id=$1",[id]);
@@ -182,20 +191,31 @@ export class W1Store {
     if(!marked&&reserved)return 'GENERATED';
     return 'UNKNOWN';
   }
-  async settleSafetyModel(id,result,errorCode=null,evidence=null) {
+  async safetySource(id) {
+    const reason=(await this.pool.query("SELECT reason FROM w1.audit_events WHERE record_id=$1 AND code='SAFETY_MODEL_QUEUED'",[id])).rows[0]?.reason;
+    try {return JSON.parse(reason).source??null;} catch {return null;}
+  }
+  // result + errorCode = the adopted fallback delivered in place of a model reply: completed, charge 0, and
+  // error_code keeps the cause so the record is never mistaken for a model reply. expect: allowed prior states.
+  async settleSafetyModel(id,result,errorCode=null,evidence=null,{expect=['generating']}={}) {
     return this.tx(async c=>{
+      // Lock order jobs → record, as claim() does, so a queued-expiry fallback and a claim never deadlock.
+      await c.query('SELECT 1 FROM w1.jobs WHERE record_id=$1 FOR UPDATE',[id]);
       const row=(await c.query("SELECT state FROM w1.gua_records WHERE id=$1 FOR UPDATE",[id])).rows[0];
-      if(!row||row.state!=='generating')return false;
+      if(!row||!expect.includes(row.state)||!['queued','generating'].includes(row.state))return false;
       if((await c.query('SELECT 1 FROM w1.reservations WHERE record_id=$1',[id])).rows.length)return false;
       // Defense in depth: only a charge-0 [[SR]] delivery may complete on this route.
       const ok=result&&result.delivery.charge===0&&result.delivery.sections.every(s=>s.tag==='SR');
+      const code=ok?errorCode:(errorCode??'SAFETY_ROUTE_NOT_SR');
+      const fallback=ok&&code!==null;
       await c.query(`UPDATE w1.gua_records SET state=$2,output_json=$3,raw_output=$4,runtime_json=$5,charge=0,
         notice=$6,push_state=$7,completed_at=now(),error_code=$8 WHERE id=$1`,
         [id,ok?'completed':'failed',ok?JSON.stringify(result.delivery):null,ok?result.output.text:null,
-          ok?JSON.stringify(result.output.runtime):(evidence?JSON.stringify(evidence):null),ok?result.delivery.notice:'failure',ok?'pending':'not_ready',ok?null:(errorCode??'SAFETY_ROUTE_NOT_SR')]);
+          ok?JSON.stringify(result.output.runtime):(evidence?JSON.stringify(evidence):null),ok?result.delivery.notice:'failure',ok?'pending':'not_ready',code]);
       await c.query("UPDATE w1.jobs SET state='done' WHERE record_id=$1",[id]);
       await c.query('INSERT INTO w1.audit_events(id,record_id,code,reason) VALUES($1,$2,$3,$4)',
-        [randomUUID(),id,ok?'SAFETY_MODEL_DELIVERED':'SAFETY_MODEL_FAILED',JSON.stringify({route:'SAFETY_MODEL',error_code:ok?null:(errorCode??'SAFETY_ROUTE_NOT_SR')})]);
+        [randomUUID(),id,fallback?'SAFETY_MODEL_FALLBACK':ok?'SAFETY_MODEL_DELIVERED':'SAFETY_MODEL_FAILED',
+          JSON.stringify({route:fallback?'SAFETY_FALLBACK':'SAFETY_MODEL',error_code:code,runtime_revision:evidence?.runtime_revision??result?.output?.runtime?.runtime_revision??null})]);
       return true;
     });
   }
@@ -289,9 +309,11 @@ export class W1Store {
       candidatesTokenCount:x.candidates_tokens,thoughtsTokenCount:x.thoughts_tokens,actual_usd:x.actual_usd===null?null:Number(x.actual_usd),settled:!!x.settled_at});
     return {generation_attempts:attempts.map(a=>({attempt:a.attempt,...row(a)})),safety_classification:safety?row(safety):null};
   }
+  // The safety lane settles within its deadline, so a safety job still queued or generating after 120s means
+  // the lane stalled or the process restarted: the service delivers the adopted fallback instead.
   async expiredSafetyJobs() {
-    return (await this.pool.query(`SELECT r.id,r.subject,r.request_id,r.input_json FROM w1.gua_records r
-      WHERE r.state='generating' AND r.started_at<now()-interval '720 seconds'
+    return (await this.pool.query(`SELECT r.id,r.subject,r.request_id,r.input_json,r.state FROM w1.gua_records r
+      WHERE ((r.state='generating' AND r.started_at<now()-interval '120 seconds') OR (r.state='queued' AND r.created_at<now()-interval '120 seconds'))
       AND EXISTS(SELECT 1 FROM w1.audit_events a WHERE a.record_id=r.id AND a.code='SAFETY_MODEL_QUEUED')
       AND NOT EXISTS(SELECT 1 FROM w1.reservations x WHERE x.record_id=r.id)`)).rows;
   }

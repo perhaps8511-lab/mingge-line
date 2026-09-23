@@ -7,6 +7,7 @@ import {W1Service} from '../src/w1/service.js';
 import {migrateW1} from '../src/w1/schema.js';
 import {createW1Server} from '../src/w1/http.js';
 import {copy} from '../public/copy.js';
+import {safetyFallback} from '../src/w1/safety.js';
 const {chromium}=await import(pathToFileURL(process.env.W1_PLAYWRIGHT_MODULE));
 const out=process.argv[2];if(!out)throw new Error('OUTPUT_REQUIRED');mkdirSync(out,{recursive:true});
 const db=new PGlite();const query=async(sql,args)=>{const r=args===undefined?(await db.exec(sql)).at(-1):await db.query(sql,args);return {...r,rowCount:r.affectedRows??r.rows.length};};
@@ -15,8 +16,10 @@ await migrateW1(pool);const store=new W1Store(pool),subject=`U${'e'.repeat(32)}`
 await store.grant(subject,{quota:3,expiresAt:new Date(Date.now()+3600000).toISOString(),enrollmentId:'ui-synthetic'});
 const raw='#META_START\nzhu_li_ren: lao_yi\nmain_kaguan: A\nsub_kaguan: none\nzou_xiang: bao_shou\nredline: false\nlevel: green\ncategory: none\nstandard_response: false\nhotline_given: false\n#META_END\n'+[1,2,3,4,5,6].map(i=>`[[J${i}]]\n合成測試信箋，第 ${i} 段。\n`).join('')+'[[ZY]]\n合成贈言。\n[[NEXT]]\n合成下一步。\n[[END]]';
 let generated=0;
-const service=new W1Service({store,manifest:{synthetic:true},buildPrompt:async()=>({}),
- generate:async()=>{generated++;return {text:raw,finishReason:'STOP',runtime:{synthetic:true}};},push:async()=>{}});
+// Synthetic provider: the crisis request (safety model route) gets an adopted v34 [[SR]]; others a full letter.
+const sr=safetyFallback('藥已經吞了',{imminent:true});
+const service=new W1Service({store,manifest:{synthetic:true},buildPrompt:async b=>({q:b.question_text}),
+ generate:async({prompt})=>{generated++;return {text:/不想活/.test(prompt.q)?sr:raw,finishReason:'STOP',runtime:{synthetic:true}};},push:async()=>{}});
 let base;
 const server=createW1Server({service,authenticate:async({token})=>{if(token!=='synthetic-valid')throw Object.assign(new Error('UNAUTHORIZED'),{status:401});return {subject};},
  staticHandler:async(req,res,url)=>{
@@ -59,13 +62,18 @@ try {
  await page.reload();await page.click('#login');await page.waitForFunction(()=>document.getElementById('quota').textContent.includes('0'));
  await page.locator('#cast').hover();await page.mouse.down();await page.waitForTimeout(650);await page.mouse.up();
  await page.fill('#question','藥已經吞了，我不想活了');await page.click('#send');
+ await page.waitForFunction(()=>document.getElementById('status').textContent.includes('已送出'));
+ const crisis=(await store.list(subject))[0];assert.equal(crisis.state,'queued');assert.equal(await store.routeOf(crisis.id),'SAFETY_MODEL');
+ await service.tick();
  await page.waitForFunction(()=>document.getElementById('letter').textContent.includes('1925'));
+ const delivered=await store.get(subject,crisis.id);
+ assert.deepEqual([delivered.state,delivered.charge,delivered.error_code,delivered.runtime_json.route],['completed',0,null,'SAFETY_MODEL']);
  await page.waitForFunction(()=>document.getElementById('quota').hidden&&document.getElementById('payment').textContent==='');
  assert.equal(JSON.stringify((await pool.query('SELECT * FROM w1.test_grants')).rows),beforeSafety);
- assert.equal(generated,1);assert.equal(await page.locator('#disclaimer').isVisible(),false);
+ assert.equal(generated,2);assert.equal(await page.locator('#disclaimer').isVisible(),false);
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:out+'/UI_SAFETY.png',fullPage:true});
  const report={status:'PASS',mode:'LOCAL_BROWSER_SYNTHETIC_LINE_AND_PROVIDER_REAL_PGLITE',
-  longPress:true,saveBeforeSent:true,closeReopenReadback:true,historyBeforeLoginSignsIn:true,charge:1,remaining:2,generatedCalls:1,
-  A14_exact:true,A12_first:'J5',safety_zero_quota_SR:true,safety_entitlement_unchanged:true,safety_no_payment_or_quota_copy:true,staging_live:'NOT_RUN',real_LINE:'NOT_RUN'};
+  longPress:true,saveBeforeSent:true,closeReopenReadback:true,historyBeforeLoginSignsIn:true,charge:1,remaining:2,generatedCalls:generated,
+  A14_exact:true,A12_first:'J5',safety_zero_quota_SR:true,safety_route:'SAFETY_MODEL',safety_entitlement_unchanged:true,safety_no_payment_or_quota_copy:true,staging_live:'NOT_RUN',real_LINE:'NOT_RUN'};
  writeFileSync(out+'/UI_READBACK.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }finally{await browser?.close();await new Promise(r=>server.close(r));await db.close();}

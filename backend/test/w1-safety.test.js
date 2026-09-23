@@ -5,7 +5,7 @@ import {W1Store} from '../src/w1/store.js';
 import {W1Service} from '../src/w1/service.js';
 import {migrateW1} from '../src/w1/schema.js';
 import {detectSafety,standardSafety,safetyDelivery,createSafetyClassifier} from '../src/w1/safety.js';
-test('SAFETY_BYPASS at zero quota: SR only, no reserve, no model, immutable entitlement rows',async()=>{
+test('crisis at zero quota: safety model route, no reserve, charge 0, immutable entitlement rows; adopted fallback if the model fails',async()=>{
  const db=new PGlite();const query=async(s,a)=>a===undefined?(await db.exec(s)).at(-1):db.query(s,a);
  const pool={query,connect:async()=>({query,release(){}})};await migrateW1(pool);
  const store=new W1Store(pool),subject='U'+'c'.repeat(32);
@@ -14,15 +14,21 @@ test('SAFETY_BYPASS at zero quota: SR only, no reserve, no model, immutable enti
  await query('UPDATE w1.test_grants SET used=1');
  const snapshot=async()=>JSON.stringify([(await query('SELECT * FROM w1.test_grants')).rows,(await query('SELECT * FROM w1.entitlements')).rows]);
  const before=await snapshot();let calls=0;
- const service=new W1Service({store,generate:async()=>{calls++;throw new Error('MUST_NOT_CALL');},buildPrompt:async()=>({}),push:async()=>{}});
+ const service=new W1Service({store,generate:async()=>{calls++;throw new Error('PROVIDER_DOWN');},buildPrompt:async()=>({}),push:async()=>{}});
  const input={request_id:'safety',ben_gua:'乾為天',bian_gua:'天風姤',dong_yao:1,qigua_time:'2026-09-21T12:00:00+08:00',question_text:'藥已經吞了，我不想活了'};
- const r=await service.create(subject,input);assert.equal(r.state,'completed');assert.equal(r.letter.charge,0);assert.deepEqual(r.letter.sections.map(s=>s.tag),['SR']);assert.match(r.letter.sections[0].text,/1925/);
+ const r=await service.create(subject,input);assert.deepEqual([r.state,r.reused],['queued',false]);
  assert.equal((await service.create(subject,input)).id,r.id);
  await assert.rejects(service.create(subject,{...input,request_id:'normal',question_text:'明天的工作方向'}),/NO_QUOTA/);
  assert.equal(calls,0);assert.equal(await snapshot(),before);
+ await service.tick();
+ const done=await store.get(subject,r.id);
+ assert.deepEqual([done.state,done.charge,done.error_code],['completed',0,'GENERATION_FAILED']);
+ assert.deepEqual(done.output_json.sections.map(s=>s.tag),['SR']);assert.match(done.output_json.sections[0].text,/1925/);
+ assert.ok(done.output_json.sections[0].text.startsWith('請現在就撥【119】或【110】'));
+ assert.equal(calls,1);assert.equal(await snapshot(),before);
  assert.equal((await query('SELECT * FROM w1.reservations')).rows.length,0);
- assert.equal((await query('SELECT * FROM w1.jobs')).rows.length,0);
- assert.equal((await query("SELECT code FROM w1.audit_events WHERE code='SAFETY_BYPASS'")).rows.length,1);
+ assert.equal((await query("SELECT code FROM w1.audit_events WHERE code='SAFETY_MODEL_FALLBACK'")).rows.length,1);
+ assert.equal((await query("SELECT code FROM w1.audit_events WHERE code='SAFETY_BYPASS'")).rows.length,0);
  const raw=standardSafety(detectSafety('我想自殺'));
  for(const bad of [raw.replace('[[END]]','[[J1]]\n完整解卦\n[[END]]'),raw.replaceAll('1925',''),raw.replace('level: crisis','level: green'),raw.replace('你的安全','你的安全，請購買方案')])assert.throws(()=>safetyDelivery(bad),/SAFETY_NO_DELIVERY/);
  assert.equal(detectSafety('我沒有想死，只是工作很累'),null);
@@ -32,7 +38,7 @@ test('SAFETY_BYPASS at zero quota: SR only, no reserve, no model, immutable enti
  service.classifySafety=async(s,q)=>{await store.reserveSafetyCall(s,{campaign:'safety-test',budgetUsd:1,upperUsd:.1,hardCapUsd:1000,reviewStopUsd:1000});return (await classifier(q.question_text)).detection;};
  // Classifier-only positive: safety-only model route (GPT ruling 2026-09-23), queued, no reservation, no model call yet.
  const indirect=await service.create(subject,{...input,request_id:'indirect',question_text:'合成間接危機語意'});
- assert.deepEqual([indirect.state,indirect.reused,indirect.letter],['queued',false,null]);assert.equal(await snapshot(),before);assert.equal(calls,0);
+ assert.deepEqual([indirect.state,indirect.reused,indirect.letter],['queued',false,null]);assert.equal(await snapshot(),before);assert.equal(calls,1);
  assert.equal((await query('SELECT * FROM w1.reservations')).rows.length,0);
  const countBefore=(await query('SELECT * FROM w1.safety_calls')).rows.length;
  assert.equal((await service.create(subject,{...input,request_id:'indirect',question_text:'合成間接危機語意'})).id,indirect.id);

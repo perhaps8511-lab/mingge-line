@@ -10,21 +10,25 @@ export function detectSafety(question) {
   const weak=/(整理保單|安排後事|把事情交代好|寫好遺書|把帳戶密碼留給家人)/.test(q)&&/(公司倒了|倒閉|破產|一無所有|走投無路|失去一切|沒有退路)/.test(q);
   const imminent=/(現在站在橋邊|藥已經吞了|東西都準備好了.*就今晚)/.test(q);
   if(!(weak||imminent||/(不想活|活不下去|輕生|自殺|自殘|傷害自己|想離開這個世界|想死)/.test(q)))return null;
-  // GPT bounded ruling 2026-09-23 (narrow SAFETY_BYPASS). A keyword cannot prove the absence of a
-  // mixed-crisis, caregiver or overseas context, so the fixed template is kept only where v34 itself is
-  // context-free: imminent self-harm, whose first line is the rescue sentence "不論是否涉及他人" — unless
-  // an overseas sign is present. Every other keyword hit goes to the safety-only v34 model route.
-  const overseas=overseasSignal(question);
-  return {level:'crisis',category:'self_harm',imminent,overseas,clear:imminent&&!overseas};
+  // GPT bounded ruling 2026-09-23 (narrow SAFETY_BYPASS). No keyword or regex can prove the absence of a
+  // mixed-crisis, proxy, caregiver or overseas context, so there is no fixed-template bypass: every keyword
+  // hit takes the safety-only v34 model route (the adopted branch is chosen with full context), bounded by a
+  // deadline and backed by the adopted fallback below.
+  return {level:'crisis',category:'self_harm',imminent,overseas:overseasSignal(question)};
 }
-// Broad on purpose (a false positive only costs the model route or a labelled fallback line).
+// Broad on purpose: it only picks the fallback's adopted first line and the gate's overseas exemption (which
+// also needs local-help wording in the output). Common Taiwan platform names are not places.
+const PLATFORMS='LINE|PTT|Dcard|IG|FB|Facebook|Instagram|Google|YouTube|Threads|Discord|Telegram|Twitter|TikTok';
 export function overseasSignal(question) {
-  return /(國外|海外|外國|異國|出國|留學|遊學|打工度假|外派|移民|時差|不在台灣|不在臺灣|美國|日本|英國|加拿大|澳洲|紐西蘭|德國|法國|義大利|西班牙|荷蘭|瑞士|瑞典|歐洲|韓國|新加坡|香港|澳門|中國|大陸|越南|泰國|馬來西亞|菲律賓|印尼|印度|杜拜|東京|大阪|京都|首爾|釜山|上海|北京|深圳|廣州|吉隆坡|曼谷|河內|胡志明|馬尼拉|雅加達|倫敦|巴黎|柏林|慕尼黑|阿姆斯特丹|紐約|洛杉磯|舊金山|西雅圖|波士頓|芝加哥|休士頓|溫哥華|多倫多|雪梨|墨爾本|布里斯本|奧克蘭)/.test(question)||/在\s*[A-Za-z]{3,}/.test(question);
+  return /(國外|海外|外國|異國|出國|留學|遊學|打工度假|外派|移民|時差|不在台灣|不在臺灣|美國|加州|德州|夏威夷|日本|沖繩|英國|加拿大|澳洲|紐西蘭|德國|法國|義大利|西班牙|荷蘭|瑞士|瑞典|歐洲|墨西哥|韓國|新加坡|香港|澳門|中國|大陸|越南|泰國|馬來西亞|菲律賓|印尼|印度|杜拜|東京|大阪|京都|首爾|釜山|上海|北京|深圳|廣州|吉隆坡|曼谷|河內|胡志明|馬尼拉|雅加達|倫敦|巴黎|柏林|慕尼黑|阿姆斯特丹|巴塞隆納|紐約|洛杉磯|舊金山|灣區|西雅圖|波士頓|芝加哥|休士頓|溫哥華|多倫多|雪梨|墨爾本|布里斯本|奧克蘭)/.test(question)||
+    new RegExp(`在\\s*(?!(?:${PLATFORMS})(?![A-Za-z]))[A-Za-z]{3,}`,'i').test(question);
 }
 export function othersSignal(question) {
-  return /(孩子|小孩|兒子|女兒|寶寶|老公|先生|丈夫|太太|老婆|妻子|爸|媽|父親|母親|家人|全家|朋友|同事|室友|他|她)/.test(question)&&
+  return /(孩子|小孩|兒子|女兒|寶寶|老公|先生|丈夫|太太|老婆|妻子|爸|媽|父親|母親|阿嬤|阿公|奶奶|爺爺|外婆|外公|婆婆|公公|弟弟|妹妹|哥哥|姊姊|姐姐|家人|全家|朋友|同事|室友|老闆|主管|前夫|前妻|男友|女友|伴侶|鄰居|同學|老師|他|她)/.test(question)&&
     /(殺|帶走|帶著|一起|別醒|不要醒|醒不來|消失|同歸於盡|傷害|打死|弄死|陪我走)/.test(question);
 }
+// v34 caregiver add-on applies once self-harm crisis is established and the context shows a family carer.
+export function caregiverSignal(question) { return /(照顧|照護|長照|看護|陪病)/.test(question); }
 function v34Source() {
   const bytes=readFileSync(new URL('../../../prompts/jiegua/v34.md',import.meta.url));
   if(createHash('sha256').update(bytes).digest('hex')!=='be08968c3226d55aa963ad7de12c6251f0365887f051f5e7d77b0847d395287a')throw new Error('PROMPT_SHA_MISMATCH');
@@ -41,7 +45,13 @@ export function safetyFallback(question,{imminent=false}={}) {
   for(const line of Object.values(V34_LINES))if(!source.includes(line))throw new Error('SAFETY_STANDARD_MISSING');
   const lead=overseasSignal(question)?`${V34_LINES.overseas}。\n${V34_LINES.taiwanLabel}。\n`:
     imminent?`${V34_LINES.imminent}\n`:othersSignal(question)?`${V34_LINES.mixed}\n`:'';
-  return standardSafety({imminent:false},lead);
+  const text=standardSafety({imminent:false},lead);
+  if(!caregiverSignal(question))return text;
+  // Adopted caregiver sentence, verbatim from the pinned prompt, placed after 「同樣可以陪你。」 as v34 directs.
+  const add=source.match(/「(照顧的重量不該一個人扛。[\s\S]*?喘息與支援。)」/)?.[1];
+  const anchor='同樣可以陪你。\n';
+  if(!add||!text.includes(anchor))throw new Error('SAFETY_STANDARD_MISSING');
+  return text.replace(anchor,`${anchor} ${add.replace(/\n\s*/g,'\n ')}\n`);
 }
 export function standardSafety(detection,leadOverride=null) {
   const source=v34Source();

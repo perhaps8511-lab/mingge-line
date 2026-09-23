@@ -94,7 +94,7 @@ test('actual above reserve is kept as-is, alerts, and blocks further paid work',
   await d.close();
 });
 
-test('P2: created/reused flag is explicit for new generation, new crisis bypass, reuse and existing queued',async()=>{
+test('P2: created/reused flag is explicit for new generation, new crisis route, create-stage fallback, reuse and existing queued',async()=>{
   const {d,store}=await db();await grant(store,'cost-5');
   const service=new W1Service({store,buildPrompt:async()=>({}),push:async()=>{},generate:async()=>{throw new Error('not in this test');}});
   const gen=await service.create(A,input('p1'));
@@ -102,10 +102,15 @@ test('P2: created/reused flag is explicit for new generation, new crisis bypass,
   // Existing queued record repeated: reused, even though its state is still queued.
   const again=await service.create(A,input('p1'));
   assert.deepEqual([again.id,again.state,again.reused],[gen.id,'queued',true]);
-  // New crisis via the imminent keyword bypass: completed immediately, yet it is new work.
+  // New crisis (imminent keyword): safety model route, queued, new work (no template bypass).
   const crisis=await service.create(A,input('p2','藥已經吞了，我不想活了'));
-  assert.deepEqual([crisis.state,crisis.reused],['completed',false]);
+  assert.deepEqual([crisis.state,crisis.reused],['queued',false]);
   assert.equal((await service.create(A,input('p2','藥已經吞了，我不想活了'))).reused,true);
+  // Create-stage fallback (no runtime bound): completed immediately, yet it is new work.
+  const bare=new W1Service({store,buildPrompt:async()=>({}),push:async()=>{}});
+  const fb=await bare.create(A,input('p4','我不想活了'));
+  assert.deepEqual([fb.state,fb.reused],['completed',false]);assert.equal(isNewWork(fb),true);
+  assert.equal((await bare.create(A,input('p4','我不想活了'))).reused,true);
   // Non-imminent crisis takes the safety model route: queued, new work, no reservation.
   const routed=await service.create(A,input('p3','我不想活了'));
   assert.deepEqual([routed.state,routed.reused],['queued',false]);assert.equal(isNewWork(routed),true);
