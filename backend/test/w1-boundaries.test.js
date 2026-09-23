@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign, randomUUID, createHmac, createHash } from 'node:crypto';
 import { createSubjectVerifier, postgresJtiConsumer } from '../src/w1/subject.js';
+import { createW1Server } from '../src/w1/http.js';
 import { createLegacyReader, mergeRecords } from '../src/w1/legacy.js';
 import { verifyLineWebhook } from '../src/w1/line-webhook.js';
 import { A11, BASIS, readthroughAdmission } from '../src/w1/admission.js';
@@ -53,6 +54,56 @@ test('identity in body, nested fields or query is rejected, not ignored', async 
 test('JTI store outage and non-boolean success cannot authenticate', async () => {
   for (const consume of [async () => { throw new Error('PRIVATE_MARKER'); }, async () => 1]) {
     await assert.rejects(verifier(consume)(request(token())), { message: 'UNAUTHORIZED' });
+  }
+});
+test('auth diagnostics use fixed reasons while HTTP response stays generic', async () => {
+  const kid = 'synthetic-kid';
+  const auth = createSubjectVerifier({ publicKey: publicPem, kid, clock: () => 1010000, consumeJti: async () => true });
+  const header = { alg: 'EdDSA', typ: 'JWT', kid };
+  const valid = token({}, privateKey, header);
+  const other = generateKeyPairSync('ed25519');
+  const cases = [
+    [{ token: undefined, requestId: 'request-a', body: {} }, 'AUTH_TOKEN_MISSING'],
+    [{ token: 'PRIVATE_TOKEN_MARKER', requestId: 'request-a', body: {} }, 'AUTH_JWT_FORMAT_INVALID'],
+    [{ token: token({}, privateKey, { ...header, kid: 'wrong-kid' }), requestId: 'request-a', body: {} }, 'AUTH_KID_MISMATCH'],
+    [{ token: token({}, other.privateKey, header), requestId: 'request-a', body: {} }, 'AUTH_SIGNATURE_INVALID'],
+    [{ token: token({ iat: 1020 }, privateKey, header), requestId: 'request-a', body: {} }, 'AUTH_CLAIMS_TIME_INVALID'],
+  ];
+  for (const [input, reason] of cases) {
+    await assert.rejects(auth(input), error => {
+      assert.equal(error.message, 'UNAUTHORIZED');
+      assert.equal(error.status, 401);
+      assert.equal(error.authReasonCode, reason);
+      assert.doesNotMatch(error.message, /PRIVATE_TOKEN_MARKER/);
+      assert.doesNotMatch(error.stack, /PRIVATE_TOKEN_MARKER/);
+      return true;
+    });
+  }
+  const jtiStorageFailure = createSubjectVerifier({ publicKey: publicPem, kid, clock: () => 1010000,
+    consumeJti: async () => { throw new Error('PRIVATE_STORAGE_MARKER'); } });
+  await assert.rejects(jtiStorageFailure({ token: valid, requestId: 'request-a', body: {} }), error => {
+    assert.equal(error.message, 'UNAUTHORIZED');
+    assert.equal(error.authReasonCode, 'AUTH_JTI_STORAGE_ERROR');
+    assert.doesNotMatch(error.stack, /PRIVATE_STORAGE_MARKER/);
+    return true;
+  });
+  const replayed = createSubjectVerifier({ publicKey: publicPem, kid, clock: () => 1010000, consumeJti: async () => false });
+  await assert.rejects(replayed({ token: valid, requestId: 'request-a', body: {} }), { authReasonCode: 'AUTH_JTI_REJECTED' });
+
+  const events = [];
+  const server = createW1Server({ service: { store: { hasOwnerBinding: async () => false } }, authenticate: auth,
+    log: event => events.push(event) });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/quota`, {
+      headers: { 'X-Mingge-Request-Id': 'request-a' },
+    });
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), { error: 'UNAUTHORIZED' });
+    assert.deepEqual(events, [{ error_code: 'AUTH_TOKEN_MISSING', status: 401 }]);
+    assert.doesNotMatch(JSON.stringify(events), /PRIVATE_TOKEN_MARKER|PRIVATE_STORAGE_MARKER/);
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
 });
 test('Postgres replay adapter uses atomic conflict insert and bound values', async () => {

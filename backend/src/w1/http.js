@@ -2,6 +2,7 @@ import http from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { recordView } from './service.js';
 import { mergeRecords } from './legacy.js';
+import { isAuthReasonCode } from './subject.js';
 const json=(res,status,body)=>{
   res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',
     'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'});res.end(JSON.stringify(body));
@@ -62,7 +63,9 @@ export function createW1Server({service,authenticate,legacyReader=null,enrollmen
     } catch(e) {
       const code=allowedCodes.has(e.message)?e.message:'SERVICE_UNAVAILABLE';
       const status=Number.isInteger(e.status)&&e.status>=400&&e.status<=599?e.status:503;
-      log({error_code:code,status}); return json(res,status,{error:code});
+      const logCode=isAuthReasonCode(e.authReasonCode)?e.authReasonCode:code;
+      log({error_code:logCode,status});
+      return json(res,status,{error:code});
     }
   });
 }
