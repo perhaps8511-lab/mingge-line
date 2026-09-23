@@ -49,11 +49,11 @@ export async function subjectToken(subject,requestId,source,env) {
 export async function verifyAccessToken(token,channelId,fetchImpl=fetch) {
   if(!token)throw authError('MISSING_LINE_TOKEN');if(!channelId)throw authError('LINE_CONFIG_MISSING');
   const verifyUrl=new URL('https://api.line.me/oauth2/v2.1/verify');verifyUrl.searchParams.set('access_token',token);
-  let a;try{a=await fetchImpl(verifyUrl,{redirect:'error',signal:AbortSignal.timeout(10000)});}catch{throw authError('LINE_VERIFY_FETCH_FAILED');}
+  let a;try{a=await fetchImpl(verifyUrl,{redirect:'manual',signal:AbortSignal.timeout(10000)});}catch{throw authError('LINE_VERIFY_FETCH_FAILED');}
   if(!a.ok)throw authError(await verifyRejectCode(a));
   let info;try{info=await a.json();}catch{throw authError('LINE_VERIFY_BODY_INVALID');}
   if(info.client_id!==channelId)throw authError('LINE_AUDIENCE_MISMATCH');if(!(info.expires_in>0))throw authError('LINE_EXPIRED');
-  let p;try{p=await fetchImpl('https://api.line.me/v2/profile',{headers:{Authorization:`Bearer ${token}`},redirect:'error',signal:AbortSignal.timeout(10000)});}catch{throw authError('LINE_PROFILE_HTTP_REJECTED');}
+  let p;try{p=await fetchImpl('https://api.line.me/v2/profile',{headers:{Authorization:`Bearer ${token}`},redirect:'manual',signal:AbortSignal.timeout(10000)});}catch{throw authError('LINE_PROFILE_HTTP_REJECTED');}
   if(!p.ok)throw authError('LINE_PROFILE_HTTP_REJECTED');let profile;try{profile=await p.json();}catch{throw authError('LINE_PROFILE_INVALID');}
   if(!/^U[0-9a-f]{32}$/.test(profile.userId))throw authError('LINE_PROFILE_INVALID');return profile.userId;
 }
@@ -70,10 +70,13 @@ async function forward(subject,requestId,source,method,path,body,env,extra={}) {
   const target=new URL(env.W1_API_ORIGIN);
   if(target.protocol!=='https:'||target.pathname!=='/'||target.username||target.password)throw authError('API_FORWARD_FAILED');
   const signed=await subjectToken(subject,requestId,source,env);
-  try{return await fetch(new URL(path,target),{method,redirect:'error',signal:AbortSignal.timeout(20000),
+  // Workers reject redirect:'error'; 'manual' never follows, and any 3xx is treated as failure.
+  let response;try{response=await fetch(new URL(path,target),{method,redirect:'manual',signal:AbortSignal.timeout(20000),
     headers:{'Content-Type':'application/json','X-Mingge-Subject-Token':signed,'X-Mingge-Request-Id':requestId,...extra},
     ...(method==='POST'?{body:JSON.stringify(body)}:{}),
   });}catch{throw authError('API_FORWARD_FAILED');}
+  if(response.status>=300&&response.status<400)throw authError('API_FORWARD_FAILED');
+  return response;
 }
 export default {async fetch(request,env) {
   const origin=request.headers.get('origin');

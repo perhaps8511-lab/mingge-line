@@ -71,3 +71,53 @@ test('LINE verify rejection is split into fixed codes without upstream text',asy
     });
   }
 });
+
+// Workers runtime throws TypeError on redirect:'error' (Node does not), so lock 'manual' explicitly.
+async function signedEnv() {
+  const pair=await crypto.subtle.generateKey({name:'Ed25519'},true,['sign','verify']);
+  const pkcs8=Buffer.from(await crypto.subtle.exportKey('pkcs8',pair.privateKey)).toString('base64');
+  return {...env,W1_SUBJECT_KID:'synthetic-kid',W1_SUBJECT_PRIVATE_KEY_PKCS8:pkcs8};
+}
+const SUBJECT='U'+'0'.repeat(32);
+function lineOk(input,init,calls,apiResponse) {
+  calls.push({url:String(input),redirect:init?.redirect});
+  if(String(input).startsWith('https://api.line.me/oauth2/v2.1/verify?'))return Response.json({client_id:'expected',expires_in:100});
+  if(String(input)==='https://api.line.me/v2/profile')return Response.json({userId:SUBJECT});
+  return apiResponse();
+}
+
+test('every upstream fetch uses redirect manual and success forwards the API response',async()=>{
+  const signed=await signedEnv(),calls=[];
+  await withConsoleAndFetch(async(input,init)=>lineOk(input,init,calls,()=>Response.json({remaining:3})),async logs=>{
+    const response=await worker.fetch(request(),signed);
+    assert.equal(response.status,200);
+    assert.deepEqual(await response.json(),{remaining:3});
+    assert.equal(calls.length,3);
+    assert.deepEqual(calls.map(c=>c.redirect),['manual','manual','manual']);
+    assert.equal(calls[2].url,'https://api.example.test/quota');
+    assert.deepEqual(logs,[{event:'W1_AUTH_DIAG',route_class:'QUOTA',code:'API_FORWARD_SUCCEEDED',status:200}]);
+    assert.equal(JSON.stringify(logs).includes(SUBJECT),false);
+  });
+});
+
+test('API redirect is not followed or relayed',async()=>{
+  const signed=await signedEnv(),calls=[];
+  await withConsoleAndFetch(async(input,init)=>lineOk(input,init,calls,()=>new Response(null,{status:302,headers:{Location:'https://elsewhere.example.test/'}})),async logs=>{
+    const response=await worker.fetch(request(),signed);
+    assert.equal(response.status,503);
+    assert.deepEqual(await response.json(),{error:'SERVICE_UNAVAILABLE'});
+    assert.equal(response.headers.get('Location'),null);
+    assert.equal(calls.length,3);
+    assert.deepEqual(logs,[{event:'W1_AUTH_DIAG',route_class:'QUOTA',code:'API_FORWARD_FAILED',status:503}]);
+  });
+});
+
+test('LINE verify redirect is rejected, not followed',async()=>{
+  const calls=[];
+  await withConsoleAndFetch(async(input,init)=>{calls.push(init?.redirect);return new Response(null,{status:302,headers:{Location:'https://elsewhere.example.test/'}});},async logs=>{
+    const response=await worker.fetch(request(),env);
+    assert.equal(response.status,503);
+    assert.deepEqual(calls,['manual']);
+    assert.deepEqual(logs,[{event:'W1_AUTH_DIAG',route_class:'QUOTA',code:'LINE_VERIFY_STATUS_4XX',status:503}]);
+  });
+});
