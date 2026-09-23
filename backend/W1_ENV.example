@@ -1,0 +1,33 @@
+# Names only. Inject secrets via provider secret facilities, never commit values.
+# Railway API, root build context (not legacy backend entry):
+W1_ENVIRONMENT=staging
+W1_DATABASE_URL=<isolated-staging-database-secret-reference>
+W1_SUBJECT_PUBLIC_KEY=<new-staging-public-SPKI-PEM>
+W1_SUBJECT_KID=<new-staging-kid>
+W1_LIFF_ID=<staging-LIFF-id>
+W1_RELAY_ORIGIN=<https-staging-worker-origin>
+W1_LINE_CHANNEL_ACCESS_TOKEN=<staging-LINE-secret-reference>
+W1_ENROLLMENT_TOKEN=<one-time-random-secret-minimum-32-chars>
+W1_ENROLLMENT_ID=<unique-enrollment-id>
+W1_GRANT_QUOTA=<positive-integer>
+W1_GRANT_EXPIRES_AT=<ISO8601-expiry>
+W1_GEMINI_API_KEY=<staging-provider-secret-reference>
+W1_RUNTIME_BINDING_JSON=<explicit-reviewed-binding-json>
+W1_PROVIDER_CAMPAIGN=<unique-general-campaign>
+W1_PROVIDER_BUDGET_USD=<approved-total>
+W1_PROVIDER_CALL_UPPER_USD=<conservative-upper-bound-per-attempt>
+W1_SAFETY_BINDING_JSON=<separate-reviewed-binding-maxOutputTokens-at-most-512>
+W1_SAFETY_CAMPAIGN=<unique-safety-campaign>
+W1_SAFETY_BUDGET_USD=<independent-approved-total>
+W1_SAFETY_CALL_UPPER_USD=<conservative-upper-bound>
+W1_RETRIEVAL_MODE=B
+W1_LEGACY_READTHROUGH=off
+AIRTABLE_LEGACY_READ_PAT=<dedicated-data.records:read-secret-reference-only>
+W1_LEGACY_PAT_SHA256=<readonly-PAT-sha256>
+W1_LEGACY_EVIDENCE_JSON=<C1-C5-status-and-real-evidence-reference>
+W1_LEGACY_BASE_ID=<approved-base>
+W1_LEGACY_TABLE_ID=<approved-table>
+# Cloudflare new staging worker:
+# W1_ENVIRONMENT, W1_API_ORIGIN, W1_UI_ORIGIN, LINE_CHANNEL_ID, W1_SUBJECT_KID
+# Secrets: W1_SUBJECT_PRIVATE_KEY_PKCS8, LINE_CHANNEL_SECRET
+# Never set private key on Railway. Never log values of any *_TOKEN, *_KEY, PAT.

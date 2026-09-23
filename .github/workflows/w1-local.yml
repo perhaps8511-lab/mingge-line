@@ -1,0 +1,22 @@
+name: W1 isolated local checks
+on:
+  pull_request:
+    paths: ['backend/**', 'prompts/jiegua/**', 'workers/mingge-w1-staging/**', '.github/workflows/w1-local.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+        working-directory: backend
+      - run: npm run w1:test
+        working-directory: backend
+      - run: node --check workers/mingge-w1-staging/worker.js
+      # This workflow deliberately has no deployment or production secrets.
+      # Live A4 and PAT-scope verification are separately evidenced acceptance.
