@@ -15,7 +15,7 @@ test('SAFETY_BYPASS at zero quota: SR only, no reserve, no model, immutable enti
  const snapshot=async()=>JSON.stringify([(await query('SELECT * FROM w1.test_grants')).rows,(await query('SELECT * FROM w1.entitlements')).rows]);
  const before=await snapshot();let calls=0;
  const service=new W1Service({store,generate:async()=>{calls++;throw new Error('MUST_NOT_CALL');},buildPrompt:async()=>({}),push:async()=>{}});
- const input={request_id:'safety',ben_gua:'乾為天',bian_gua:'天風姤',dong_yao:1,qigua_time:'2026-09-21T12:00:00+08:00',question_text:'我不想活了'};
+ const input={request_id:'safety',ben_gua:'乾為天',bian_gua:'天風姤',dong_yao:1,qigua_time:'2026-09-21T12:00:00+08:00',question_text:'藥已經吞了，我不想活了'};
  const r=await service.create(subject,input);assert.equal(r.state,'completed');assert.equal(r.letter.charge,0);assert.deepEqual(r.letter.sections.map(s=>s.tag),['SR']);assert.match(r.letter.sections[0].text,/1925/);
  assert.equal((await service.create(subject,input)).id,r.id);
  await assert.rejects(service.create(subject,{...input,request_id:'normal',question_text:'明天的工作方向'}),/NO_QUOTA/);

@@ -102,10 +102,13 @@ test('P2: created/reused flag is explicit for new generation, new crisis bypass,
   // Existing queued record repeated: reused, even though its state is still queued.
   const again=await service.create(A,input('p1'));
   assert.deepEqual([again.id,again.state,again.reused],[gen.id,'queued',true]);
-  // New crisis: completed immediately via SAFETY_BYPASS, yet it is new work.
-  const crisis=await service.create(A,input('p2','我不想活了'));
+  // New crisis via the imminent keyword bypass: completed immediately, yet it is new work.
+  const crisis=await service.create(A,input('p2','藥已經吞了，我不想活了'));
   assert.deepEqual([crisis.state,crisis.reused],['completed',false]);
-  assert.equal((await service.create(A,input('p2','我不想活了'))).reused,true);
+  assert.equal((await service.create(A,input('p2','藥已經吞了，我不想活了'))).reused,true);
+  // Non-imminent crisis takes the safety model route: queued, new work, no reservation.
+  const routed=await service.create(A,input('p3','我不想活了'));
+  assert.deepEqual([routed.state,routed.reused],['queued',false]);assert.equal(isNewWork(routed),true);
   assert.equal(isNewWork(gen),true);assert.equal(isNewWork(crisis),true);assert.equal(isNewWork(again),false);
   assert.throws(()=>isNewWork({state:'queued'}),/CREATE_FLAG_MISSING/);
   await d.close();

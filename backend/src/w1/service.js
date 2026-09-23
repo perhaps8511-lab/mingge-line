@@ -1,6 +1,9 @@
 import { generateChecked } from './delivery.js';
-import {detectSafety,standardSafety,safetyDelivery} from './safety.js';
+import {detectSafety,standardSafety,safetyDelivery,safetyFallback,SAFETY_COMMERCE} from './safety.js';
 const fail=(code,status=503)=>Object.assign(new Error(code),{status});
+// Safety model route accepts only a crisis [[SR]] without commerce/URL (v34 crisis iron rules; ruling C.5).
+const safetyRouteAccept=v=>[...(v.hasSR?[]:['SAFETY_ROUTE_NOT_SR']),...(v.meta.level==='crisis'?[]:['SAFETY_ROUTE_NOT_CRISIS']),
+  ...(v.hasSR&&SAFETY_COMMERCE.test(v.segments.SR??'')?['SAFETY_ROUTE_COMMERCE']:[])];
 export function validateInput(body) {
   const keys=['request_id','ben_gua','bian_gua','dong_yao','qigua_time','question_text','session_id'];
   if (!body || Object.keys(body).some(k=>!keys.includes(k)) ||
@@ -25,9 +28,9 @@ export class W1Service {
     validateInput(body);
     // reused tells a runner whether this request triggered new work; it never changes the record.
     const old=await this.store.existingRequest(subject,body);if(old)return {...recordView(old),reused:true};
-    // Narrow SAFETY_BYPASS (GPT bounded ruling 2026-09-23): the fixed v34 self-harm template is used only
-    // for clear keyword self-harm. Keyword hits with mixed/overseas signs and classifier-only positives go
-    // to the safety-only model route, where the adopted v34 branch is produced and gated (charge 0).
+    // Narrow SAFETY_BYPASS (GPT bounded ruling 2026-09-23): the fixed v34 template only for imminent keyword
+    // self-harm without an overseas sign (v34's context-free rescue-first branch). All other keyword hits and
+    // classifier-only positives take the safety-only model route (adopted v34 branch, gated, charge 0).
     const keyword=detectSafety(body.question_text);
     if(keyword?.clear) {
       if(!await this.store.isOwnerTestGrant(subject))throw fail('OWNER_GRANT_REQUIRED',403);
@@ -50,18 +53,22 @@ export class W1Service {
   }
   async tick() {
     await this.store.detectExpiredClaims();
+    // Expired safety-route generations get the adopted fallback, never "unknown" with no resource.
+    for(const row of await this.store.expiredSafetyJobs())
+      await this.safetyFallback(row,'GENERATION_UNRESOLVED',{route:'SAFETY_MODEL',runtime_revision:this.manifest?.source_revision??null});
     const pending=await this.store.nextPendingPush();
     if(pending){await this.repush(pending.subject,pending.id);return true;}
     if(!this.generate) return false;
     const row=await this.store.claim(); if(!row) return false;
     const route=await this.store.routeOf(row.id);
     const safetyRoute=route==='SAFETY_MODEL';
-    const settle=(r,code,ev)=>safetyRoute?this.store.settleSafetyModel(row.id,r,code,ev):this.store.settle(row.id,r,code,ev);
     const base={route,runtime_revision:this.manifest?.source_revision??null};
-    // Inconsistent route markers never generate: fail closed on whichever settlement applies.
+    // Inconsistent route markers never generate: fail closed on whichever settlement applies, and always
+    // reach a terminal state.
     if(route==='UNKNOWN'){
       await this.store.alert(row.id,'ROUTE_UNKNOWN',base);
-      if(!await this.store.settle(row.id,null,'ROUTE_UNKNOWN',base))await this.store.settleSafetyModel(row.id,null,'ROUTE_UNKNOWN',base);
+      if(!await this.store.settle(row.id,null,'ROUTE_UNKNOWN',base)&&!await this.store.settleSafetyModel(row.id,null,'ROUTE_UNKNOWN',base))
+        await this.store.failStuck(row.id,'ROUTE_UNKNOWN');
       return true;
     }
     let result,last=null;
@@ -69,18 +76,37 @@ export class W1Service {
       const prompt=await this.buildPrompt(row.input_json);
       result=await generateChecked(attempt=>this.generate({prompt,recordId:row.id,attempt}),
         (code,detail)=>{last={...base,...detail};return this.store.alert(row.id,code,last);},
-        safetyRoute?{accept:v=>v.hasSR?[]:['SAFETY_ROUTE_NOT_SR']}:{});
+        safetyRoute?{accept:safetyRouteAccept}:{});
     } catch(e) {
       // Budget stops keep their own code so a runner can halt instead of scoring them as failures.
       const code=['COST_HARD_CAP_REACHED','COST_REVIEW_STOP_REACHED','COST_RESERVE_EXCEEDED','PROVIDER_BUDGET_EXHAUSTED'].includes(e?.message)?e.message:'GENERATION_FAILED';
-      await settle(null,code,last??base); return true;
+      const evidence={...(last??base),failure_code:/^[A-Z0-9_]{2,64}$/.test(e?.message??'')?e.message:'UNCLASSIFIED'};
+      if(safetyRoute){await this.safetyFallback(row,code,evidence);return true;}
+      await this.store.settle(row.id,null,code,evidence); return true;
     }
+    result.output.runtime={...result.output.runtime,...base};
     // If persistence fails, leave the reservation unresolved. Never publish or
     // classify a DB failure as an ordinary generated failure and overwrite it.
-    if(!await settle(result))return true;
+    if(!await (safetyRoute?this.store.settleSafetyModel(row.id,result):this.store.settle(row.id,result)))return true;
     await this.store.get(row.subject,row.id); // owning-store readback before push
     await this.repush(row.subject,row.id);
     return true;
+  }
+  // Safety net for the safety-only model route: the adopted v34 self-harm standard response with the
+  // adopted first line the context calls for (overseas / imminent / mixed). Charge 0, pushed like any SR.
+  async safetyFallback(row,cause,evidence) {
+    let result;
+    try {
+      const detection=await this.store.classifierDetection(row.subject,row.request_id);
+      const imminent=detection?.imminent===true||detectSafety(row.input_json.question_text)?.imminent===true;
+      result=safetyDelivery(safetyFallback(row.input_json.question_text,{imminent}),'SAFETY_FALLBACK');
+      result.output.runtime={...result.output.runtime,...evidence,route:'SAFETY_FALLBACK',fallback_cause:cause};
+    } catch {
+      await this.store.settleSafetyModel(row.id,null,cause,evidence);return;
+    }
+    if(!await this.store.settleSafetyModel(row.id,result))return;
+    await this.store.alert(row.id,'SAFETY_MODEL_FALLBACK',{cause,runtime_revision:evidence?.runtime_revision??null});
+    await this.repush(row.subject,row.id);
   }
   async repush(subject,id) {
     const row=await this.store.claimPush(subject,id);

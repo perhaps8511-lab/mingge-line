@@ -119,7 +119,10 @@ export class W1Store {
   }
   async claim() {
     return this.tx(async c => {
-      const {rows} = await c.query(`SELECT record_id FROM w1.jobs WHERE state='pending' ORDER BY record_id LIMIT 1 FOR UPDATE SKIP LOCKED`);
+      // Safety model route (crisis) jobs are claimed before ordinary letters.
+      const {rows} = await c.query(`SELECT j.record_id FROM w1.jobs j WHERE j.state='pending'
+        ORDER BY EXISTS(SELECT 1 FROM w1.audit_events a WHERE a.record_id=j.record_id AND a.code='SAFETY_MODEL_QUEUED') DESC,
+        j.record_id LIMIT 1 FOR UPDATE OF j SKIP LOCKED`);
       if (!rows.length) return null;
       const id=rows[0].record_id;
       await c.query("UPDATE w1.jobs SET state='claimed',claimed_at=now() WHERE record_id=$1",[id]);
@@ -286,10 +289,33 @@ export class W1Store {
       candidatesTokenCount:x.candidates_tokens,thoughtsTokenCount:x.thoughts_tokens,actual_usd:x.actual_usd===null?null:Number(x.actual_usd),settled:!!x.settled_at});
     return {generation_attempts:attempts.map(a=>({attempt:a.attempt,...row(a)})),safety_classification:safety?row(safety):null};
   }
+  async expiredSafetyJobs() {
+    return (await this.pool.query(`SELECT r.id,r.subject,r.request_id,r.input_json FROM w1.gua_records r
+      WHERE r.state='generating' AND r.started_at<now()-interval '720 seconds'
+      AND EXISTS(SELECT 1 FROM w1.audit_events a WHERE a.record_id=r.id AND a.code='SAFETY_MODEL_QUEUED')
+      AND NOT EXISTS(SELECT 1 FROM w1.reservations x WHERE x.record_id=r.id)`)).rows;
+  }
+  // Classifier result cached for this request (imminent flag for the fallback lead line).
+  async classifierDetection(subject,requestId) {
+    return (await this.pool.query('SELECT result_json FROM w1.safety_calls WHERE subject=$1 AND request_id=$2',[subject,requestId])).rows[0]?.result_json?.detection??null;
+  }
+  // Last-resort terminal state for a claimed record no settlement path accepts (route markers inconsistent
+  // with the reservation state). Charge and entitlement are never changed here.
+  async failStuck(id,code) {
+    return this.tx(async c=>{
+      const u=await c.query("UPDATE w1.gua_records SET state='failed',push_state='not_ready',completed_at=now(),error_code=$2 WHERE id=$1 AND state='generating' RETURNING id",[id,code]);
+      if(!u.rowCount)return false;
+      await c.query("UPDATE w1.jobs SET state='done' WHERE record_id=$1",[id]);
+      await c.query('INSERT INTO w1.audit_events(id,record_id,code,reason) VALUES($1,$2,$3,$4)',[randomUUID(),id,'ROUTE_UNKNOWN_FAILED',JSON.stringify({error_code:code})]);
+      return true;
+    });
+  }
   async claimSlowNotice() {
     return (await this.pool.query(`UPDATE w1.gua_records SET slow_notified=true WHERE id=(
-      SELECT id FROM w1.gua_records WHERE state='generating' AND slow_notified=false
-      AND started_at<now()-interval '90 seconds' ORDER BY started_at LIMIT 1)
+      SELECT r.id FROM w1.gua_records r WHERE r.state='generating' AND r.slow_notified=false
+      AND r.started_at<now()-interval '90 seconds'
+      AND NOT EXISTS(SELECT 1 FROM w1.audit_events a WHERE a.record_id=r.id AND a.code='SAFETY_MODEL_QUEUED')
+      ORDER BY r.started_at LIMIT 1)
       AND slow_notified=false RETURNING *`)).rows[0]??null;
   }
   async detectExpiredClaims() {
@@ -300,15 +326,9 @@ export class W1Store {
       await this.tx(async c=>{
         const {rows}=await c.query('SELECT * FROM w1.reservations WHERE record_id=$1 FOR UPDATE',[id]);
         const r=rows[0];
-        if(!r){
-          // Safety model route holds no reservation: mark the unresolved provider outcome, charge 0.
-          const marked=(await c.query("SELECT 1 FROM w1.audit_events WHERE record_id=$1 AND code='SAFETY_MODEL_QUEUED'",[id])).rows.length>0;
-          if(!marked)return;
-          await c.query("UPDATE w1.gua_records SET state='generation_unknown',charge=0,error_code='GENERATION_UNRESOLVED' WHERE id=$1 AND state='generating'",[id]);
-          await c.query("UPDATE w1.jobs SET state='unknown' WHERE record_id=$1",[id]);
-          await this.audit(c,'GENERATION_UNRESOLVED',id);
-          return;
-        }
+        // Safety model route holds no reservation; its expiry is settled by the service fallback
+        // (expiredSafetyJobs), so a crisis-routed user is never left with no safety resource.
+        if(!r)return;
         if(r.state!=='reserved')return;
         await c.query(`UPDATE ${sourceTable(r.source_kind)} SET reserved=reserved-1 WHERE id=$1`,[r.source_id]);
         await c.query("UPDATE w1.reservations SET state='released' WHERE record_id=$1",[id]);

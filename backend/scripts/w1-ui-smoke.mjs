@@ -58,7 +58,7 @@ try {
  const beforeSafety=JSON.stringify((await pool.query('SELECT * FROM w1.test_grants')).rows);
  await page.reload();await page.click('#login');await page.waitForFunction(()=>document.getElementById('quota').textContent.includes('0'));
  await page.locator('#cast').hover();await page.mouse.down();await page.waitForTimeout(650);await page.mouse.up();
- await page.fill('#question','我不想活了');await page.click('#send');
+ await page.fill('#question','藥已經吞了，我不想活了');await page.click('#send');
  await page.waitForFunction(()=>document.getElementById('letter').textContent.includes('1925'));
  await page.waitForFunction(()=>document.getElementById('quota').hidden&&document.getElementById('payment').textContent==='');
  assert.equal(JSON.stringify((await pool.query('SELECT * FROM w1.test_grants')).rows),beforeSafety);
