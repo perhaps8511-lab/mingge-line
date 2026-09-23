@@ -40,7 +40,7 @@ test('staging Worker signs a fresh key; backend verifies kid and verified subjec
  const verify=createSubjectVerifier({publicKey:publicKey.export({type:'spki',format:'pem'}),kid:'synthetic-kid',consumeJti:async()=>true});
  assert.equal((await verify({token,requestId:'r1'})).subject,subject);
  await assert.rejects(createSubjectVerifier({publicKey:publicKey.export({type:'spki',format:'pem'}),kid:'wrong',consumeJti:async()=>true})({token,requestId:'r1'}),/UNAUTHORIZED/);
- await assert.rejects(verifyAccessToken('synthetic','expected',async()=>({ok:true,json:async()=>({client_id:'wrong',expires_in:100})})),/UNAUTHORIZED/);
+ await assert.rejects(verifyAccessToken('synthetic','expected',async()=>({ok:true,json:async()=>({client_id:'wrong',expires_in:100})})),/LINE_AUDIENCE_MISMATCH/);
  assert.equal(await verifyWebhook(new Uint8Array([1]),'bad','synthetic'),false);
 });
 test('A14 is only UI for full green/yellow letters; failure contains no W2 promise',()=>{
