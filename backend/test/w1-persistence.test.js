@@ -21,8 +21,8 @@ test('owning-store close/reopen, 384 seed readback, durable replay and budget gu
   await store.grant(subject,{quota:2,expiresAt:new Date(Date.now()+3600000).toISOString(),enrollmentId:'disk-enroll'});
   const input={request_id:'disk-one',ben_gua:'乾為天',bian_gua:'天風姤',dong_yao:1,qigua_time:'2026-09-21T12:00:00+08:00',question_text:'SYNTHETIC_DISK_MARKER'};
   const record=await store.create(subject,input);await store.claim();
-  await store.reserveProviderCall(record.id,0,{campaign:'synthetic',budgetUsd:1,upperUsd:.5,hardCapUsd:1000});
-  await assert.rejects(store.reserveProviderCall(record.id,1,{campaign:'synthetic',budgetUsd:1,upperUsd:.5,hardCapUsd:1000}),/PROVIDER_BUDGET_EXHAUSTED/);
+  await store.reserveProviderCall(record.id,0,{campaign:'synthetic',budgetUsd:1,upperUsd:.5,hardCapUsd:1000,reviewStopUsd:1000});
+  await assert.rejects(store.reserveProviderCall(record.id,1,{campaign:'synthetic',budgetUsd:1,upperUsd:.5,hardCapUsd:1000,reviewStopUsd:1000}),/PROVIDER_BUDGET_EXHAUSTED/);
   await store.settle(record.id,null,'SYNTHETIC_FAILURE');
   await db.close();db=new PGlite(dir);const reopened=new W1Store(connect(db));
   const read=await reopened.get(subject,record.id);assert.equal(read.input_json.question_text,'SYNTHETIC_DISK_MARKER');

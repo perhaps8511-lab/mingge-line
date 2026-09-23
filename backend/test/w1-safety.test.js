@@ -29,7 +29,7 @@ test('SAFETY_BYPASS at zero quota: SR only, no reserve, no model, immutable enti
  assert.equal(detectSafety('照顧很累，想請人輪班'),null);
  assert.equal(await snapshot(),before);
  const classifier=createSafetyClassifier(async({prompt})=>{assert.doesNotMatch(prompt.system,/J1/);return {text:'{"self_harm":true,"imminent":false}',finishReason:'STOP',runtime:{synthetic:true}};});
- service.classifySafety=async(s,q)=>{await store.reserveSafetyCall(s,{campaign:'safety-test',budgetUsd:1,upperUsd:.1,hardCapUsd:1000});return (await classifier(q.question_text)).detection;};
+ service.classifySafety=async(s,q)=>{await store.reserveSafetyCall(s,{campaign:'safety-test',budgetUsd:1,upperUsd:.1,hardCapUsd:1000,reviewStopUsd:1000});return (await classifier(q.question_text)).detection;};
  const indirect=await service.create(subject,{...input,request_id:'indirect',question_text:'合成間接危機語意'});
  assert.equal(indirect.letter.charge,0);assert.equal(await snapshot(),before);assert.equal(calls,0);
  const countBefore=(await query('SELECT * FROM w1.safety_calls')).rows.length;
@@ -38,12 +38,12 @@ test('SAFETY_BYPASS at zero quota: SR only, no reserve, no model, immutable enti
  assert.equal((await query('SELECT * FROM w1.safety_calls')).rows.length,countBefore);
  const malformed=createSafetyClassifier(async()=>({text:'[[J1]] 完整解卦',finishReason:'STOP'}));
  await assert.rejects(malformed('synthetic'),/SAFETY_CLASSIFICATION_INVALID/);
- for(let i=0;i<5;i++)await store.reserveSafetyCall(subject,{campaign:'safety-test',budgetUsd:1,upperUsd:.1,hardCapUsd:1000});
- await assert.rejects(store.reserveSafetyCall(subject,{campaign:'safety-test',budgetUsd:1,upperUsd:.1,hardCapUsd:1000}),/SAFETY_BUDGET_EXHAUSTED/);
+ for(let i=0;i<5;i++)await store.reserveSafetyCall(subject,{campaign:'safety-test',budgetUsd:1,upperUsd:.1,hardCapUsd:1000,reviewStopUsd:1000});
+ await assert.rejects(store.reserveSafetyCall(subject,{campaign:'safety-test',budgetUsd:1,upperUsd:.1,hardCapUsd:1000,reviewStopUsd:1000}),/SAFETY_BUDGET_EXHAUSTED/);
  assert.equal((await query('SELECT * FROM w1.provider_calls')).rows.length,0);
  assert.equal(await snapshot(),before);
  const other='U'+'d'.repeat(32);await store.grant(other,{quota:1,expiresAt:new Date(Date.now()+3600000).toISOString(),enrollmentId:'other-safety'});
- const budget={campaign:'other',budgetUsd:1,upperUsd:.1,hardCapUsd:1000},body={request_id:'same',question_text:'synthetic'};
+ const budget={campaign:'other',budgetUsd:1,upperUsd:.1,hardCapUsd:1000,reviewStopUsd:1000},body={request_id:'same',question_text:'synthetic'};
  const claim=await store.reserveSafetyCall(other,budget,body);
  await assert.rejects(store.reserveSafetyCall(other,budget,body),/SAFETY_CLASSIFICATION_UNRESOLVED/);
  await assert.rejects(store.reserveSafetyCall(other,budget,{...body,question_text:'changed'}),/REQUEST_CONTENT_CONFLICT/);

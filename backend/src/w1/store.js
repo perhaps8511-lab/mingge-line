@@ -60,13 +60,13 @@ export class W1Store {
   }
   async create(subject, input) {
     const hash = createHash('sha256').update(JSON.stringify(canonical(input))).digest('hex');
-    const id = await this.tx(async c => {
+    const {id,reused} = await this.tx(async c => {
       // Locks the subject across both entitlement sources and request IDs.
       await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[subject]);
       const existing = await c.query('SELECT id,input_sha FROM w1.gua_records WHERE subject=$1 AND request_id=$2',[subject,input.request_id]);
       if (existing.rows.length) {
         if (existing.rows[0].input_sha !== hash) throw fail('REQUEST_CONTENT_CONFLICT',409);
-        return existing.rows[0].id;
+        return {id:existing.rows[0].id,reused:true};
       }
       let source;
       for (const kind of ['entitlements','test_grants']) {
@@ -81,13 +81,13 @@ export class W1Store {
       await c.query(`UPDATE ${sourceTable(source.kind)} SET reserved=reserved+1 WHERE id=$1`,[source.row.id]);
       await c.query('INSERT INTO w1.reservations(record_id,source_kind,source_id) VALUES($1,$2,$3)',[recordId,source.kind,source.row.id]);
       await c.query('INSERT INTO w1.jobs(record_id) VALUES($1)',[recordId]);
-      await this.audit(c,'RESERVED',recordId); return recordId;
+      await this.audit(c,'RESERVED',recordId); return {id:recordId,reused:false};
     });
     // Independent post-commit readback; failure never becomes a saved promise.
     try {
       const row = await this.get(subject,id);
       if (row.input_sha !== hash) throw fail('WRITE_UNCONFIRMED');
-      return {...row,readback_verified:true};
+      return {...row,readback_verified:true,reused};
     } catch { throw fail('WRITE_UNCONFIRMED'); }
   }
   async get(subject,id) {
@@ -99,19 +99,19 @@ export class W1Store {
     const {safetyDelivery}=await import('./safety.js');
     result=safetyDelivery(result.output.text);
     const hash=createHash('sha256').update(JSON.stringify(canonical(input))).digest('hex');
-    const id=await this.tx(async c=>{
+    const {id,reused}=await this.tx(async c=>{
       await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[subject]);
       const previous=(await c.query('SELECT id,input_sha FROM w1.gua_records WHERE subject=$1 AND request_id=$2',[subject,input.request_id])).rows[0];
-      if(previous){if(previous.input_sha!==hash)throw fail('REQUEST_CONTENT_CONFLICT',409);return previous.id;}
+      if(previous){if(previous.input_sha!==hash)throw fail('REQUEST_CONTENT_CONFLICT',409);return {id:previous.id,reused:true};}
       const active=await c.query("SELECT id FROM w1.test_grants WHERE subject=$1 AND environment='staging' AND expires_at>now() AND revoked_at IS NULL AND reason='w1_owner_uat' FOR SHARE",[subject]);
       if(!active.rows.length)throw fail('OWNER_GRANT_REQUIRED',403);
       const id=randomUUID();
       await c.query(`INSERT INTO w1.gua_records(id,subject,request_id,input_sha,input_json,push_key,state,output_json,raw_output,runtime_json,charge,notice,push_state,completed_at)
         VALUES($1,$2,$3,$4,$5,$6,'completed',$7,$8,$9,0,'none','pending',now())`,
         [id,subject,input.request_id,hash,JSON.stringify(input),randomUUID(),JSON.stringify(result.delivery),result.output.text,JSON.stringify(result.output.runtime)]);
-      await this.audit(c,'SAFETY_BYPASS',id);return id;
+      await this.audit(c,'SAFETY_BYPASS',id);return {id,reused:false};
     });
-    try {const row=await this.get(subject,id);if(row.input_sha!==hash)throw fail('WRITE_UNCONFIRMED');return {...row,readback_verified:true};}
+    try {const row=await this.get(subject,id);if(row.input_sha!==hash)throw fail('WRITE_UNCONFIRMED');return {...row,readback_verified:true,reused};}
     catch {throw fail('WRITE_UNCONFIRMED');}
   }
   async list(subject) {
@@ -153,13 +153,13 @@ export class W1Store {
   async nextPendingPush() {
     return (await this.pool.query("SELECT id,subject FROM w1.gua_records WHERE state='completed' AND push_state='pending' ORDER BY completed_at LIMIT 1")).rows[0]??null;
   }
-  async reserveProviderCall(recordId,attempt,{campaign,budgetUsd,upperUsd,hardCapUsd}) {
-    if(typeof campaign!=='string'||!campaign||!Number.isFinite(budgetUsd)||!Number.isFinite(upperUsd)||upperUsd<=0||budgetUsd<=0||!Number.isFinite(hardCapUsd)||hardCapUsd<=0)throw fail('PROVIDER_BUDGET_REQUIRED');
+  async reserveProviderCall(recordId,attempt,{campaign,budgetUsd,upperUsd,hardCapUsd,reviewStopUsd}) {
+    if(typeof campaign!=='string'||!campaign||!Number.isFinite(budgetUsd)||!Number.isFinite(upperUsd)||upperUsd<=0||budgetUsd<=0||!Number.isFinite(hardCapUsd)||hardCapUsd<=0||!Number.isFinite(reviewStopUsd)||reviewStopUsd<=0||reviewStopUsd>hardCapUsd)throw fail('PROVIDER_BUDGET_REQUIRED');
     await this.tx(async c=>{
       await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['provider:'+campaign]);
       const used=Number((await c.query('SELECT COALESCE(sum(COALESCE(actual_usd,reserved_usd)),0) AS used FROM w1.provider_calls WHERE campaign=$1',[campaign])).rows[0].used);
       if(used+upperUsd>budgetUsd*.9)throw fail('PROVIDER_BUDGET_EXHAUSTED');
-      await this.checkHardCap(c,upperUsd,hardCapUsd);
+      await this.checkHardCap(c,upperUsd,hardCapUsd,reviewStopUsd);
       await c.query('INSERT INTO w1.provider_calls(record_id,attempt,campaign,reserved_usd) VALUES($1,$2,$3,$4)',[recordId,attempt,campaign,upperUsd]);
     });
   }
@@ -168,8 +168,8 @@ export class W1Store {
     if(row&&row.input_sha!==createHash('sha256').update(JSON.stringify(canonical(input))).digest('hex'))throw fail('REQUEST_CONTENT_CONFLICT',409);
     return row?{...row,readback_verified:true}:null;
   }
-  async reserveSafetyCall(subject,{campaign,budgetUsd,upperUsd,hardCapUsd},input={request_id:randomUUID()}) {
-    if(!campaign||!Number.isFinite(budgetUsd)||!Number.isFinite(upperUsd)||budgetUsd<=0||upperUsd<=0||!Number.isFinite(hardCapUsd)||hardCapUsd<=0)throw fail('SAFETY_BUDGET_REQUIRED');
+  async reserveSafetyCall(subject,{campaign,budgetUsd,upperUsd,hardCapUsd,reviewStopUsd},input={request_id:randomUUID()}) {
+    if(!campaign||!Number.isFinite(budgetUsd)||!Number.isFinite(upperUsd)||budgetUsd<=0||upperUsd<=0||!Number.isFinite(hardCapUsd)||hardCapUsd<=0||!Number.isFinite(reviewStopUsd)||reviewStopUsd<=0||reviewStopUsd>hardCapUsd)throw fail('SAFETY_BUDGET_REQUIRED');
     return this.tx(async c=>{
       await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['safety:'+campaign]);
       await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['safety-subject:'+subject]);
@@ -181,30 +181,40 @@ export class W1Store {
       const rate=Number((await c.query("SELECT count(*) AS n FROM w1.safety_calls WHERE subject=$1 AND created_at>now()-interval '60 seconds'",[subject])).rows[0].n);
       const spent=Number((await c.query('SELECT COALESCE(sum(COALESCE(actual_usd,reserved_usd)),0) AS n FROM w1.safety_calls WHERE campaign=$1',[campaign])).rows[0].n);
       if(rate>=6||spent+upperUsd>budgetUsd*.9)throw fail('SAFETY_BUDGET_EXHAUSTED',429);
-      await this.checkHardCap(c,upperUsd,hardCapUsd);
+      await this.checkHardCap(c,upperUsd,hardCapUsd,reviewStopUsd);
       const id=randomUUID();await c.query('INSERT INTO w1.safety_calls(id,subject,campaign,reserved_usd,request_id,input_sha) VALUES($1,$2,$3,$4,$5,$6)',[id,subject,campaign,upperUsd,input.request_id,hash]);return {id,cached:false};
     });
   }
   // Owner cost ruling 2026-09-23: one hard cap across provider + safety spend. Settled calls count
   // their actual cost, unsettled calls their full reserve; the lock serializes both reserve paths.
-  async checkHardCap(c,upperUsd,hardCapUsd) {
+  // All gates read the owning store, so a page reload cannot bypass them: a settled call whose
+  // actual exceeded its reserve blocks further paid work until reviewed; reaching the review stop
+  // halts the run for review; the hard cap is never exceeded.
+  async checkHardCap(c,upperUsd,hardCapUsd,reviewStopUsd) {
     await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['w1-cost-hard-cap']);
-    const total=Number((await c.query(`SELECT (SELECT COALESCE(sum(COALESCE(actual_usd,reserved_usd)),0) FROM w1.provider_calls)
-      +(SELECT COALESCE(sum(COALESCE(actual_usd,reserved_usd)),0) FROM w1.safety_calls) AS n`)).rows[0].n);
+    const row=(await c.query(`SELECT (SELECT COALESCE(sum(COALESCE(actual_usd,reserved_usd)),0) FROM w1.provider_calls)
+      +(SELECT COALESCE(sum(COALESCE(actual_usd,reserved_usd)),0) FROM w1.safety_calls) AS n,
+      (SELECT count(*) FROM w1.provider_calls WHERE actual_usd>reserved_usd)+(SELECT count(*) FROM w1.safety_calls WHERE actual_usd>reserved_usd) AS over`)).rows[0];
+    const total=Number(row.n);
+    if(Number(row.over)>0)throw fail('COST_RESERVE_EXCEEDED',429);
+    if(total>=reviewStopUsd)throw fail('COST_REVIEW_STOP_REACHED',429);
     if(total+upperUsd>hardCapUsd)throw fail('COST_HARD_CAP_REACHED',429);
   }
   // Settle once from provider usage; a missing cost keeps the full reserve.
   async settleProviderCall(recordId,attempt,cost) {
     if(!cost)return false;
     const r=await this.pool.query(`UPDATE w1.provider_calls SET prompt_tokens=$3,cached_tokens=$4,candidates_tokens=$5,thoughts_tokens=$6,
-      actual_usd=$7,settled_at=now() WHERE record_id=$1 AND attempt=$2 AND settled_at IS NULL`,
+      actual_usd=$7,settled_at=now() WHERE record_id=$1 AND attempt=$2 AND settled_at IS NULL RETURNING reserved_usd`,
       [recordId,attempt,cost.prompt,cost.cached,cost.candidates,cost.thoughts,cost.usd]);
+    // Actual is recorded as-is, never truncated; exceeding the reserve alerts and trips the gate.
+    if(r.rowCount===1&&cost.usd>Number(r.rows[0].reserved_usd))await this.alert(recordId,'COST_EXCEEDED_RESERVE');
     return r.rowCount===1;
   }
   async settleSafetyCall(id,cost) {
     if(!cost)return false;
     const r=await this.pool.query(`UPDATE w1.safety_calls SET prompt_tokens=$2,cached_tokens=$3,candidates_tokens=$4,thoughts_tokens=$5,
-      actual_usd=$6,settled_at=now() WHERE id=$1 AND settled_at IS NULL`,[id,cost.prompt,cost.cached,cost.candidates,cost.thoughts,cost.usd]);
+      actual_usd=$6,settled_at=now() WHERE id=$1 AND settled_at IS NULL RETURNING reserved_usd`,[id,cost.prompt,cost.cached,cost.candidates,cost.thoughts,cost.usd]);
+    if(r.rowCount===1&&cost.usd>Number(r.rows[0].reserved_usd))await this.alert(null,'COST_EXCEEDED_RESERVE');
     return r.rowCount===1;
   }
   async costTotal() {

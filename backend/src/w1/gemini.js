@@ -34,7 +34,7 @@ export function createGeminiAdapter({binding,key,fetchImpl=fetch}) {
         runtime:{requested_config:{...requested,config_fingerprint:configFingerprint},
           provider_acceptance:{provider:'gemini',model:config.model,modelVersion:data.modelVersion,apiVersion:'v1beta',httpStatus:response.status,finishReason:c?.finishReason},
           applied_config_readback:{status:'NOT_RETURNED',reason:'UNVERIFIABLE_BY_PROVIDER_RESPONSE'},
-          usage:{input:data.usageMetadata?.promptTokenCount,cached:data.usageMetadata?.cachedContentTokenCount??0,output:data.usageMetadata?.candidatesTokenCount,thinking:data.usageMetadata?.thoughtsTokenCount}}};
+          usage:{input:data.usageMetadata?.promptTokenCount,cached:data.usageMetadata?.cachedContentTokenCount,output:data.usageMetadata?.candidatesTokenCount,thinking:data.usageMetadata?.thoughtsTokenCount}}};
     } catch {throw new Error('PROVIDER_UNVERIFIED_NO_DELIVERY');}
   };
 }

@@ -15,7 +15,9 @@ import {BASIS,A11} from './admission.js';
 import {copy} from '../../public/copy.js';
 import {randomUUID} from 'node:crypto';
 const env=process.env;
-const hardCapUsd=Number(env.W1_COST_HARD_CAP_USD);
+const hardCapUsd=Number(env.W1_COST_HARD_CAP_USD),reviewStopUsd=Number(env.W1_COST_REVIEW_STOP_USD);
+// Review stop (Owner-adopted US$20 incl. canary) must sit at or below the hard cap.
+const costGatesValid=()=>Number.isFinite(hardCapUsd)&&hardCapUsd>0&&Number.isFinite(reviewStopUsd)&&reviewStopUsd>0&&reviewStopUsd<=hardCapUsd;
 let build={source_revision:'LOCAL_UNPACKAGED'};
 try{build=JSON.parse(readFileSync(new URL('../../../W1_BUILD.json',import.meta.url),'utf8'));}catch{}
 const emit=error_code=>process.stdout.write(JSON.stringify({error_code})+'\n');
@@ -32,8 +34,8 @@ async function boot() {
  if(env.W1_RUNTIME_BINDING_JSON&&env.W1_GEMINI_API_KEY) {
   binding=JSON.parse(env.W1_RUNTIME_BINDING_JSON);
   const adapter=createGeminiAdapter({binding,key:env.W1_GEMINI_API_KEY});
-  const budget={campaign:env.W1_PROVIDER_CAMPAIGN,budgetUsd:Number(env.W1_PROVIDER_BUDGET_USD),upperUsd:Number(env.W1_PROVIDER_CALL_UPPER_USD),hardCapUsd};
-  if(!Number.isFinite(hardCapUsd)||hardCapUsd<=0)throw new Error('COST_HARD_CAP_REQUIRED');
+  const budget={campaign:env.W1_PROVIDER_CAMPAIGN,budgetUsd:Number(env.W1_PROVIDER_BUDGET_USD),upperUsd:Number(env.W1_PROVIDER_CALL_UPPER_USD),hardCapUsd,reviewStopUsd};
+  if(!costGatesValid())throw new Error('COST_HARD_CAP_REQUIRED');
   if(!budget.campaign||!Number.isFinite(budget.budgetUsd)||budget.budgetUsd<=0||!Number.isFinite(budget.upperUsd)||budget.upperUsd<=0)throw new Error('PROVIDER_BUDGET_REQUIRED');
   generate=async args=>{await store.reserveProviderCall(args.recordId,args.attempt,budget);const out=await adapter(args);
    try{await store.settleProviderCall(args.recordId,args.attempt,actualCost(binding.model,out.runtime?.usage));}catch{emit('COST_SETTLEMENT_UNCONFIRMED');}
@@ -47,8 +49,8 @@ async function boot() {
   const binding=JSON.parse(env.W1_SAFETY_BINDING_JSON);
   if(binding.maxOutputTokens>512)throw new Error('SAFETY_OUTPUT_CAP_REQUIRED');
   const classify=createSafetyClassifier(createGeminiAdapter({binding,key:env.W1_GEMINI_API_KEY}));
-  const budget={campaign:env.W1_SAFETY_CAMPAIGN,budgetUsd:Number(env.W1_SAFETY_BUDGET_USD),upperUsd:Number(env.W1_SAFETY_CALL_UPPER_USD),hardCapUsd};
-  if(!Number.isFinite(hardCapUsd)||hardCapUsd<=0)throw new Error('COST_HARD_CAP_REQUIRED');
+  const budget={campaign:env.W1_SAFETY_CAMPAIGN,budgetUsd:Number(env.W1_SAFETY_BUDGET_USD),upperUsd:Number(env.W1_SAFETY_CALL_UPPER_USD),hardCapUsd,reviewStopUsd};
+  if(!costGatesValid())throw new Error('COST_HARD_CAP_REQUIRED');
   classifySafety=async(subject,input)=>{const claim=await store.reserveSafetyCall(subject,budget,input);if(claim.cached)return claim.result.detection;try{const result=await classify(input.question_text);await pool.query('UPDATE w1.safety_calls SET runtime_json=$2,result_json=$3 WHERE id=$1',[claim.id,JSON.stringify(result.runtime),JSON.stringify({detection:result.detection})]);try{await store.settleSafetyCall(claim.id,actualCost(binding.model,result.runtime?.usage));}catch{emit('COST_SETTLEMENT_UNCONFIRMED');}return result.detection;}catch{await store.alert(null,'SAFETY_CLASSIFICATION_FAILED');throw new Error('SAFETY_NO_DELIVERY');}};
  }
  const service=new W1Service({store,generate,push,buildPrompt,classifySafety,

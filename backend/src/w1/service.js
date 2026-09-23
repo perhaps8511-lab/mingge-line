@@ -23,19 +23,20 @@ export class W1Service {
   constructor({store,generate,push,buildPrompt,manifest,classifySafety}) { Object.assign(this,{store,generate,push,buildPrompt,manifest,classifySafety}); }
   async create(subject,body) {
     validateInput(body);
-    const old=await this.store.existingRequest(subject,body);if(old)return recordView(old);
+    // reused tells a runner whether this request triggered new work; it never changes the record.
+    const old=await this.store.existingRequest(subject,body);if(old)return {...recordView(old),reused:true};
     const safety=detectSafety(body.question_text)??(this.classifySafety?await this.classifySafety(subject,body):null);
     if(safety) {
       if(!await this.store.isOwnerTestGrant(subject))throw fail('OWNER_GRANT_REQUIRED',403);
       let result;
       try {result=safetyDelivery(standardSafety(safety));}
       catch {await this.store.alert(null,'SAFETY_NO_DELIVERY');throw fail('SAFETY_NO_DELIVERY');}
-      return recordView(await this.store.createSafety(subject,body,result));
+      const saved=await this.store.createSafety(subject,body,result);return {...recordView(saved),reused:saved.reused===true};
     }
     if(!this.generate) throw fail('RUNTIME_BINDING_UNVERIFIED');
     // Deterministic lookup must succeed before reserving a coin or spending.
     await this.buildPrompt(body);
-    return recordView(await this.store.create(subject,body));
+    const saved=await this.store.create(subject,body);return {...recordView(saved),reused:saved.reused===true};
   }
   async tick() {
     await this.store.detectExpiredClaims();
@@ -50,7 +51,7 @@ export class W1Service {
         code=>this.store.alert(row.id,code));
     } catch(e) {
       // Budget stops keep their own code so a runner can halt instead of scoring them as failures.
-      const code=['COST_HARD_CAP_REACHED','PROVIDER_BUDGET_EXHAUSTED'].includes(e?.message)?e.message:'GENERATION_FAILED';
+      const code=['COST_HARD_CAP_REACHED','COST_REVIEW_STOP_REACHED','COST_RESERVE_EXCEEDED','PROVIDER_BUDGET_EXHAUSTED'].includes(e?.message)?e.message:'GENERATION_FAILED';
       await this.store.settle(row.id,null,code); return true;
     }
     // If persistence fails, leave the reservation unresolved. Never publish or
