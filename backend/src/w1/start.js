@@ -35,7 +35,7 @@ async function boot() {
   generate=async args=>{await store.reserveProviderCall(args.recordId,args.attempt,budget);return adapter(args);};
   runtimeStatus='CONFIGURED_NOT_LIVE_VERIFIED';
  }
- const push=env.W1_LINE_CHANNEL_ACCESS_TOKEN?createLinePush({token:env.W1_LINE_CHANNEL_ACCESS_TOKEN}):async()=>{throw new Error('PUSH_UNCONFIGURED');};
+ const push=env.W1_LINE_CHANNEL_ACCESS_TOKEN?createLinePush({token:env.W1_LINE_CHANNEL_ACCESS_TOKEN,liffId:env.W1_LIFF_ID}):async()=>{throw new Error('PUSH_UNCONFIGURED');};
  const buildPrompt=createPromptBuilder({data,prefix,prompt,mode:env.W1_RETRIEVAL_MODE??'B'});
  let classifySafety;
  if(env.W1_SAFETY_BINDING_JSON&&env.W1_GEMINI_API_KEY){
