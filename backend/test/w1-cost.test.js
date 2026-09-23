@@ -148,7 +148,7 @@ test('runner phases are fixed lists; review stop at US$20 with cases left; proje
 test('runner run namespace (R8 + Codex 5272047): revision + effective safety binding fingerprint; fail closed; no mixed runtime',async()=>{
   // w1-qa.js is a browser module; minimal inert globals let Node import its pure helpers.
   globalThis.fetch=async()=>({json:async()=>({})});globalThis.document={getElementById:()=>({})};
-  const {runCampaignOf,safetyFingerprintOf,runtimeIdentity,sameRuntime,modelRouteFail}=await import('../public/w1-qa.js');
+  const {runCampaignOf,safetyFingerprintOf,runtimeIdentity,sameRuntime,modelRouteFail,RESUMABLE_RUNS}=await import('../public/w1-qa.js');
   const {createHash}=await import('node:crypto');const {readFileSync}=await import('node:fs');
   // Same stable serializer on both sides (server computes, runner verifies): guard against drift.
   const stableLine=f=>readFileSync(new URL(f,import.meta.url),'utf8').split(/\r?\n/).find(l=>l.startsWith('const stable='));
@@ -186,6 +186,14 @@ test('runner run namespace (R8 + Codex 5272047): revision + effective safety bin
   assert.equal(sameRuntime(base,runtimeIdentity(m({...binding,timeoutMs:1}))),false);
   assert.equal(sameRuntime(base,runtimeIdentity({...m(),runtime_binding:{model:'h'}})),false);
   assert.equal(sameRuntime(base,runtimeIdentity(undefined)),false);
+  // R21 resume: the named interrupted run keeps its original namespace under a newer deployed revision.
+  assert.deepEqual(RESUMABLE_RUNS['resume-91e90c2'],{revision:'91e90c2',phase:'remaining'});
+  const resumed=await runCampaignOf(suite,m(binding,'feedbee0123456789'),{resumeRevision:'91e90c2'});
+  assert.equal(resumed,'w1-regress-x1-r91e90c2-s'+fp.slice(0,12));
+  assert.equal(resumed,(await runCampaignOf(suite,m(binding,'91e90c23722d11cc57b47c57742a889801ac4880'))));
+  for(const bad of ['9ac1a53','1d60678','','91E90C2'])await assert.rejects(runCampaignOf(suite,m(),{resumeRevision:bad}),/RESUME_RUN_NOT_ALLOWED/);
+  await assert.rejects(runCampaignOf(suite,{...m(),safety_binding_fingerprint:'x'.repeat(64)},{resumeRevision:'91e90c2'}),/SAFETY_BINDING_FINGERPRINT_INVALID/);
+  await assert.rejects(runCampaignOf(suite,{...m(),source_revision:'LOCAL_UNPACKAGED'},{resumeRevision:'91e90c2'}),/SOURCE_REVISION_UNVERIFIED/);
   assert.equal(modelRouteFail({runtime:{route:'SAFETY_FALLBACK'}}),true);
   for(const r of [{runtime:{route:'SAFETY_MODEL'}},{runtime:{route:'GENERATED'}},{},null])assert.equal(modelRouteFail(r),false);
 });

@@ -9,7 +9,7 @@ import {loadV34,checkRuntimeBinding} from './registry.js';
 import {loadClassics,loadPrefix,createPromptBuilder,CLASSICS_SHA,PREFIX_SHA} from './classics.js';
 import {createGeminiAdapter} from './gemini.js';
 import {actualCost} from './cost.js';
-import {createSafetyClassifier} from './safety.js';
+import {createSafetyClassifier,createClassifySafety} from './safety.js';
 import {createLinePush} from './line.js';
 import {BASIS,A11} from './admission.js';
 import {copy} from '../../public/copy.js';
@@ -60,7 +60,8 @@ async function boot() {
   safetyFingerprint=createHash('sha256').update(stable(safetyBinding)).digest('hex');
   const budget={campaign:env.W1_SAFETY_CAMPAIGN,budgetUsd:Number(env.W1_SAFETY_BUDGET_USD),upperUsd:Number(env.W1_SAFETY_CALL_UPPER_USD),hardCapUsd,reviewStopUsd};
   if(!costGatesValid())throw new Error('COST_HARD_CAP_REQUIRED');
-  classifySafety=async(subject,input)=>{const claim=await store.reserveSafetyCall(subject,budget,input);if(claim.cached)return claim.result.detection;try{const result=await classify(input.question_text);await pool.query('UPDATE w1.safety_calls SET runtime_json=$2,result_json=$3 WHERE id=$1',[claim.id,JSON.stringify(result.runtime),JSON.stringify({detection:result.detection})]);try{await store.settleSafetyCall(claim.id,actualCost(binding.model,result.runtime?.usage));}catch{emit('COST_SETTLEMENT_UNCONFIRMED');}return result.detection;}catch{await store.alert(null,'SAFETY_CLASSIFICATION_FAILED');throw new Error('SAFETY_NO_DELIVERY');}};
+  classifySafety=createClassifySafety({store,budget,classify,
+   settle:async(id,runtime)=>{try{await store.settleSafetyCall(id,actualCost(binding.model,runtime?.usage));}catch{emit('COST_SETTLEMENT_UNCONFIRMED');}}});
  }
  const service=new W1Service({store,generate,push,buildPrompt,classifySafety,
   manifest:{service:'mingge-w1',environment:'staging',source_revision:build.source_revision,basis:BASIS,prompt:{id:prompt.id,sha256:prompt.sha256},

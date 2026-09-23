@@ -15,10 +15,15 @@ export async function safetyFingerprintOf(manifest){
  if(await sha256Hex(stable(manifest.safety_binding))!==fp)throw new Error('SAFETY_BINDING_FINGERPRINT_MISMATCH');
  return fp;
 }
-export async function runCampaignOf(suite,manifest){
+// GPT R21 ruling: resume ONE named, interrupted run after a bounded fix. Its request_id namespace stays pinned to
+// the run's original revision, so completed cases are read back (reused, never regenerated or re-charged) and only
+// unfinished cases are generated - by the current revision, which each stored record reports as runtime_revision.
+export const RESUMABLE_RUNS=Object.freeze({'resume-91e90c2':Object.freeze({revision:'91e90c2',phase:'remaining'})});
+export async function runCampaignOf(suite,manifest,{resumeRevision}={}){
  const rev=manifest?.source_revision;
  if(typeof rev!=='string'||!/^[0-9a-f]{7,40}$/.test(rev))throw new Error('SOURCE_REVISION_UNVERIFIED');
- return suite.campaign+'-r'+rev.slice(0,7)+'-s'+(await safetyFingerprintOf(manifest)).slice(0,12);
+ if(resumeRevision!==undefined&&!Object.values(RESUMABLE_RUNS).some(r=>r.revision===resumeRevision))throw new Error('RESUME_RUN_NOT_ALLOWED');
+ return suite.campaign+'-r'+(resumeRevision??rev.slice(0,7))+'-s'+(await safetyFingerprintOf(manifest)).slice(0,12);
 }
 // The runtime identity a run is bound to; any case served under a different one ends the run (no mixed PASS).
 export const runtimeIdentity=m=>({source_revision:m?.source_revision??null,safety_binding_fingerprint:m?.safety_binding_fingerprint??null,
@@ -27,7 +32,7 @@ export const sameRuntime=(a,b)=>['source_revision','safety_binding_fingerprint',
 // A fallback is never a model-route result: it is MODEL_ROUTE_FAIL and never counts toward A4 PASS.
 export const modelRouteFail=result=>result?.runtime?.route==='SAFETY_FALLBACK';
 const config=await(await fetch('/ui-config',{cache:'no-store'})).json();
-let token,suite,manifest,running=false,stop=false,rows=[],newCosts=[],projections=[],phase='',runCampaign='',runRuntime=null,mixedRuntime=false;
+let token,suite,manifest,running=false,stop=false,rows=[],newCosts=[],projections=[],phase='',runCampaign='',runRuntime=null,mixedRuntime=false,resumedRun=null;
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function api(path,body,headers={}){
  const response=await fetch(config.relayOrigin+path,{method:body?'POST':'GET',cache:'no-store',headers:{'X-Line-AccessToken':token,'Content-Type':'application/json',...headers},body:body?JSON.stringify(body):undefined});
@@ -60,10 +65,11 @@ $('run').onclick=async()=>{
  let halt='',fresh=0;
  try{
   // Scope is the fixed phase list; new-vs-reused comes from the server's reused flag.
-  const plan=phasePlan(suite.cases,$('phase').value);phase=$('phase').value;
+  resumedRun=RESUMABLE_RUNS[$('phase').value]??null;phase=resumedRun?resumedRun.phase:$('phase').value;
+  const plan=phasePlan(suite.cases,phase);
   // Fresh-read the runtime at every start (a reload/resume is a new start) and bind the run to it.
   manifest=await api('/runtime-manifest');if(manifest.environment!=='staging'||manifest.runtime_status!=='CONFIGURED_NOT_LIVE_VERIFIED')throw new Error('WRONG_RUNTIME');
-  runCampaign=await runCampaignOf(suite,manifest);runRuntime=runtimeIdentity(manifest);
+  runCampaign=await runCampaignOf(suite,manifest,resumedRun?{resumeRevision:resumedRun.revision}:{});runRuntime=runtimeIdentity(manifest);
   for(const [i,c] of plan.cases.entries()){if(stop)break;const began=Date.now();const request_id=runCampaign+'-'+c.case_key;
    $('status').textContent=`${phase==='targeted'?'第一階段 targeted':'第二階段 remaining'} ${i+1}/${plan.cases.length}：${c.case_key}`;
    // End-to-end timing from this phone: LIFF token -> Worker LINE verify -> backend (+ classifier) -> saved.
@@ -97,7 +103,7 @@ $('run').onclick=async()=>{
  }catch{$('status').textContent='結果未確認，已停止且不自動重送；請由 Codex 查 owning store。';}
  finally{running=false;$('stop').disabled=true;$('run').disabled=true;}
 };
-$('download').onclick=()=>{const blob=new Blob([JSON.stringify({kind:'W1_SYNTHETIC_RESULTS',manifest,verified_suite_sha256:SUITE_SHA256,suite_sha256:SUITE_SHA256,source_sha256:suite.source_sha256,campaign:suite.campaign,suite_campaign:suite.campaign,run_campaign:runCampaign,source_revision:runRuntime?.source_revision??null,
+$('download').onclick=()=>{const blob=new Blob([JSON.stringify({kind:'W1_SYNTHETIC_RESULTS',manifest,verified_suite_sha256:SUITE_SHA256,suite_sha256:SUITE_SHA256,source_sha256:suite.source_sha256,campaign:suite.campaign,suite_campaign:suite.campaign,run_campaign:runCampaign,source_revision:runRuntime?.source_revision??null,resumed_run_revision:resumedRun?.revision??null,
   safety_binding_fingerprint:runRuntime?.safety_binding_fingerprint??null,safety_binding:manifest?.safety_binding??null,
   fingerprint_scope:'safety_binding_fingerprint = sha256(stable effective safety binding: provider,model,temperature,maxOutputTokens,thinking,safety,timeoutMs); not the adapter requested_config.config_fingerprint (which omits model/timeout)',
   mixed_runtime:mixedRuntime,model_route_fail:rows.filter(r=>r.verdict==='MODEL_ROUTE_FAIL').map(r=>r.case_key),phase,rows,cost_baseline:summarize(rows),projections,hard_cap_usd:HARD_CAP_USD,review_stop_usd:REVIEW_STOP_USD},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(runCampaign||suite.campaign)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};

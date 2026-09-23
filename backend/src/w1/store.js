@@ -270,6 +270,9 @@ export class W1Store {
     if(r.rowCount===1&&cost.usd>Number(r.rows[0].reserved_usd))await this.alert(recordId,'COST_EXCEEDED_RESERVE');
     return r.rowCount===1;
   }
+  async resolveSafetyCall(id,{runtime,result}) {
+    await this.pool.query('UPDATE w1.safety_calls SET runtime_json=$2,result_json=$3 WHERE id=$1',[id,JSON.stringify(runtime??null),JSON.stringify(result)]);
+  }
   async settleSafetyCall(id,cost) {
     if(!cost)return false;
     const r=await this.pool.query(`UPDATE w1.safety_calls SET prompt_tokens=$2,cached_tokens=$3,candidates_tokens=$4,thoughts_tokens=$5,

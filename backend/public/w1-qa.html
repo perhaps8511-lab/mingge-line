@@ -4,7 +4,7 @@
 <form id="enroll" hidden><label for="enrollment-token">一次性測試授權碼</label><input type="password" id="enrollment-token" autocomplete="off"><button>啟用測試額度</button></form>
 <label for="suite">載入已封存的 125 題合成測試 JSON</label><input id="suite" type="file" accept="application/json">
 <p>只走現行 reserve／generate／consistency／confirm-release 路徑。成功輸出會依 staging 設定推送到登入 Owner 的 LINE。未知結果停止，不自動重送。</p>
-<label for="phase">階段</label><select id="phase"><option value="targeted">第一階段：targeted 20 題</option><option value="remaining">第二階段：其餘 105 題（第一階段回讀成本無異常後）</option></select><p>已跑過的題目只回讀、不再計費。累積成本（含 canary）達 US$20 且未跑完即停止回審；預估總額超過 US$30 即停止回報 Owner。</p>
+<label for="phase">階段</label><select id="phase"><option value="targeted">第一階段：targeted 20 題</option><option value="remaining">第二階段：其餘 105 題（第一階段回讀成本無異常後）</option><option value="resume-91e90c2">續跑：r91e90c2 這一輪（已完成題只回讀，只跑未完成題）</option></select><p>已跑過的題目只回讀、不再計費。累積成本（含 canary）達 US$20 且未跑完即停止回審；預估總額超過 US$30 即停止回報 Owner。</p>
 <button id="run" disabled>執行本階段</button><button id="stop" disabled>完成本題後停止</button><button id="download" disabled>下載合成驗收結果</button>
 <p id="status" role="status">尚未登入</p><pre id="summary"></pre><a href="/">返回測試頁</a>
 </main><script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script><script type="module" src="/w1-qa.js"></script></body></html>
