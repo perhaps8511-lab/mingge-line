@@ -5,7 +5,7 @@ import {W1Service} from './service.js';
 import {createW1Server} from './http.js';
 import {createSubjectVerifier,postgresJtiConsumer} from './subject.js';
 import {createLegacyReader} from './legacy.js';
-import {loadV34} from './registry.js';
+import {loadV34,checkRuntimeBinding} from './registry.js';
 import {loadClassics,loadPrefix,createPromptBuilder,CLASSICS_SHA,PREFIX_SHA} from './classics.js';
 import {createGeminiAdapter} from './gemini.js';
 import {actualCost} from './cost.js';
@@ -13,7 +13,9 @@ import {createSafetyClassifier} from './safety.js';
 import {createLinePush} from './line.js';
 import {BASIS,A11} from './admission.js';
 import {copy} from '../../public/copy.js';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
+// Stable key-sorted serialization for the safety binding fingerprint (same rule as public/w1-qa.js).
+const stable=v=>Array.isArray(v)?'['+v.map(stable).join(',')+']':v&&typeof v==='object'?'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}':JSON.stringify(v);
 const env=process.env;
 const hardCapUsd=Number(env.W1_COST_HARD_CAP_USD),reviewStopUsd=Number(env.W1_COST_REVIEW_STOP_USD);
 // Review stop (Owner-adopted US$20 incl. canary) must sit at or below the hard cap.
@@ -44,11 +46,18 @@ async function boot() {
  }
  const push=env.W1_LINE_CHANNEL_ACCESS_TOKEN?createLinePush({token:env.W1_LINE_CHANNEL_ACCESS_TOKEN,liffId:env.W1_LIFF_ID}):async()=>{throw new Error('PUSH_UNCONFIGURED');};
  const buildPrompt=createPromptBuilder({data,prefix,prompt,mode:env.W1_RETRIEVAL_MODE??'B'});
- let classifySafety;
+ let classifySafety,safetyBinding=null,safetyFingerprint=null;
  if(env.W1_SAFETY_BINDING_JSON&&env.W1_GEMINI_API_KEY){
   const binding=JSON.parse(env.W1_SAFETY_BINDING_JSON);
   if(binding.maxOutputTokens>512)throw new Error('SAFETY_OUTPUT_CAP_REQUIRED');
   const classify=createSafetyClassifier(createGeminiAdapter({binding,key:env.W1_GEMINI_API_KEY}));
+  // Read-only manifest metadata (R8 run namespace): identity of the binding actually loaded and validated
+  // above - every execution-affecting field, never the key. Distinct from the adapter's requested_config
+  // fingerprint, which omits model and timeout.
+  const effective=checkRuntimeBinding(binding);
+  safetyBinding={provider:effective.provider,model:effective.model,temperature:effective.temperature,maxOutputTokens:effective.maxOutputTokens,
+   thinking:effective.thinking,safety:effective.safety,timeoutMs:effective.timeoutMs};
+  safetyFingerprint=createHash('sha256').update(stable(safetyBinding)).digest('hex');
   const budget={campaign:env.W1_SAFETY_CAMPAIGN,budgetUsd:Number(env.W1_SAFETY_BUDGET_USD),upperUsd:Number(env.W1_SAFETY_CALL_UPPER_USD),hardCapUsd,reviewStopUsd};
   if(!costGatesValid())throw new Error('COST_HARD_CAP_REQUIRED');
   classifySafety=async(subject,input)=>{const claim=await store.reserveSafetyCall(subject,budget,input);if(claim.cached)return claim.result.detection;try{const result=await classify(input.question_text);await pool.query('UPDATE w1.safety_calls SET runtime_json=$2,result_json=$3 WHERE id=$1',[claim.id,JSON.stringify(result.runtime),JSON.stringify({detection:result.detection})]);try{await store.settleSafetyCall(claim.id,actualCost(binding.model,result.runtime?.usage));}catch{emit('COST_SETTLEMENT_UNCONFIRMED');}return result.detection;}catch{await store.alert(null,'SAFETY_CLASSIFICATION_FAILED');throw new Error('SAFETY_NO_DELIVERY');}};
@@ -56,7 +65,8 @@ async function boot() {
  const service=new W1Service({store,generate,push,buildPrompt,classifySafety,
   manifest:{service:'mingge-w1',environment:'staging',source_revision:build.source_revision,basis:BASIS,prompt:{id:prompt.id,sha256:prompt.sha256},
     prefix_sha256:PREFIX_SHA,classics_sha256:CLASSICS_SHA,classics_edition:'CANDIDATE_EDITION_UNVERIFIED',
-    runtime_status:runtimeStatus,runtime_binding:binding??null,A11,waves:{replay:'W2',backfill:'W3'}}});
+    runtime_status:runtimeStatus,runtime_binding:binding??null,
+    safety_binding_status:classifySafety?'CONFIGURED':'DISABLED',safety_binding:safetyBinding,safety_binding_fingerprint:safetyFingerprint,A11,waves:{replay:'W2',backfill:'W3'}}});
  let legacyReader=null;
  if(env.W1_LEGACY_READTHROUGH==='on')legacyReader=createLegacyReader({
    environment:'staging',evidence:JSON.parse(env.W1_LEGACY_EVIDENCE_JSON??'{}'),token:env.AIRTABLE_LEGACY_READ_PAT,

@@ -145,18 +145,47 @@ test('runner phases are fixed lists; review stop at US$20 with cases left; proje
   assert.deepEqual([s.cases_with_regeneration,s.cache_hit_ratio,s.generation_actual_usd,s.safety_actual_usd],[1,0.4,0.03,0.001]);
 });
 
-test('runner run namespace (R8 amendment): per-revision request_id space; frozen suite campaign unchanged; fallback = MODEL_ROUTE_FAIL',async()=>{
+test('runner run namespace (R8 + Codex 5272047): revision + effective safety binding fingerprint; fail closed; no mixed runtime',async()=>{
   // w1-qa.js is a browser module; minimal inert globals let Node import its pure helpers.
   globalThis.fetch=async()=>({json:async()=>({})});globalThis.document={getElementById:()=>({})};
-  const {runCampaignOf,modelRouteFail}=await import('../public/w1-qa.js');
+  const {runCampaignOf,safetyFingerprintOf,runtimeIdentity,sameRuntime,modelRouteFail}=await import('../public/w1-qa.js');
+  const {createHash}=await import('node:crypto');const {readFileSync}=await import('node:fs');
+  // Same stable serializer on both sides (server computes, runner verifies): guard against drift.
+  const stableLine=f=>readFileSync(new URL(f,import.meta.url),'utf8').split(/\r?\n/).find(l=>l.startsWith('const stable='));
+  assert.ok(stableLine('../src/w1/start.js'));assert.equal(stableLine('../src/w1/start.js'),stableLine('../public/w1-qa.js'));
+  // Evaluate the runner's exact serializer line (recursive, so it needs its own binding).
+  const stable=(0,eval)('(()=>{'+stableLine('../public/w1-qa.js')+'return stable;})()');
+  const binding={provider:'gemini',model:'gemini-3.7-flash',temperature:0,maxOutputTokens:512,thinking:{mode:'low'},timeoutMs:12000,
+    safety:{profile:'p',categories:[{category:'HARM_CATEGORY_HARASSMENT',threshold:'BLOCK_ONLY_HIGH'}]}};
+  const fpOf=b=>createHash('sha256').update(stable(b)).digest('hex');
+  const m=(b=binding,rev='63d87705aca96b0e9e9d467552aee5c5dfd6008e')=>({source_revision:rev,safety_binding_status:'CONFIGURED',safety_binding:b,safety_binding_fingerprint:fpOf(b),runtime_binding:{model:'g'}});
   const suite={campaign:'w1-regress-x1'};
-  assert.equal(runCampaignOf(suite,{source_revision:'63d87705aca96b0e9e9d467552aee5c5dfd6008e'}),'w1-regress-x1-r63d8770');
-  assert.notEqual(runCampaignOf(suite,{source_revision:'aaaaaaa'}),runCampaignOf(suite,{source_revision:'bbbbbbb'}));
+  const fp=fpOf(binding);
+  assert.equal(await safetyFingerprintOf(m()),fp);
+  assert.equal(await runCampaignOf(suite,m()),'w1-regress-x1-r63d8770-s'+fp.slice(0,12));
+  // Key order in the published binding does not change identity; any execution-affecting change does.
+  assert.equal(fpOf({...binding,model:binding.model,provider:'gemini'}),fp);
+  for(const change of [{model:'gemini-other'},{timeoutMs:13000},{temperature:0.1},{maxOutputTokens:256},{thinking:{mode:'medium'}}])
+    assert.notEqual(await runCampaignOf(suite,m({...binding,...change})),await runCampaignOf(suite,m()),JSON.stringify(change));
+  assert.notEqual(await runCampaignOf(suite,m(binding,'aaaaaaa')),await runCampaignOf(suite,m(binding,'bbbbbbb')));
+  assert.equal(await runCampaignOf(suite,m()),await runCampaignOf(suite,m()));   // same binding: safe resume
   assert.equal(suite.campaign,'w1-regress-x1');
-  for(const bad of [undefined,'LOCAL_UNPACKAGED','abc',''])assert.throws(()=>runCampaignOf(suite,{source_revision:bad}),/SOURCE_REVISION_UNVERIFIED/);
+  // Fail closed: bad revision, disabled / missing / malformed / mismatched fingerprint.
+  for(const rev of [undefined,'LOCAL_UNPACKAGED','abc',''])await assert.rejects(runCampaignOf(suite,{...m(),source_revision:rev}),/SOURCE_REVISION_UNVERIFIED/);
+  await assert.rejects(runCampaignOf(suite,{...m(),safety_binding_status:'DISABLED'}),/SAFETY_BINDING_NOT_CONFIGURED/);
+  await assert.rejects(runCampaignOf(suite,{...m(),safety_binding:null}),/SAFETY_BINDING_NOT_CONFIGURED/);
+  for(const bad of [null,'','x'.repeat(64),fp.slice(0,12)])await assert.rejects(runCampaignOf(suite,{...m(),safety_binding_fingerprint:bad}),/SAFETY_BINDING_FINGERPRINT_INVALID/);
+  await assert.rejects(runCampaignOf(suite,{...m(),safety_binding_fingerprint:fpOf({...binding,model:'x'})}),/SAFETY_BINDING_FINGERPRINT_MISMATCH/);
   // Longest legal campaign + case key stays inside the server's request_id limit and w1-regress- prefix.
-  const id=runCampaignOf({campaign:'w1-regress-'+'x'.repeat(40)},{source_revision:'0123456789abcdef'})+'-'+'X'.repeat(24);
-  assert.ok(/^[A-Za-z0-9_-]{1,128}$/.test(id)&&id.startsWith('w1-regress-'));
+  const id=(await runCampaignOf({campaign:'w1-regress-'+'x'.repeat(40)},m(binding,'0123456789abcdef')))+'-'+'X'.repeat(24);
+  assert.ok(/^[A-Za-z0-9_-]{1,128}$/.test(id)&&id.startsWith('w1-regress-'),id.length);
+  // Runtime identity: any revision / safety binding / generation binding change is a different runtime.
+  const base=runtimeIdentity(m());
+  assert.equal(sameRuntime(base,runtimeIdentity(m())),true);
+  assert.equal(sameRuntime(base,runtimeIdentity(m(binding,'bbbbbbb'))),false);
+  assert.equal(sameRuntime(base,runtimeIdentity(m({...binding,timeoutMs:1}))),false);
+  assert.equal(sameRuntime(base,runtimeIdentity({...m(),runtime_binding:{model:'h'}})),false);
+  assert.equal(sameRuntime(base,runtimeIdentity(undefined)),false);
   assert.equal(modelRouteFail({runtime:{route:'SAFETY_FALLBACK'}}),true);
   for(const r of [{runtime:{route:'SAFETY_MODEL'}},{runtime:{route:'GENERATED'}},{},null])assert.equal(modelRouteFail(r),false);
 });
