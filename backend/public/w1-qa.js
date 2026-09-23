@@ -35,7 +35,15 @@ async function api(path,body,headers={}){
 }
 function ready(){ $('run').disabled=running||!suite||!manifest; }
 async function owner(){manifest=await api('/runtime-manifest');if(manifest.environment!=='staging'||manifest.runtime_status!=='CONFIGURED_NOT_LIVE_VERIFIED')throw new Error('WRONG_RUNTIME');$('status').textContent='已驗證 Owner；'+manifest.source_revision;ready();}
-$('login').onclick=async()=>{try{await liff.init({liffId:config.liffId});if(!liff.isLoggedIn()){liff.login({redirectUri:location.origin+'/w1-qa.html'});return;}token=liff.getAccessToken();await owner();}catch(e){if(e.message==='OWNER_TEST_GRANT_REQUIRED')$('enroll').hidden=false;else $('status').textContent='登入／runtime 未確認';}};
+// The LINE in-app browser can keep an expired LIFF access token while liff.isLoggedIn() stays true; the relay
+// then rejects every call. On a failed verification with a cached session, force ONE fresh LINE login
+// (sessionStorage flag prevents a loop); a second failure is reported instead of retried.
+const RELOGIN='w1-qa-relogin';
+const flag={get:()=>{try{return sessionStorage.getItem(RELOGIN);}catch{return '1';}},set:v=>{try{v?sessionStorage.setItem(RELOGIN,'1'):sessionStorage.removeItem(RELOGIN);}catch{}}};
+$('login').onclick=async()=>{try{await liff.init({liffId:config.liffId});if(!liff.isLoggedIn()){liff.login({redirectUri:location.origin+'/w1-qa.html'});return;}token=liff.getAccessToken();await owner();flag.set(false);}catch(e){
+ if(e.message==='OWNER_TEST_GRANT_REQUIRED'){$('enroll').hidden=false;return;}
+ if(liff.isLoggedIn?.()&&!flag.get()){flag.set(true);$('status').textContent='LINE 登入已過期，重新登入中…';liff.logout();liff.login({redirectUri:location.origin+'/w1-qa.html'});return;}
+ flag.set(false);$('status').textContent='登入／runtime 未確認（已重新登入仍失敗，請截圖回報）';}};
 $('enroll').onsubmit=async event=>{event.preventDefault();const secret=$('enrollment-token').value;$('enrollment-token').value='';try{await api('/test-grants/enroll',{}, {'X-W1-Enrollment-Token':secret});$('enroll').hidden=true;await owner();}catch{$('status').textContent='授權尚未確認，不重送。';}};
 $('suite').onchange=async()=>{try{
  const file=$('suite').files[0];if(!file||file.size>1000000)throw new Error();
