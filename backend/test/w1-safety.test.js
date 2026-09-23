@@ -5,7 +5,7 @@ import {W1Store} from '../src/w1/store.js';
 import {W1Service} from '../src/w1/service.js';
 import {migrateW1} from '../src/w1/schema.js';
 import {detectSafety,standardSafety,safetyDelivery,createSafetyClassifier} from '../src/w1/safety.js';
-test('crisis at zero quota: safety model route, no reserve, charge 0, immutable entitlement rows; adopted fallback if the model fails',async()=>{
+test('crisis at zero quota: safety model route, no reserve, charge 0, immutable entitlement rows; NO_DELIVERY if the model fails',async()=>{
  const db=new PGlite();const query=async(s,a)=>a===undefined?(await db.exec(s)).at(-1):db.query(s,a);
  const pool={query,connect:async()=>({query,release(){}})};await migrateW1(pool);
  const store=new W1Store(pool),subject='U'+'c'.repeat(32);
@@ -22,12 +22,11 @@ test('crisis at zero quota: safety model route, no reserve, charge 0, immutable 
  assert.equal(calls,0);assert.equal(await snapshot(),before);
  await service.tick();
  const done=await store.get(subject,r.id);
- assert.deepEqual([done.state,done.charge,done.error_code],['completed',0,'GENERATION_FAILED']);
- assert.deepEqual(done.output_json.sections.map(s=>s.tag),['SR']);assert.match(done.output_json.sections[0].text,/1925/);
- assert.ok(done.output_json.sections[0].text.startsWith('請現在就撥【119】或【110】'));
+ assert.deepEqual([done.state,done.charge,done.error_code,done.output_json,done.push_state],['failed',0,'GENERATION_FAILED',null,'not_ready']);
+ assert.deepEqual([done.runtime_json.route,done.runtime_json.failure_code],['SAFETY_MODEL','PROVIDER_DOWN']);
  assert.equal(calls,1);assert.equal(await snapshot(),before);
  assert.equal((await query('SELECT * FROM w1.reservations')).rows.length,0);
- assert.equal((await query("SELECT code FROM w1.audit_events WHERE code='SAFETY_MODEL_FALLBACK'")).rows.length,1);
+ assert.equal((await query("SELECT code FROM w1.audit_events WHERE code='SAFETY_MODEL_NO_DELIVERY'")).rows.length,1);
  assert.equal((await query("SELECT code FROM w1.audit_events WHERE code='SAFETY_BYPASS'")).rows.length,0);
  const raw=standardSafety(detectSafety('我想自殺'));
  for(const bad of [raw.replace('[[END]]','[[J1]]\n完整解卦\n[[END]]'),raw.replaceAll('1925',''),raw.replace('level: crisis','level: green'),raw.replace('你的安全','你的安全，請購買方案')])assert.throws(()=>safetyDelivery(bad),/SAFETY_NO_DELIVERY/);

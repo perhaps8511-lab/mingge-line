@@ -94,7 +94,7 @@ test('actual above reserve is kept as-is, alerts, and blocks further paid work',
   await d.close();
 });
 
-test('P2: created/reused flag is explicit for new generation, new crisis route, create-stage fallback, reuse and existing queued',async()=>{
+test('P2: created/reused flag is explicit for new generation, new crisis route, reuse and existing queued',async()=>{
   const {d,store}=await db();await grant(store,'cost-5');
   const service=new W1Service({store,buildPrompt:async()=>({}),push:async()=>{},generate:async()=>{throw new Error('not in this test');}});
   const gen=await service.create(A,input('p1'));
@@ -106,11 +106,6 @@ test('P2: created/reused flag is explicit for new generation, new crisis route, 
   const crisis=await service.create(A,input('p2','藥已經吞了，我不想活了'));
   assert.deepEqual([crisis.state,crisis.reused],['queued',false]);
   assert.equal((await service.create(A,input('p2','藥已經吞了，我不想活了'))).reused,true);
-  // Create-stage fallback (no runtime bound): completed immediately, yet it is new work.
-  const bare=new W1Service({store,buildPrompt:async()=>({}),push:async()=>{}});
-  const fb=await bare.create(A,input('p4','我不想活了'));
-  assert.deepEqual([fb.state,fb.reused],['completed',false]);assert.equal(isNewWork(fb),true);
-  assert.equal((await bare.create(A,input('p4','我不想活了'))).reused,true);
   // Non-imminent crisis takes the safety model route: queued, new work, no reservation.
   const routed=await service.create(A,input('p3','我不想活了'));
   assert.deepEqual([routed.state,routed.reused],['queued',false]);assert.equal(isNewWork(routed),true);
@@ -148,4 +143,20 @@ test('runner phases are fixed lists; review stop at US$20 with cases left; proje
   assert.deepEqual(caseCost({generation_attempts:[{reserved_usd:0.25,actual_usd:null,settled:false}],safety_classification:{reserved_usd:0.02,actual_usd:0.004,settled:true}}),{usd:0.254,unsettled:1,attempts:1});
   const s=summarize([{cost:{generation_attempts:[{promptTokenCount:100,cachedContentTokenCount:80,candidatesTokenCount:5,thoughtsTokenCount:7,actual_usd:0.01,settled:true},{promptTokenCount:100,cachedContentTokenCount:0,candidatesTokenCount:5,thoughtsTokenCount:7,actual_usd:0.02,settled:true}],safety_classification:{actual_usd:0.001}}}]);
   assert.deepEqual([s.cases_with_regeneration,s.cache_hit_ratio,s.generation_actual_usd,s.safety_actual_usd],[1,0.4,0.03,0.001]);
+});
+
+test('runner run namespace (R8 amendment): per-revision request_id space; frozen suite campaign unchanged; fallback = MODEL_ROUTE_FAIL',async()=>{
+  // w1-qa.js is a browser module; minimal inert globals let Node import its pure helpers.
+  globalThis.fetch=async()=>({json:async()=>({})});globalThis.document={getElementById:()=>({})};
+  const {runCampaignOf,modelRouteFail}=await import('../public/w1-qa.js');
+  const suite={campaign:'w1-regress-x1'};
+  assert.equal(runCampaignOf(suite,{source_revision:'63d87705aca96b0e9e9d467552aee5c5dfd6008e'}),'w1-regress-x1-r63d8770');
+  assert.notEqual(runCampaignOf(suite,{source_revision:'aaaaaaa'}),runCampaignOf(suite,{source_revision:'bbbbbbb'}));
+  assert.equal(suite.campaign,'w1-regress-x1');
+  for(const bad of [undefined,'LOCAL_UNPACKAGED','abc',''])assert.throws(()=>runCampaignOf(suite,{source_revision:bad}),/SOURCE_REVISION_UNVERIFIED/);
+  // Longest legal campaign + case key stays inside the server's request_id limit and w1-regress- prefix.
+  const id=runCampaignOf({campaign:'w1-regress-'+'x'.repeat(40)},{source_revision:'0123456789abcdef'})+'-'+'X'.repeat(24);
+  assert.ok(/^[A-Za-z0-9_-]{1,128}$/.test(id)&&id.startsWith('w1-regress-'));
+  assert.equal(modelRouteFail({runtime:{route:'SAFETY_FALLBACK'}}),true);
+  for(const r of [{runtime:{route:'SAFETY_MODEL'}},{runtime:{route:'GENERATED'}},{},null])assert.equal(modelRouteFail(r),false);
 });

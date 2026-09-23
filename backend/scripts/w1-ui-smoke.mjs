@@ -7,7 +7,7 @@ import {W1Service} from '../src/w1/service.js';
 import {migrateW1} from '../src/w1/schema.js';
 import {createW1Server} from '../src/w1/http.js';
 import {copy} from '../public/copy.js';
-import {safetyFallback} from '../src/w1/safety.js';
+import {standardSafety} from '../src/w1/safety.js';
 const {chromium}=await import(pathToFileURL(process.env.W1_PLAYWRIGHT_MODULE));
 const out=process.argv[2];if(!out)throw new Error('OUTPUT_REQUIRED');mkdirSync(out,{recursive:true});
 const db=new PGlite();const query=async(sql,args)=>{const r=args===undefined?(await db.exec(sql)).at(-1):await db.query(sql,args);return {...r,rowCount:r.affectedRows??r.rows.length};};
@@ -16,8 +16,8 @@ await migrateW1(pool);const store=new W1Store(pool),subject=`U${'e'.repeat(32)}`
 await store.grant(subject,{quota:3,expiresAt:new Date(Date.now()+3600000).toISOString(),enrollmentId:'ui-synthetic'});
 const raw='#META_START\nzhu_li_ren: lao_yi\nmain_kaguan: A\nsub_kaguan: none\nzou_xiang: bao_shou\nredline: false\nlevel: green\ncategory: none\nstandard_response: false\nhotline_given: false\n#META_END\n'+[1,2,3,4,5,6].map(i=>`[[J${i}]]\n合成測試信箋，第 ${i} 段。\n`).join('')+'[[ZY]]\n合成贈言。\n[[NEXT]]\n合成下一步。\n[[END]]';
 let generated=0;
-// Synthetic provider: the crisis request (safety model route) gets an adopted v34 [[SR]]; others a full letter.
-const sr=safetyFallback('藥已經吞了',{imminent:true});
+// Synthetic provider: the crisis request (safety model route) gets the v34 self-harm [[SR]]; others a full letter.
+const sr=standardSafety({imminent:true});
 const service=new W1Service({store,manifest:{synthetic:true},buildPrompt:async b=>({q:b.question_text}),
  generate:async({prompt})=>{generated++;return {text:/不想活/.test(prompt.q)?sr:raw,finishReason:'STOP',runtime:{synthetic:true}};},push:async()=>{}});
 let base;

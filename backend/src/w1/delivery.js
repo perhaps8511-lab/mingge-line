@@ -10,18 +10,11 @@ const enums = {
 const checked = new WeakSet();
 const ORDER = ['GZ','J5','J2','J3','J4','J1','J6','ZY','NEXT'];
 const HOTLINES = new Set(['1925','119','110','1995','1980','1966','0800507272','113']);
-// v34 §4.0.3 overseas branch replaces every Taiwan dial instruction (§9.3 1925 rule then does not apply).
-// The exemption needs BOTH a request-side overseas sign (context.overseas, computed from the question —
-// never trusted from model output alone) and an output that points to local help (battery LN-31 accepts
-// 當地 or 所在地). Foreign numbers are never allowed (v34: no local numbers; battery bans 911/988).
-const LOCAL_HELP = /(所在地|當地)/;
-const FOREIGN_EMERGENCY = /(?<![0-9])(911|988|999|112|000)(?![0-9])/;
 const URGENT_HARM_MARK = '先停下來';          // v34 urgent-harm-to-others branch opener (no 113)
 const VICTIM_SAFETY_MARK = '你現在的安全最重要'; // v34 violence-safety branch opener (lists 113)
-export function requiredHotlineErrors(meta, raw, context = {}) {
-  const errors = FOREIGN_EMERGENCY.test(raw) ? ['HOTLINE_NOT_ALLOWED'] : [];
-  if (context.overseas === true && LOCAL_HELP.test(raw)) return errors;
-  if (meta.category === 'self_harm') return raw.includes('1925') ? errors : [...errors, 'HOTLINE_MISSING'];
+export function requiredHotlineErrors(meta, raw) {
+  const errors = [];
+  if (meta.category === 'self_harm') return raw.includes('1925') ? errors : ['HOTLINE_MISSING'];
   if (meta.category === 'violence') {
     if (!raw.includes('110')) errors.push('HOTLINE_MISSING');
     // Victim safety (incl. proxy asking) must list 113. Urgent harm to others has none; a mixed crisis
@@ -34,8 +27,7 @@ export function requiredHotlineErrors(meta, raw, context = {}) {
   // No adopted v34 crisis branch exists for any other category: fail closed.
   return meta.level === 'crisis' ? [...errors, 'CRISIS_CATEGORY_UNSUPPORTED'] : errors;
 }
-// context.overseas: request-side overseas sign (see requiredHotlineErrors); defaults to Taiwan.
-export function checkConsistency(raw, finishReason = 'STOP', context = {}) {
+export function checkConsistency(raw, finishReason = 'STOP') {
   const errors = [];
   if (typeof raw !== 'string' || raw.length > 200000) return { ok: false, errors: ['OUTPUT_INVALID'] };
   const block = raw.match(/#META_START\s*\n([\s\S]*?)\n\s*#META_END/);
@@ -72,7 +64,7 @@ export function checkConsistency(raw, finishReason = 'STOP', context = {}) {
     // Category-aware required resources (GPT bounded ruling 2026-09-23, restoring adopted v34 §4.0.3/§9.3):
     // 1925 is the self-harm resource, not a universal crisis requirement. Requirements are a subset of
     // each v34 branch's exact text and never contradict the frozen battery.
-    for (const code of requiredHotlineErrors(meta, raw, context)) errors.push(code);
+    for (const code of requiredHotlineErrors(meta, raw)) errors.push(code);
     const patterns = [/【\s*(\d{3,4})\s*】/g,
       /(?:專線|熱線|撥打|請撥|快撥|電話|打給|打)[^0-9]{0,6}(\d{3,4})(?![0-9\-－—–])/g,
       /(?<![0-9])(0800-?\d{3}-?\d{3})(?![0-9])/g];
@@ -103,10 +95,10 @@ export function attemptEvidence(attempt, output, errors) {
     usage: { prompt: n(u.input), cached: n(u.cached), candidates: n(u.output), thoughts: n(u.thinking) } };
 }
 // accept(value) may add route-specific rejection codes to an otherwise consistent output.
-export async function generateChecked(generate, alert, { accept, context } = {}) {
+export async function generateChecked(generate, alert, { accept } = {}) {
   for (let attempt = 0; attempt < 2; attempt++) {
     const output = await generate(attempt);
-    const result = checkConsistency(output.text, output.finishReason, context);
+    const result = checkConsistency(output.text, output.finishReason);
     const errors = result.ok ? (accept ? accept(result.value) : []) : result.errors;
     if (!errors.length) return { output, delivery: classifyDelivery(result.value) };
     await alert('CONSISTENCY_FAILED', attemptEvidence(attempt, output, errors));

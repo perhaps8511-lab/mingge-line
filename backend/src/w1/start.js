@@ -80,15 +80,12 @@ async function boot() {
       'Content-Security-Policy':"default-src 'self'; script-src 'self' https://static.line-scdn.net; style-src 'self'; connect-src 'self' https://api.line.me https://access.line.me "+(env.W1_RELAY_ORIGIN??'')+"; frame-src https://access.line.me; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"});res.end(content);return true;
   },
  });
- // Separate loops: a safety-route job never waits behind an ordinary letter, and the sweep that delivers the
- // adopted fallback for a stalled safety job does not depend on either generation loop.
- const loop=(fn,ms)=>{let busy=false;return setInterval(async()=>{if(busy)return;busy=true;try{await fn();}catch{emit('JOB_UNRESOLVED');}finally{busy=false;}},ms);};
- const timer=loop(()=>service.tickOrdinary(),1000),safetyTimer=loop(()=>service.tickSafety(),1000),sweepTimer=loop(()=>service.sweepSafety(),5000);
+ const timer=setInterval(async()=>{if(ticking)return;ticking=true;try{await service.tick();}catch{emit('JOB_UNRESOLVED');}finally{ticking=false;}},1000);let ticking=false;
  let checkingSlow=false;
  const slowTimer=setInterval(async()=>{if(checkingSlow)return;checkingSlow=true;try{
    const row=await store.claimSlowNotice();if(row)await push({...row,push_key:randomUUID(),output_json:{sections:[{tag:'STATUS',text:copy.slow}]}});
  }catch{emit('SLOW_NOTICE_UNCONFIRMED');}finally{checkingSlow=false;}},5000);
  server.listen(Number(env.PORT??8080));
- const close=()=>{for(const t of [timer,safetyTimer,sweepTimer,slowTimer])clearInterval(t);server.close(()=>pool.end());};process.on('SIGTERM',close);process.on('SIGINT',close);
+ const close=()=>{clearInterval(timer);clearInterval(slowTimer);server.close(()=>pool.end());};process.on('SIGTERM',close);process.on('SIGINT',close);
 }
 boot().catch(()=>{emit('W1_BOOT_FAILED');process.exitCode=1;});

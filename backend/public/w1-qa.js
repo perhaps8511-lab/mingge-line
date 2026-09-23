@@ -1,8 +1,17 @@
 import {phasePlan,isNewWork,caseCost,projection,summarize,HARD_CAP_USD,REVIEW_STOP_USD,COST_STOP_CODES} from './w1-qa-cost.js';
 const $=id=>document.getElementById(id);
 const SUITE_SHA256='dac0b95f771e539a8416431dac8a35da30e53b66bdc118621a2496f06214e8ff';
+// Run namespace (GPT R8 re-review, bounded amendment): the frozen suite bytes/campaign stay unchanged; each
+// deployed revision gets its own request_id space so a rerun never reuses another revision's records.
+export function runCampaignOf(suite,manifest){
+ const rev=manifest?.source_revision;
+ if(typeof rev!=='string'||!/^[0-9a-f]{7,40}$/.test(rev))throw new Error('SOURCE_REVISION_UNVERIFIED');
+ return suite.campaign+'-r'+rev.slice(0,7);
+}
+// A fallback is never a model-route result: it is MODEL_ROUTE_FAIL and never counts toward A4 PASS.
+export const modelRouteFail=result=>result?.runtime?.route==='SAFETY_FALLBACK';
 const config=await(await fetch('/ui-config',{cache:'no-store'})).json();
-let token,suite,manifest,running=false,stop=false,rows=[],newCosts=[],projections=[],phase='';
+let token,suite,manifest,running=false,stop=false,rows=[],newCosts=[],projections=[],phase='',runCampaign='';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function api(path,body,headers={}){
  const response=await fetch(config.relayOrigin+path,{method:body?'POST':'GET',cache:'no-store',headers:{'X-Line-AccessToken':token,'Content-Type':'application/json',...headers},body:body?JSON.stringify(body):undefined});
@@ -27,8 +36,8 @@ $('run').onclick=async()=>{
  let halt='',fresh=0;
  try{
   // Scope is the fixed phase list; new-vs-reused comes from the server's reused flag.
-  const plan=phasePlan(suite.cases,$('phase').value);phase=$('phase').value;
-  for(const [i,c] of plan.cases.entries()){if(stop)break;const began=Date.now();const request_id=suite.campaign+'-'+c.case_key;
+  const plan=phasePlan(suite.cases,$('phase').value);phase=$('phase').value;runCampaign=runCampaignOf(suite,manifest);
+  for(const [i,c] of plan.cases.entries()){if(stop)break;const began=Date.now();const request_id=runCampaign+'-'+c.case_key;
    $('status').textContent=`${phase==='targeted'?'第一階段 targeted':'第二階段 remaining'} ${i+1}/${plan.cases.length}：${c.case_key}`;
    // End-to-end timing from this phone: LIFF token -> Worker LINE verify -> backend (+ classifier) -> saved.
    let created;const t0=performance.now();
@@ -42,12 +51,14 @@ $('run').onclick=async()=>{
    const terminalMs=Math.round(performance.now()-t0);
    const cc=caseCost(result.cost);
    if(isNew){fresh++;newCosts.push(cc.usd);}
-   rows.push({case_key:c.case_key,phase,new_in_this_run:isNew,case_cost_usd:cc.usd,submit_ms:submitMs,terminal_ms:terminalMs,...result});
+   const routeFail=modelRouteFail(result);
+   rows.push({case_key:c.case_key,phase,new_in_this_run:isNew,case_cost_usd:cc.usd,submit_ms:submitMs,terminal_ms:terminalMs,...result,...(routeFail?{verdict:'MODEL_ROUTE_FAIL',a4_countable:false}:{})});
    const proj=projection({totalEffectiveUsd:result.cost_total?.total_effective_usd??0,newCaseCosts:newCosts,remainingCases:plan.remainingAfter(i)});
    projections.push({after:c.case_key,...proj});
    $('summary').textContent=JSON.stringify({phase,processed:rows.length,new_this_run:fresh,states:rows.reduce((a,r)=>(a[r.state]=(a[r.state]??0)+1,a),{}),
     ...proj,baseline:summarize(rows)},null,2);$('download').disabled=false;
    if(COST_STOP_CODES.includes(result.error_code)){halt=`成本守門已停止生成（${result.error_code}），停止並回報 Owner。`;break;}
+   if(routeFail&&phase==='targeted'){halt=`${c.case_key} 為 SAFETY_FALLBACK（MODEL_ROUTE_FAIL），targeted 階段停止，不計 A4 PASS。`;break;}
    if(!['completed','failed'].includes(result.state))throw new Error('GENERATION_UNRESOLVED');
    if(proj.stop){halt=`預估總額 US$${proj.projected_total_usd} 超過 US$30，停止並回報 Owner，不自動加額。`;break;}
    if(proj.review_stop){halt=`累積成本 US$${proj.spent_incl_canary_usd} 已達 US$20 且尚未跑完，停止回審。`;break;}
@@ -58,4 +69,4 @@ $('run').onclick=async()=>{
  }catch{$('status').textContent='結果未確認，已停止且不自動重送；請由 Codex 查 owning store。';}
  finally{running=false;$('stop').disabled=true;$('run').disabled=true;}
 };
-$('download').onclick=()=>{const blob=new Blob([JSON.stringify({kind:'W1_SYNTHETIC_RESULTS',manifest,verified_suite_sha256:SUITE_SHA256,source_sha256:suite.source_sha256,campaign:suite.campaign,phase,rows,cost_baseline:summarize(rows),projections,hard_cap_usd:HARD_CAP_USD,review_stop_usd:REVIEW_STOP_USD},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=suite.campaign+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+$('download').onclick=()=>{const blob=new Blob([JSON.stringify({kind:'W1_SYNTHETIC_RESULTS',manifest,verified_suite_sha256:SUITE_SHA256,suite_sha256:SUITE_SHA256,source_sha256:suite.source_sha256,campaign:suite.campaign,suite_campaign:suite.campaign,run_campaign:runCampaign,source_revision:manifest?.source_revision??null,model_route_fail:rows.filter(r=>r.verdict==='MODEL_ROUTE_FAIL').map(r=>r.case_key),phase,rows,cost_baseline:summarize(rows),projections,hard_cap_usd:HARD_CAP_USD,review_stop_usd:REVIEW_STOP_USD},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(runCampaign||suite.campaign)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};

@@ -9,62 +9,21 @@ export function detectSafety(question) {
     .replace(/(?:工作|專案|會議|關係)(?:快)?(?:結束|解脫)/g,'');
   const weak=/(整理保單|安排後事|把事情交代好|寫好遺書|把帳戶密碼留給家人)/.test(q)&&/(公司倒了|倒閉|破產|一無所有|走投無路|失去一切|沒有退路)/.test(q);
   const imminent=/(現在站在橋邊|藥已經吞了|東西都準備好了.*就今晚)/.test(q);
-  if(!(weak||imminent||/(不想活|活不下去|輕生|自殺|自殘|傷害自己|想離開這個世界|想死)/.test(q)))return null;
-  // GPT bounded ruling 2026-09-23 (narrow SAFETY_BYPASS). No keyword or regex can prove the absence of a
-  // mixed-crisis, proxy, caregiver or overseas context, so there is no fixed-template bypass: every keyword
-  // hit takes the safety-only v34 model route (the adopted branch is chosen with full context), bounded by a
-  // deadline and backed by the adopted fallback below.
-  return {level:'crisis',category:'self_harm',imminent,overseas:overseasSignal(question)};
+  return weak||imminent||/(不想活|活不下去|輕生|自殺|自殘|傷害自己|想離開這個世界|想死)/.test(q)?{level:'crisis',category:'self_harm',imminent}:null;
 }
-// Broad on purpose: it only picks the fallback's adopted first line and the gate's overseas exemption (which
-// also needs local-help wording in the output). Common Taiwan platform names are not places.
-const PLATFORMS='LINE|PTT|Dcard|IG|FB|Facebook|Instagram|Google|YouTube|Threads|Discord|Telegram|Twitter|TikTok';
-export function overseasSignal(question) {
-  return /(國外|海外|外國|異國|出國|留學|遊學|打工度假|外派|移民|時差|不在台灣|不在臺灣|美國|加州|德州|夏威夷|日本|沖繩|英國|加拿大|澳洲|紐西蘭|德國|法國|義大利|西班牙|荷蘭|瑞士|瑞典|歐洲|墨西哥|韓國|新加坡|香港|澳門|中國|大陸|越南|泰國|馬來西亞|菲律賓|印尼|印度|杜拜|東京|大阪|京都|首爾|釜山|上海|北京|深圳|廣州|吉隆坡|曼谷|河內|胡志明|馬尼拉|雅加達|倫敦|巴黎|柏林|慕尼黑|阿姆斯特丹|巴塞隆納|紐約|洛杉磯|舊金山|灣區|西雅圖|波士頓|芝加哥|休士頓|溫哥華|多倫多|雪梨|墨爾本|布里斯本|奧克蘭)/.test(question)||
-    new RegExp(`在\\s*(?!(?:${PLATFORMS})(?![A-Za-z]))[A-Za-z]{3,}`,'i').test(question);
-}
-export function othersSignal(question) {
-  return /(孩子|小孩|兒子|女兒|寶寶|老公|先生|丈夫|太太|老婆|妻子|爸|媽|父親|母親|阿嬤|阿公|奶奶|爺爺|外婆|外公|婆婆|公公|弟弟|妹妹|哥哥|姊姊|姐姐|家人|全家|朋友|同事|室友|老闆|主管|前夫|前妻|男友|女友|伴侶|鄰居|同學|老師|他|她)/.test(question)&&
-    /(殺|帶走|帶著|一起|別醒|不要醒|醒不來|消失|同歸於盡|傷害|打死|弄死|陪我走)/.test(question);
-}
-// v34 caregiver add-on applies once self-harm crisis is established and the context shows a family carer.
-export function caregiverSignal(question) { return /(照顧|照護|長照|看護|陪病)/.test(question); }
-function v34Source() {
+export function standardSafety(detection) {
   const bytes=readFileSync(new URL('../../../prompts/jiegua/v34.md',import.meta.url));
   if(createHash('sha256').update(bytes).digest('hex')!=='be08968c3226d55aa963ad7de12c6251f0365887f051f5e7d77b0847d395287a')throw new Error('PROMPT_SHA_MISMATCH');
-  return bytes.toString('utf8');
-}
-// Exact adopted v34 sentences (§4.0.3), located verbatim in the pinned prompt; never re-authored here.
-const V34_LINES={imminent:'請現在就撥【119】或【110】,讓人馬上到你身邊。',mixed:'如果危險正在發生,請現在就撥【110】;有人受傷或需要救護,撥【119】。',
-  overseas:'請現在撥打你所在地的緊急救援電話',taiwanLabel:'以下是台灣的服務,人在台灣時可以使用'};
-// Safety net for the safety-only model route (any failure: provider error, budget stop, rejected output).
-// It renders the adopted self-harm standard response with the adopted first line the context calls for,
-// so a crisis-routed user never ends with no resource. Requires review (see return packet).
-export function safetyFallback(question,{imminent=false}={}) {
-  const source=v34Source();
-  for(const line of Object.values(V34_LINES))if(!source.includes(line))throw new Error('SAFETY_STANDARD_MISSING');
-  const lead=overseasSignal(question)?`${V34_LINES.overseas}。\n${V34_LINES.taiwanLabel}。\n`:
-    imminent?`${V34_LINES.imminent}\n`:othersSignal(question)?`${V34_LINES.mixed}\n`:'';
-  const text=standardSafety({imminent:false},lead);
-  if(!caregiverSignal(question))return text;
-  // Adopted caregiver sentence, verbatim from the pinned prompt, placed after 「同樣可以陪你。」 as v34 directs.
-  const add=source.match(/「(照顧的重量不該一個人扛。[\s\S]*?喘息與支援。)」/)?.[1];
-  const anchor='同樣可以陪你。\n';
-  if(!add||!text.includes(anchor))throw new Error('SAFETY_STANDARD_MISSING');
-  return text.replace(anchor,`${anchor} ${add.replace(/\n\s*/g,'\n ')}\n`);
-}
-export function standardSafety(detection,leadOverride=null) {
-  const source=v34Source();
+  const source=bytes.toString('utf8');
   const body=source.match(/「謝謝你願意說出來。這一刻,[\s\S]*?身邊有沒有人可以陪你\?」/)?.[0];
   if(!body)throw new Error('SAFETY_STANDARD_MISSING');
-  const lead=leadOverride??(detection.imminent?'請現在就撥【119】或【110】,讓人馬上到你身邊。\n':'');
+  const lead=detection.imminent?'請現在就撥【119】或【110】,讓人馬上到你身邊。\n':'';
   return '#META_START\nzhu_li_ren: lao_yi\nmain_kaguan: none\nsub_kaguan: none\nzou_xiang: none\nredline: true\nlevel: crisis\ncategory: self_harm\nstandard_response: true\nhotline_given: true\n#META_END\n[[SR]]\n'+lead+body+'\n[[END]]';
 }
-export const SAFETY_COMMERCE=/((?<!免)付費|購買|升級方案|訂閱|https?:\/\/)/;
-export function safetyDelivery(raw,path='SAFETY_BYPASS') {
+export function safetyDelivery(raw) {
   const gate=checkConsistency(raw);
-  if(!gate.ok||!gate.value.hasSR||gate.value.meta.level!=='crisis'||gate.value.meta.category!=='self_harm'||Object.keys(gate.value.segments).some(k=>!['SR','END'].includes(k))||SAFETY_COMMERCE.test(gate.value.segments.SR))throw new Error('SAFETY_NO_DELIVERY');
-  return {output:{text:raw,runtime:{path,provider:'NONE',charge:0}},delivery:classifyDelivery(gate.value)};
+  if(!gate.ok||!gate.value.hasSR||gate.value.meta.level!=='crisis'||gate.value.meta.category!=='self_harm'||Object.keys(gate.value.segments).some(k=>!['SR','END'].includes(k))||/((?<!免)付費|購買|升級方案|訂閱|https?:\/\/)/.test(gate.value.segments.SR))throw new Error('SAFETY_NO_DELIVERY');
+  return {output:{text:raw,runtime:{path:'SAFETY_BYPASS',provider:'NONE',charge:0}},delivery:classifyDelivery(gate.value)};
 }
 export function createSafetyClassifier(adapter) {
   return async question=>{
