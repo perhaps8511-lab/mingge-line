@@ -30,16 +30,19 @@ $('run').onclick=async()=>{
   const plan=phasePlan(suite.cases,$('phase').value);phase=$('phase').value;
   for(const [i,c] of plan.cases.entries()){if(stop)break;const began=Date.now();const request_id=suite.campaign+'-'+c.case_key;
    $('status').textContent=`${phase==='targeted'?'第一階段 targeted':'第二階段 remaining'} ${i+1}/${plan.cases.length}：${c.case_key}`;
-   let created;
+   // End-to-end timing from this phone: LIFF token -> Worker LINE verify -> backend (+ classifier) -> saved.
+   let created;const t0=performance.now();
    try{created=await api('/gua-records',{...c.input,request_id,session_id:request_id});}
    catch(e){if(COST_STOP_CODES.includes(e.message)){halt=`成本守門停止（${e.message}），停止並回報 Owner。`;break;}throw e;}
    if(!created.id||created.readback_verified!==true)throw new Error('SAVE_UNCONFIRMED');
+   const submitMs=Math.round(performance.now()-t0);
    const isNew=isNewWork(created);
    let result;const until=Date.now()+750000;
    do{await pause(isNew?2000:0);result=await api('/regression/records/'+created.id);if(['completed','failed','generation_unknown'].includes(result.state))break;if(!isNew)await pause(2000);}while(Date.now()<until);
+   const terminalMs=Math.round(performance.now()-t0);
    const cc=caseCost(result.cost);
    if(isNew){fresh++;newCosts.push(cc.usd);}
-   rows.push({case_key:c.case_key,phase,new_in_this_run:isNew,case_cost_usd:cc.usd,...result});
+   rows.push({case_key:c.case_key,phase,new_in_this_run:isNew,case_cost_usd:cc.usd,submit_ms:submitMs,terminal_ms:terminalMs,...result});
    const proj=projection({totalEffectiveUsd:result.cost_total?.total_effective_usd??0,newCaseCosts:newCosts,remainingCases:plan.remainingAfter(i)});
    projections.push({after:c.case_key,...proj});
    $('summary').textContent=JSON.stringify({phase,processed:rows.length,new_this_run:fresh,states:rows.reduce((a,r)=>(a[r.state]=(a[r.state]??0)+1,a),{}),
@@ -50,7 +53,8 @@ $('run').onclick=async()=>{
    if(proj.review_stop){halt=`累積成本 US$${proj.spent_incl_canary_usd} 已達 US$20 且尚未跑完，停止回審。`;break;}
    if(isNew)await pause(Math.max(0,11000-(Date.now()-began)));
   }
-  $('status').textContent=halt||(phase==='targeted'?`第一階段 targeted 20 題已處理（新題 ${fresh}）；請下載結果，待回讀成本後再執行第二階段。`:'第二階段已處理；仍須機械／語意判分，不代表 PASS。');
+  const done=rows.length===plan.cases.length;
+  $('status').textContent=halt||(!done?`已停止：本階段 ${rows.length}/${plan.cases.length} 題；請下載結果，依實際清單判定完整性。`:phase==='targeted'?`第一階段 targeted 20 題已處理（新題 ${fresh}）；請下載結果，待回讀成本後再執行第二階段。`:'第二階段已處理；仍須機械／語意判分，不代表 PASS。');
  }catch{$('status').textContent='結果未確認，已停止且不自動重送；請由 Codex 查 owning store。';}
  finally{running=false;$('stop').disabled=true;$('run').disabled=true;}
 };
