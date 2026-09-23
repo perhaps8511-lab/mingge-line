@@ -11,7 +11,7 @@ async function api(path,body,extraHeaders={}) {
 async function quota(){const q=await api('/quota');remaining=q.remaining;$('quota').textContent=`尚餘 ${remaining} 枚問卦銅錢。`;$('quota').hidden=safetyView;$('payment').textContent=!safetyView&&remaining<=1?copy.unavailablePayment:'';$('cast').disabled=false;}
 $('login').onclick=async()=>{
  try{await liff.init({liffId:config.liffId});if(!liff.isLoggedIn()){liff.login();return;}token=liff.getAccessToken();
- $('login').hidden=true;$('login-copy').hidden=true;await quota();await history();}catch(e){if(e.message==='OWNER_TEST_GRANT_REQUIRED')$('enroll').hidden=false;else $('status').textContent=copy.unknown;}
+ $('login').hidden=true;$('login-copy').hidden=true;$('status').textContent='';await quota();await history();}catch(e){if(e.message==='OWNER_TEST_GRANT_REQUIRED')$('enroll').hidden=false;else $('status').textContent=copy.unknown;}
 };
 $('cast').onpointerdown=e=>{if(!token)return;pressedAt=Date.now();e.target.setPointerCapture(e.pointerId);};
 $('cast').onpointerup=()=>{
@@ -46,6 +46,7 @@ async function history(){const data=await api('/gua-records');$('records').repla
  const input=r.input??r;button.textContent=[input.qigua_time,input.ben_gua,input.question_text].filter(Boolean).join(' · ');
  button.onclick=()=>{if(r.origin==='legacy'){const view=legacyLetterView(r.output_json);$('letter').textContent=view.text;$('disclaimer').textContent=view.disclaimer??'';$('disclaimer').hidden=!view.disclaimer;}else show(r);};$('records').append(button);}
 }
-$('history').onclick=()=>history().catch(()=>{$('status').textContent=copy.unknown;});
+// Before login there is no token: sign in first instead of showing a save-state notice.
+$('history').onclick=()=>token?history().catch(()=>{$('status').textContent=copy.unknown;}):$('login').onclick();
 
 $('enroll').onsubmit=async e=>{e.preventDefault();const code=$('enrollment-token').value;$('enrollment-token').value='';try{await api('/test-grants/enroll',{}, {'X-W1-Enrollment-Token':code});$('enroll').hidden=true;await quota();await history();}catch{$('status').textContent=copy.unknown;}};

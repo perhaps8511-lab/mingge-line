@@ -47,8 +47,10 @@ try {
  assert.equal(await page.locator('#disclaimer').textContent(),copy.disclaimer);
  assert.equal(await page.locator('#letter p').first().textContent(),'合成測試信箋，第 5 段。');
  await page.screenshot({path:out+'/UI_MOBILE.png',fullPage:true});
- await page.close();page=await context.newPage();await page.goto(base);await page.click('#login');
- await page.waitForSelector('.record');await page.locator('.record').first().click();
+ await page.close();page=await context.newPage();await page.goto(base);
+ // Reopen: tapping 我的卦記 before login must sign in first, not show a save-state notice.
+ await page.click('#history');
+ await page.waitForSelector('.record');assert.equal(await page.locator('#status').textContent(),'');await page.locator('.record').first().click();
  assert.equal(await page.locator('#disclaimer').textContent(),copy.disclaimer);assert.equal(generated,1);
  assert.equal((await store.get(subject,saved.id)).charge,1);assert.equal((await store.quota(subject)).remaining,2);
  await page.setViewportSize({width:1100,height:900});await page.screenshot({path:out+'/UI_DESKTOP.png',fullPage:true});
@@ -63,7 +65,7 @@ try {
  assert.equal(generated,1);assert.equal(await page.locator('#disclaimer').isVisible(),false);
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:out+'/UI_SAFETY.png',fullPage:true});
  const report={status:'PASS',mode:'LOCAL_BROWSER_SYNTHETIC_LINE_AND_PROVIDER_REAL_PGLITE',
-  longPress:true,saveBeforeSent:true,closeReopenReadback:true,charge:1,remaining:2,generatedCalls:1,
+  longPress:true,saveBeforeSent:true,closeReopenReadback:true,historyBeforeLoginSignsIn:true,charge:1,remaining:2,generatedCalls:1,
   A14_exact:true,A12_first:'J5',safety_zero_quota_SR:true,safety_entitlement_unchanged:true,safety_no_payment_or_quota_copy:true,staging_live:'NOT_RUN',real_LINE:'NOT_RUN'};
  writeFileSync(out+'/UI_READBACK.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }finally{await browser?.close();await new Promise(r=>server.close(r));await db.close();}
