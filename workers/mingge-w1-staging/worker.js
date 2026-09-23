@@ -4,8 +4,21 @@ const b64url=bytes=>b64(bytes).replaceAll('+','-').replaceAll('/','_').replaceAl
 const unbase64=value=>Uint8Array.from(atob(value),c=>c.charCodeAt(0));
 const AUTH_CODES=new Set(['MISSING_LINE_TOKEN','LINE_CONFIG_MISSING','LINE_VERIFY_HTTP_REJECTED','LINE_AUDIENCE_MISMATCH',
   'LINE_EXPIRED','LINE_PROFILE_HTTP_REJECTED','LINE_PROFILE_INVALID','SIGNING_FAILED','API_FORWARD_FAILED','API_FORWARD_SUCCEEDED',
-  'API_RESPONSE_UNAUTHORIZED','API_RESPONSE_REJECTED','AUTH_INTERNAL']);
+  'API_RESPONSE_UNAUTHORIZED','API_RESPONSE_REJECTED','AUTH_INTERNAL',
+  'LINE_VERIFY_FETCH_FAILED','LINE_VERIFY_TOKEN_EXPIRED','LINE_VERIFY_TOKEN_INVALID','LINE_VERIFY_STATUS_400',
+  'LINE_VERIFY_STATUS_401','LINE_VERIFY_STATUS_4XX','LINE_VERIFY_STATUS_5XX','LINE_VERIFY_BODY_INVALID']);
 function authError(code){const error=new Error(code);error.authCode=code;return error;}
+// Maps a rejected LINE verify response to a fixed code. The upstream description is
+// only pattern-tested here and is never logged or returned.
+async function verifyRejectCode(response) {
+  const s=response.status;
+  if(s>=500)return 'LINE_VERIFY_STATUS_5XX';
+  if(s!==400&&s!==401)return 'LINE_VERIFY_STATUS_4XX';
+  let description='';try{const body=await response.json();description=typeof body?.error_description==='string'?body.error_description:'';}catch{}
+  if(/expired/i.test(description))return 'LINE_VERIFY_TOKEN_EXPIRED';
+  if(/invalid|not JWS/i.test(description))return 'LINE_VERIFY_TOKEN_INVALID';
+  return s===400?'LINE_VERIFY_STATUS_400':'LINE_VERIFY_STATUS_401';
+}
 function routeClass(path){
   if(path==='/quota')return 'QUOTA';
   if(path==='/test-grants/enroll'||/^\/test-grants\/[0-9a-f-]{36}\/revoke$/.test(path))return 'ENROLL';
@@ -36,9 +49,9 @@ export async function subjectToken(subject,requestId,source,env) {
 export async function verifyAccessToken(token,channelId,fetchImpl=fetch) {
   if(!token)throw authError('MISSING_LINE_TOKEN');if(!channelId)throw authError('LINE_CONFIG_MISSING');
   const verifyUrl=new URL('https://api.line.me/oauth2/v2.1/verify');verifyUrl.searchParams.set('access_token',token);
-  let a;try{a=await fetchImpl(verifyUrl,{redirect:'error',signal:AbortSignal.timeout(10000)});}catch{throw authError('LINE_VERIFY_HTTP_REJECTED');}
-  if(!a.ok)throw authError('LINE_VERIFY_HTTP_REJECTED');
-  let info;try{info=await a.json();}catch{throw authError('LINE_VERIFY_HTTP_REJECTED');}
+  let a;try{a=await fetchImpl(verifyUrl,{redirect:'error',signal:AbortSignal.timeout(10000)});}catch{throw authError('LINE_VERIFY_FETCH_FAILED');}
+  if(!a.ok)throw authError(await verifyRejectCode(a));
+  let info;try{info=await a.json();}catch{throw authError('LINE_VERIFY_BODY_INVALID');}
   if(info.client_id!==channelId)throw authError('LINE_AUDIENCE_MISMATCH');if(!(info.expires_in>0))throw authError('LINE_EXPIRED');
   let p;try{p=await fetchImpl('https://api.line.me/v2/profile',{headers:{Authorization:`Bearer ${token}`},redirect:'error',signal:AbortSignal.timeout(10000)});}catch{throw authError('LINE_PROFILE_HTTP_REJECTED');}
   if(!p.ok)throw authError('LINE_PROFILE_HTTP_REJECTED');let profile;try{profile=await p.json();}catch{throw authError('LINE_PROFILE_INVALID');}
