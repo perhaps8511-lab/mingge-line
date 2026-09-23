@@ -9,7 +9,7 @@ const json=(res,status,body)=>{
 };
 const allowedCodes=new Set(['UNAUTHORIZED','BAD_FIELD','NOT_FOUND','REQUEST_CONTENT_CONFLICT','NO_QUOTA',
   'WRITE_UNCONFIRMED','RUNTIME_BINDING_UNVERIFIED','ENROLLMENT_ALREADY_USED','GRANT_INVALID',
-  'OWNER_TEST_GRANT_REQUIRED','NEEDS_BOUNDED_CHANGE','LEGACY_READ_UNAVAILABLE','NOT_DELIVERABLE']);
+  'OWNER_TEST_GRANT_REQUIRED','NEEDS_BOUNDED_CHANGE','LEGACY_READ_UNAVAILABLE','NOT_DELIVERABLE','COST_HARD_CAP_REACHED']);
 async function bodyOf(req) {
   let size=0; const parts=[];
   for await(const chunk of req){size+=chunk.length;if(size>20000)throw new Error('BAD_FIELD');parts.push(chunk);}
@@ -55,7 +55,8 @@ export function createW1Server({service,authenticate,legacyReader=null,enrollmen
       } else if(req.method==='GET'&&/^\/regression\/records\/[0-9a-f-]{36}$/.test(url.pathname)) {
         const row=await service.store.get(auth.subject,url.pathname.split('/')[3]);
         if(!row.request_id.startsWith('w1-regress-'))return json(res,404,{error:'NOT_FOUND'});
-        result={id:row.id,state:row.state,raw_output:row.raw_output,runtime:row.runtime_json,charge:row.charge,manifest:service.manifest};
+        result={id:row.id,state:row.state,error_code:row.error_code,raw_output:row.raw_output,runtime:row.runtime_json,charge:row.charge,manifest:service.manifest,
+          cost:await service.store.recordCost(auth.subject,row.id),cost_total:await service.store.costTotal()};
       } else if(req.method==='POST'&&/^\/gua-records\/[0-9a-f-]{36}\/repush$/.test(url.pathname)) {
         result=await service.repush(auth.subject,url.pathname.split('/')[2]);
       } else return json(res,404,{error:'NOT_FOUND'});

@@ -48,8 +48,10 @@ export class W1Service {
       const prompt=await this.buildPrompt(row.input_json);
       result=await generateChecked(attempt=>this.generate({prompt,recordId:row.id,attempt}),
         code=>this.store.alert(row.id,code));
-    } catch {
-      await this.store.settle(row.id,null,'GENERATION_FAILED'); return true;
+    } catch(e) {
+      // Budget stops keep their own code so a runner can halt instead of scoring them as failures.
+      const code=['COST_HARD_CAP_REACHED','PROVIDER_BUDGET_EXHAUSTED'].includes(e?.message)?e.message:'GENERATION_FAILED';
+      await this.store.settle(row.id,null,code); return true;
     }
     // If persistence fails, leave the reservation unresolved. Never publish or
     // classify a DB failure as an ordinary generated failure and overwrite it.

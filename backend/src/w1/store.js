@@ -153,12 +153,13 @@ export class W1Store {
   async nextPendingPush() {
     return (await this.pool.query("SELECT id,subject FROM w1.gua_records WHERE state='completed' AND push_state='pending' ORDER BY completed_at LIMIT 1")).rows[0]??null;
   }
-  async reserveProviderCall(recordId,attempt,{campaign,budgetUsd,upperUsd}) {
-    if(typeof campaign!=='string'||!campaign||!Number.isFinite(budgetUsd)||!Number.isFinite(upperUsd)||upperUsd<=0||budgetUsd<=0)throw fail('PROVIDER_BUDGET_REQUIRED');
+  async reserveProviderCall(recordId,attempt,{campaign,budgetUsd,upperUsd,hardCapUsd}) {
+    if(typeof campaign!=='string'||!campaign||!Number.isFinite(budgetUsd)||!Number.isFinite(upperUsd)||upperUsd<=0||budgetUsd<=0||!Number.isFinite(hardCapUsd)||hardCapUsd<=0)throw fail('PROVIDER_BUDGET_REQUIRED');
     await this.tx(async c=>{
       await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['provider:'+campaign]);
-      const used=Number((await c.query('SELECT COALESCE(sum(reserved_usd),0) AS used FROM w1.provider_calls WHERE campaign=$1',[campaign])).rows[0].used);
+      const used=Number((await c.query('SELECT COALESCE(sum(COALESCE(actual_usd,reserved_usd)),0) AS used FROM w1.provider_calls WHERE campaign=$1',[campaign])).rows[0].used);
       if(used+upperUsd>budgetUsd*.9)throw fail('PROVIDER_BUDGET_EXHAUSTED');
+      await this.checkHardCap(c,upperUsd,hardCapUsd);
       await c.query('INSERT INTO w1.provider_calls(record_id,attempt,campaign,reserved_usd) VALUES($1,$2,$3,$4)',[recordId,attempt,campaign,upperUsd]);
     });
   }
@@ -167,8 +168,8 @@ export class W1Store {
     if(row&&row.input_sha!==createHash('sha256').update(JSON.stringify(canonical(input))).digest('hex'))throw fail('REQUEST_CONTENT_CONFLICT',409);
     return row?{...row,readback_verified:true}:null;
   }
-  async reserveSafetyCall(subject,{campaign,budgetUsd,upperUsd},input={request_id:randomUUID()}) {
-    if(!campaign||!Number.isFinite(budgetUsd)||!Number.isFinite(upperUsd)||budgetUsd<=0||upperUsd<=0)throw fail('SAFETY_BUDGET_REQUIRED');
+  async reserveSafetyCall(subject,{campaign,budgetUsd,upperUsd,hardCapUsd},input={request_id:randomUUID()}) {
+    if(!campaign||!Number.isFinite(budgetUsd)||!Number.isFinite(upperUsd)||budgetUsd<=0||upperUsd<=0||!Number.isFinite(hardCapUsd)||hardCapUsd<=0)throw fail('SAFETY_BUDGET_REQUIRED');
     return this.tx(async c=>{
       await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['safety:'+campaign]);
       await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['safety-subject:'+subject]);
@@ -178,10 +179,50 @@ export class W1Store {
       const active=await c.query("SELECT id FROM w1.test_grants WHERE subject=$1 AND environment='staging' AND expires_at>now() AND revoked_at IS NULL AND reason='w1_owner_uat' FOR SHARE",[subject]);
       if(!active.rows.length)throw fail('OWNER_GRANT_REQUIRED',403);
       const rate=Number((await c.query("SELECT count(*) AS n FROM w1.safety_calls WHERE subject=$1 AND created_at>now()-interval '60 seconds'",[subject])).rows[0].n);
-      const spent=Number((await c.query('SELECT COALESCE(sum(reserved_usd),0) AS n FROM w1.safety_calls WHERE campaign=$1',[campaign])).rows[0].n);
+      const spent=Number((await c.query('SELECT COALESCE(sum(COALESCE(actual_usd,reserved_usd)),0) AS n FROM w1.safety_calls WHERE campaign=$1',[campaign])).rows[0].n);
       if(rate>=6||spent+upperUsd>budgetUsd*.9)throw fail('SAFETY_BUDGET_EXHAUSTED',429);
+      await this.checkHardCap(c,upperUsd,hardCapUsd);
       const id=randomUUID();await c.query('INSERT INTO w1.safety_calls(id,subject,campaign,reserved_usd,request_id,input_sha) VALUES($1,$2,$3,$4,$5,$6)',[id,subject,campaign,upperUsd,input.request_id,hash]);return {id,cached:false};
     });
+  }
+  // Owner cost ruling 2026-09-23: one hard cap across provider + safety spend. Settled calls count
+  // their actual cost, unsettled calls their full reserve; the lock serializes both reserve paths.
+  async checkHardCap(c,upperUsd,hardCapUsd) {
+    await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['w1-cost-hard-cap']);
+    const total=Number((await c.query(`SELECT (SELECT COALESCE(sum(COALESCE(actual_usd,reserved_usd)),0) FROM w1.provider_calls)
+      +(SELECT COALESCE(sum(COALESCE(actual_usd,reserved_usd)),0) FROM w1.safety_calls) AS n`)).rows[0].n);
+    if(total+upperUsd>hardCapUsd)throw fail('COST_HARD_CAP_REACHED',429);
+  }
+  // Settle once from provider usage; a missing cost keeps the full reserve.
+  async settleProviderCall(recordId,attempt,cost) {
+    if(!cost)return false;
+    const r=await this.pool.query(`UPDATE w1.provider_calls SET prompt_tokens=$3,cached_tokens=$4,candidates_tokens=$5,thoughts_tokens=$6,
+      actual_usd=$7,settled_at=now() WHERE record_id=$1 AND attempt=$2 AND settled_at IS NULL`,
+      [recordId,attempt,cost.prompt,cost.cached,cost.candidates,cost.thoughts,cost.usd]);
+    return r.rowCount===1;
+  }
+  async settleSafetyCall(id,cost) {
+    if(!cost)return false;
+    const r=await this.pool.query(`UPDATE w1.safety_calls SET prompt_tokens=$2,cached_tokens=$3,candidates_tokens=$4,thoughts_tokens=$5,
+      actual_usd=$6,settled_at=now() WHERE id=$1 AND settled_at IS NULL`,[id,cost.prompt,cost.cached,cost.candidates,cost.thoughts,cost.usd]);
+    return r.rowCount===1;
+  }
+  async costTotal() {
+    const q=async table=>(await this.pool.query(`SELECT count(*)::int AS calls,count(settled_at)::int AS settled,
+      COALESCE(sum(actual_usd),0) AS actual,COALESCE(sum(reserved_usd) FILTER (WHERE settled_at IS NULL),0) AS open_reserve,
+      COALESCE(sum(COALESCE(actual_usd,reserved_usd)),0) AS effective FROM ${table}`)).rows[0];
+    const view=r=>({calls:r.calls,settled:r.settled,actual_usd:Number(r.actual),open_reserve_usd:Number(r.open_reserve),effective_usd:Number(r.effective)});
+    const provider=view(await q('w1.provider_calls')),safety=view(await q('w1.safety_calls'));
+    return {provider,safety,total_effective_usd:Math.round((provider.effective_usd+safety.effective_usd)*1e8)/1e8};
+  }
+  async recordCost(subject,recordId) {
+    const attempts=(await this.pool.query(`SELECT attempt,reserved_usd,prompt_tokens,cached_tokens,candidates_tokens,thoughts_tokens,actual_usd,settled_at
+      FROM w1.provider_calls WHERE record_id=$1 ORDER BY attempt`,[recordId])).rows;
+    const safety=(await this.pool.query(`SELECT s.reserved_usd,s.prompt_tokens,s.cached_tokens,s.candidates_tokens,s.thoughts_tokens,s.actual_usd,s.settled_at
+      FROM w1.safety_calls s JOIN w1.gua_records r ON r.subject=s.subject AND r.request_id=s.request_id WHERE r.id=$1 AND r.subject=$2`,[recordId,subject])).rows[0]??null;
+    const row=x=>({reserved_usd:Number(x.reserved_usd),promptTokenCount:x.prompt_tokens,cachedContentTokenCount:x.cached_tokens,
+      candidatesTokenCount:x.candidates_tokens,thoughtsTokenCount:x.thoughts_tokens,actual_usd:x.actual_usd===null?null:Number(x.actual_usd),settled:!!x.settled_at});
+    return {generation_attempts:attempts.map(a=>({attempt:a.attempt,...row(a)})),safety_classification:safety?row(safety):null};
   }
   async claimSlowNotice() {
     return (await this.pool.query(`UPDATE w1.gua_records SET slow_notified=true WHERE id=(
