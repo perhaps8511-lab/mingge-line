@@ -13,6 +13,17 @@
 //         需要 Secret: DIFY_LAOYI_KEY(Perth 貼進 Cloudflare Secrets;缺鑰時路由回 503)
 // S20260721 UAT F4: /laoyi/chat 加 Workers Rate Limiting API binding(LAOYI_RATE_LIMITER,見 wrangler.toml)
 //         per-verified-user 20 req/min,保護共用 Dify credit;workers.dev 子域無 zone,故不走 WAF 儀表板規則
+//
+// ⚠️ MAKE_EXIT 第2b段(獨立審 HOLD 修正②，2026-09-11)：本次修改**只 commit，不部署**。
+//   /history、/log、/trace、/log/seal、/trigger/deepdive 五條路由改為薄轉發到新的 Postgres 後端 API
+//   (env.MAKE_EXIT_API_BASE_URL)，取代直接讀寫 Airtable Divination_Log；驗證邏輯(resolveUserId)、
+//   ownership 比對、payload 驗證規則完全比照原本，不放寬。其餘路由(/study、/artifacts、
+//   /trigger/fupan、/laoyi/chat、/falsetoken/checkout)一個字不動。
+//   正式部署前必做：①在 wrangler 設定加 MAKE_EXIT_API_BASE_URL(指向正式環境的新後端，非 staging)；
+//   ②新後端目前 gua_records 表缺 bian_gua/dong_yao/output_json 三欄，下面標了 TODO，部署前要先補欄位
+//   +搬資料，否則這三個欄位在正式切換後會變成一律 null；③這是 Owner 明確裁定「切正式必須另發 GO」的
+//   動作，本次 commit 本身不構成部署授權。回退：`wrangler rollback` 回上一個部署版本即可，此檔沒有
+//   拆成兩支腳本，是同一支腳本內部路由改寫，回退是單一版本回滾，乾淨。
 // ====================================================
 
 const ALLOWED_ORIGIN = "https://perhaps8511-lab.github.io";
@@ -70,6 +81,9 @@ const ARTIFACT_PUBLIC_FIELDS = [
 ];
 const TRACE_MAX_BODY_BYTES = 4096;
 const TRACE_REQUEST_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// 新後端用 UUID 當主鍵(不是 Airtable 的 rec 前綴格式)；薄轉發路由用這個驗證 log_id 格式,
+// 格式不對就地回 400,不讓一個明顯錯的字串一路轉發到新 API 才在資料庫層炸開。
+const MAKE_EXIT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Hub R9, 2026-09-03: no completed owning-store readback. Shared by both R2 pages.
 const FUPAN_LIVE_PROVEN = false;
 const LAOYI_CONV_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
@@ -102,17 +116,17 @@ export default {
         return json({ error: e.message }, e.status || 401);
       }
 
+      if (!env.MAKE_EXIT_API_BASE_URL) {
+        return json({ error: "MAKE_EXIT_API_BASE_URL not configured" }, 503);
+      }
       if (!env.AIRTABLE_API_KEY) {
         return json({ error: "AIRTABLE_API_KEY not configured" }, 503);
       }
 
-      const [divResult, subResult] = await Promise.all([
-        airtableFetchStrict(env.AIRTABLE_API_KEY, AT_BASE, AT_DIV_LOG, {
-          filterByFormula: `AND({line_user_id_raw}="${verifiedUserId}",{entry_type}="divination")`,
-          sort: [{ field: "qigua_time", direction: "desc" }],
-          fields: ["question_text", "ben_gua", "bian_gua", "dong_yao", "qigua_time", "session_id", "entry_type", "golden_seal", "golden_seal_time", "trace_text", "trace_at"],
-          maxRecords: 50,
-        }),
+      // 卦記列表:薄轉發到新後端(MAKE_EXIT 遷移範圍)。會員狀態(Subscribers)不在本次遷移範圍——
+      // Owner 裁定 Entitlements/Subscribers 屬第5段(金流)才動,這裡維持原本直讀 Airtable。
+      const [newApiRes, subResult] = await Promise.all([
+        fetch(`${env.MAKE_EXIT_API_BASE_URL}/gua-records?subject=${encodeURIComponent(verifiedUserId)}`),
         airtableFetchStrict(env.AIRTABLE_API_KEY, AT_BASE, AT_SUBS, {
           filterByFormula: `{line_user_id}="${verifiedUserId}"`,
           fields: ["subscriber_tier", "trial_quota_remaining", "monthly_quota_remaining", "subscription_start"],
@@ -120,23 +134,28 @@ export default {
         }),
       ]);
 
-      if (!divResult.ok || !subResult.ok
-        || [...divResult.records, ...subResult.records].some(r => !r || typeof r.id !== "string"
-          || !r.fields || typeof r.fields !== "object" || Array.isArray(r.fields))) {
+      if (!newApiRes.ok || !subResult.ok) {
+        return json({ state: "read_error" }, 502);
+      }
+      const newApiData = await newApiRes.json();
+      if (!Array.isArray(newApiData.records)) {
         return json({ state: "read_error" }, 502);
       }
 
-      const records = (divResult.records || []).map(r => {
-        const f = r.fields || {};
-        return {
-          log_id: r.id,
-          ...f,
-          golden_seal: !!f.golden_seal,
-          golden_seal_time: f.golden_seal_time || null,
-          trace_text: f.trace_text || null,
-          trace_at: f.trace_at || null,
-        };
-      });
+      const records = newApiData.records.map(r => ({
+        log_id: r.id,
+        session_id: r.request_id || null,
+        question_text: r.question_text || null,
+        ben_gua: r.ben_gua || null,
+        bian_gua: null, // TODO(部署前補齊):新後端 gua_records 目前沒有 bian_gua 欄位
+        dong_yao: null, // TODO(部署前補齊):新後端 gua_records 目前沒有 dong_yao 欄位
+        qigua_time: r.qigua_time || null,
+        entry_type: "divination",
+        golden_seal: !!r.golden_seal,
+        golden_seal_time: r.golden_seal_time || null,
+        trace_text: r.trace_text || null,
+        trace_at: r.trace_at || null,
+      }));
       const subRec  = (subResult.records || [])[0];
       const sub     = subRec ? subRec.fields : null;
 
@@ -170,47 +189,46 @@ export default {
         return json({ error: e.message }, e.status || 401);
       }
 
-      if (!env.AIRTABLE_API_KEY) {
-        return json({ error: "AIRTABLE_API_KEY not configured" }, 503);
+      if (!MAKE_EXIT_UUID_RE.test(logId)) {
+        return json({ error: "Invalid log_id" }, 400);
+      }
+      if (!env.MAKE_EXIT_API_BASE_URL) {
+        return json({ error: "MAKE_EXIT_API_BASE_URL not configured" }, 503);
       }
 
       let recRes, rec;
       try {
-        recRes = await fetch(
-          `https://api.airtable.com/v0/${AT_BASE}/${AT_DIV_LOG}/${encodeURIComponent(logId)}`,
-          { headers: { "Authorization": "Bearer " + env.AIRTABLE_API_KEY } }
-        );
+        recRes = await fetch(`${env.MAKE_EXIT_API_BASE_URL}/gua-records/${encodeURIComponent(logId)}`);
         if (recRes.ok) rec = await recRes.json();
       } catch (_) { return json({ state: "read_error" }, 502); }
-      if (!recRes.ok) {
-        return json({ record: null }, recRes.status === 404 ? 404 : 502);
+      if (recRes.status === 404) {
+        return json({ record: null }, 404);
       }
-      if (!rec || rec.id !== logId || !rec.fields || typeof rec.fields !== "object" || Array.isArray(rec.fields)) {
+      if (!recRes.ok || !rec || typeof rec !== "object") {
         return json({ state: "read_error" }, 502);
       }
-      const f = rec.fields || {};
 
-      if (f.line_user_id_raw !== verifiedUserId) {
+      if (rec.subject !== verifiedUserId) {
         return json({ record: null }, 403);
       }
 
       return json({
         record: {
           log_id:         rec.id,
-          session_id:     f.session_id     || null,
-          question_text:  f.question_text  || null,
-          ben_gua:        f.ben_gua        || null,
-          bian_gua:       f.bian_gua       || null,
-          dong_yao:       f.dong_yao       || null,
-          qigua_time:     f.qigua_time     || null,
-          entry_type:     f.entry_type     || "divination",
-          output_json:    f.output_json    || null,
-          golden_seal:    !!f.golden_seal,
-          golden_seal_time: f.golden_seal_time || null,
-          trace_text:     f.trace_text     || null,
-          trace_at:       f.trace_at       || null,
-          deep_read_state: f.deep_read_state ?? null,
-          deep_read_output_json: f.deep_read_output_json ?? null,
+          session_id:     rec.request_id   || null,
+          question_text:  rec.question_text || null,
+          ben_gua:        rec.ben_gua      || null,
+          bian_gua:       null, // TODO(部署前補齊):新後端 gua_records 目前沒有 bian_gua 欄位
+          dong_yao:       null, // TODO(部署前補齊):新後端 gua_records 目前沒有 dong_yao 欄位
+          qigua_time:     rec.qigua_time   || null,
+          entry_type:     "divination",
+          output_json:    null, // TODO(部署前補齊):新後端 gua_records 目前沒有保存原始解卦 output_json
+          golden_seal:    !!rec.golden_seal,
+          golden_seal_time: rec.golden_seal_time || null,
+          trace_text:     rec.trace_text   || null,
+          trace_at:       rec.trace_at     || null,
+          deep_read_state: rec.deep_read_state ?? null,
+          deep_read_output_json: rec.deep_read_output_json ?? null,
         },
       });
     }
@@ -295,84 +313,51 @@ export default {
       }
 
       const logId = payloadIsObject ? payload.log_id : undefined;
-      if (typeof logId !== "string" || !/^rec[a-zA-Z0-9]{14}$/.test(logId)) {
+      if (typeof logId !== "string" || !MAKE_EXIT_UUID_RE.test(logId)) {
         return json({ error: "Invalid log_id" }, 400);
       }
 
-      if (!env.AIRTABLE_API_KEY) {
-        return json({ error: "AIRTABLE_API_KEY not configured" }, 503);
+      if (!env.MAKE_EXIT_API_BASE_URL) {
+        return json({ error: "MAKE_EXIT_API_BASE_URL not configured" }, 503);
       }
 
-      let recRes;
+      let recRes, rec;
       try {
-        recRes = await fetch(
-          `https://api.airtable.com/v0/${AT_BASE}/${AT_DIV_LOG}/${encodeURIComponent(logId)}`,
-          { headers: { "Authorization": "Bearer " + env.AIRTABLE_API_KEY } }
-        );
+        recRes = await fetch(`${env.MAKE_EXIT_API_BASE_URL}/gua-records/${encodeURIComponent(logId)}`);
+        if (recRes.ok) rec = await recRes.json();
       } catch (e) {
-        console.log("Airtable seal read failed", e.message || e);
-        return json({ error: "Airtable read failed" }, 502);
+        console.log("New-API seal read failed", e.message || e);
+        return json({ error: "Read failed" }, 502);
       }
 
       if (recRes.status === 404) {
         return json({ record: null }, 404);
       }
-      if (!recRes.ok) {
-        console.log("Airtable seal read failed", recRes.status);
-        return json({ error: "Airtable read failed" }, 502);
+      if (!recRes.ok || !rec) {
+        console.log("New-API seal read failed", recRes.status);
+        return json({ error: "Read failed" }, 502);
       }
 
-      let rec;
-      try {
-        rec = await recRes.json();
-      } catch (e) {
-        console.log("Airtable seal read JSON parse failed", e.message || e);
-        return json({ error: "Airtable read failed" }, 502);
-      }
-
-      const f = rec.fields || {};
-      if (f.line_user_id_raw !== verifiedUserId) {
+      if (rec.subject !== verifiedUserId) {
         return json({ error: "Forbidden" }, 403);
       }
 
-      if (f.golden_seal === true) {
-        if (isValidIsoDateString(f.golden_seal_time)) {
-          return json({ sealed: true, sealed_at: f.golden_seal_time, already_sealed: true });
-        }
-        console.log("Golden seal data anomaly", logId, "missing_or_invalid_golden_seal_time");
-        return json({ sealed: true, sealed_at: null, already_sealed: true });
-      }
-
-      const sealedAt = new Date().toISOString();
-      let patchRes;
+      // 新後端 /gua-records/:id/seal 本身已冪等(已蓋印直接回 already_sealed:true),
+      // 這裡不需要重複判斷 golden_seal 現況再自行分岔,直接轉發、原樣轉發它的判斷結果。
+      let sealRes;
       try {
-        patchRes = await fetch(
-          `https://api.airtable.com/v0/${AT_BASE}/${AT_DIV_LOG}/${encodeURIComponent(logId)}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Authorization": "Bearer " + env.AIRTABLE_API_KEY,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              fields: {
-                golden_seal: true,
-                golden_seal_time: sealedAt,
-              },
-            }),
-          }
-        );
+        sealRes = await fetch(`${env.MAKE_EXIT_API_BASE_URL}/gua-records/${encodeURIComponent(logId)}/seal`, {
+          method: "POST",
+        });
       } catch (e) {
-        console.log("Airtable seal write failed", e.message || e);
-        return json({ error: "Airtable write failed" }, 502);
+        console.log("New-API seal write failed", e.message || e);
+        return json({ error: "Write failed" }, 502);
       }
-
-      if (!patchRes.ok) {
-        console.log("Airtable seal write failed", patchRes.status);
-        return json({ error: "Airtable write failed" }, 502);
+      if (!sealRes.ok) {
+        console.log("New-API seal write failed", sealRes.status);
+        return json({ error: "Write failed" }, 502);
       }
-
-      return json({ sealed: true, sealed_at: sealedAt, already_sealed: false });
+      return json(await sealRes.json());
     }
 
     // S163(E25②):卦記蓋印·補後續 —— TA 事後補寫「後來怎麼走」,
@@ -424,7 +409,7 @@ export default {
       }
 
       const logId = payloadIsObject ? payload.log_id : undefined;
-      if (typeof logId !== "string" || !/^rec[a-zA-Z0-9]{14}$/.test(logId)) {
+      if (typeof logId !== "string" || !MAKE_EXIT_UUID_RE.test(logId)) {
         return json({ state: "failed", error: "Invalid log_id" }, 400);
       }
 
@@ -438,94 +423,55 @@ export default {
         return json({ state: "failed", error: "Invalid trace_text" }, 400);
       }
 
-      if (!env.AIRTABLE_API_KEY) {
-        return json({ state: "failed", error: "AIRTABLE_API_KEY not configured" }, 503);
+      if (!env.MAKE_EXIT_API_BASE_URL) {
+        return json({ state: "failed", error: "MAKE_EXIT_API_BASE_URL not configured" }, 503);
       }
 
-      let recRes;
+      let recRes, rec;
       try {
-        recRes = await fetch(
-          `https://api.airtable.com/v0/${AT_BASE}/${AT_DIV_LOG}/${encodeURIComponent(logId)}`,
-          { headers: { "Authorization": "Bearer " + env.AIRTABLE_API_KEY } }
-        );
+        recRes = await fetch(`${env.MAKE_EXIT_API_BASE_URL}/gua-records/${encodeURIComponent(logId)}`);
+        if (recRes.ok) rec = await recRes.json();
       } catch (e) {
-        return json({ state: "failed", error: "Airtable read failed" }, 502);
+        return json({ state: "failed", error: "Read failed" }, 502);
       }
 
       if (recRes.status === 404) {
         return json({ state: "failed", record: null }, 404);
       }
-      if (!recRes.ok) {
-        console.log("SECURITY_GATE", "AIRTABLE_TRACE_READ_HTTP_ERROR", recRes.status);
-        return json({ state: "failed", error: "Airtable read failed" }, 502);
+      if (!recRes.ok || !rec) {
+        console.log("SECURITY_GATE", "NEW_API_TRACE_READ_HTTP_ERROR", recRes.status);
+        return json({ state: "failed", error: "Read failed" }, 502);
       }
-
-      let rec;
-      try {
-        rec = await recRes.json();
-      } catch (e) {
-        return json({ state: "failed", error: "Airtable read failed" }, 502);
-      }
-
-      if (!rec || rec.id !== logId || !rec.fields || typeof rec.fields !== "object" || Array.isArray(rec.fields)) {
-        return json({ state: "failed", error: "Airtable read failed" }, 502);
-      }
-      const f = rec.fields;
-      if (f.line_user_id_raw !== verifiedUserId) {
+      if (rec.subject !== verifiedUserId) {
         return json({ state: "failed", error: "Forbidden" }, 403);
       }
-      if ((f.entry_type || "divination") !== "divination") {
-        return json({ state: "failed", record: null }, 404);
-      }
 
-      if (f.trace_text != null && typeof f.trace_text !== "string") {
-        return json({ state: "failed", error: "Invalid stored trace" }, 502);
+      // 冪等/append/寫後 readback-verify 的邏輯本身已經搬進新後端的
+      // POST /gua-records/:id/trace(用 (gua_record_id, request_id) 正規化表當冪等鍵，
+      // 見 backend/src/server.js traceGuaRecord())；Worker 這裡只需要單純轉發+把回應
+      // 重新包裝成跟舊版一模一樣的對外形狀，不用再自己實作重試/驗證迴圈。
+      let traceRes;
+      try {
+        traceRes = await fetch(`${env.MAKE_EXIT_API_BASE_URL}/gua-records/${encodeURIComponent(logId)}/trace`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ request_id: requestId, trace_text: traceText }),
+        });
+      } catch (e) {
+        return json({ state: "unconfirmed", request_id: requestId }, 202);
       }
-      const tracedAt = new Date().toISOString();
-      const stamp = new Date(Date.parse(tracedAt) + 8 * 3600000).toISOString().replace("Z", "+08:00");
-      const entry = `${stamp} · req:${requestId.toLowerCase()}\n${traceText}`;
-      const recordUrl = `https://api.airtable.com/v0/${AT_BASE}/${AT_DIV_LOG}/${encodeURIComponent(logId)}`;
-      const headers = { "Authorization": "Bearer " + env.AIRTABLE_API_KEY, "Content-Type": "application/json" };
-      const unconfirmed = () => json({ state: "unconfirmed", request_id: requestId }, 202);
-      const confirmed = (fields, savedEntry, idempotent) => json({
-        traced: true, trace_text: fields.trace_text, trace_at: fields.trace_at,
-        request_id: requestId, entry: savedEntry, idempotent,
+      if (traceRes.status === 409) {
+        // 新後端對「同 request_id、不同內容」回 409——跟舊版「重用 ID 但內容不同不算成功」語意一致。
+        return json({ state: "unconfirmed", request_id: requestId }, 202);
+      }
+      if (!traceRes.ok) {
+        return json({ state: "unconfirmed", request_id: requestId }, 202);
+      }
+      const result = await traceRes.json();
+      return json({
+        traced: true, trace_text: result.trace_text, trace_at: result.trace_at,
+        request_id: requestId, idempotent: !!result.idempotent,
       });
-      let current = f;
-      // Hub R1 KNOWN_RESIDUAL: conditional writes are unavailable here. Verification
-      // and one repair reduce the window; they do not serialize devices or prevent a later lost update.
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const oldTrace = current.trace_text || "";
-        const existing = findTraceRequestEntry(oldTrace, requestId);
-        if (existing) {
-          // Reusing an ID for different content must not turn an unrelated entry into success.
-          if (existing.slice(existing.indexOf("\n") + 1) !== traceText) return unconfirmed();
-          return confirmed(current, existing, true);
-        }
-        const next = oldTrace ? oldTrace + "\n---\n" + entry : entry;
-        try {
-          const patchRes = await fetch(recordUrl, {
-            method: "PATCH", headers,
-            body: JSON.stringify({ fields: { trace_text: next, trace_at: tracedAt } }),
-          });
-          // Once PATCH was attempted, a transport/status error does not prove no write occurred.
-          if (!patchRes.ok) return unconfirmed();
-          const verifyRes = await fetch(recordUrl, { headers, cache: "no-store" });
-          if (!verifyRes.ok) return unconfirmed();
-          const verified = await verifyRes.json();
-          if (!verified || verified.id !== logId || !verified.fields
-            || verified.fields.line_user_id_raw !== verifiedUserId
-            || (verified.fields.entry_type || "divination") !== "divination"
-            || typeof verified.fields.trace_text !== "string") return unconfirmed();
-          current = verified.fields;
-          if (current.trace_text.startsWith(next)
-            && findTraceRequestEntry(current.trace_text, requestId) === entry
-            && (current.trace_text !== next || Date.parse(current.trace_at) === Date.parse(tracedAt))) {
-            return confirmed(current, entry, false);
-          }
-        } catch (_) { return unconfirmed(); }
-      }
-      return unconfirmed();
     }
 
     // S140(E27):深卜/複盤薄代理層 —— 前端只打這裡,Worker 驗完身分才轉發 Make webhook,
@@ -636,69 +582,53 @@ export default {
       }
 
       const logId = payloadIsObject ? payload.log_id : undefined;
-      if (typeof logId !== "string" || !/^rec[a-zA-Z0-9]{14}$/.test(logId)) {
+      if (typeof logId !== "string" || !MAKE_EXIT_UUID_RE.test(logId)) {
         return json({ error: "Invalid log_id" }, 400);
       }
 
-      if (!env.AIRTABLE_API_KEY) {
-        return json({ error: "AIRTABLE_API_KEY not configured" }, 503);
-      }
-      if (!env.HOOK_DEEPDIVE) {
-        return json({ error: "HOOK_DEEPDIVE not configured" }, 503);
+      if (!env.MAKE_EXIT_API_BASE_URL) {
+        return json({ error: "MAKE_EXIT_API_BASE_URL not configured" }, 503);
       }
 
-      let recRes;
+      let recRes, rec;
       try {
-        recRes = await fetch(
-          `https://api.airtable.com/v0/${AT_BASE}/${AT_DIV_LOG}/${encodeURIComponent(logId)}`,
-          { headers: { "Authorization": "Bearer " + env.AIRTABLE_API_KEY } }
-        );
+        recRes = await fetch(`${env.MAKE_EXIT_API_BASE_URL}/gua-records/${encodeURIComponent(logId)}`);
+        if (recRes.ok) rec = await recRes.json();
       } catch (e) {
-        console.log("Airtable deepdive read failed", e.message || e);
-        return json({ error: "Airtable read failed" }, 502);
+        console.log("New-API deepdive read failed", e.message || e);
+        return json({ error: "Read failed" }, 502);
       }
 
       if (recRes.status === 404) {
         return json({ record: null }, 404);
       }
-      if (!recRes.ok) {
-        console.log("Airtable deepdive read failed", recRes.status);
-        return json({ error: "Airtable read failed" }, 502);
+      if (!recRes.ok || !rec) {
+        console.log("New-API deepdive read failed", recRes.status);
+        return json({ error: "Read failed" }, 502);
       }
 
-      let rec;
-      try {
-        rec = await recRes.json();
-      } catch (e) {
-        console.log("Airtable deepdive read JSON parse failed", e.message || e);
-        return json({ error: "Airtable read failed" }, 502);
-      }
-
-      const f = rec.fields || {};
-      if (f.line_user_id_raw !== verifiedUserId) {
+      if (rec.subject !== verifiedUserId) {
         return json({ error: "Forbidden" }, 403);
       }
 
-      const hookPayload = {
-        line_user_id:  verifiedUserId,
-        ben_gua:       f.ben_gua       || "",
-        question_text: f.question_text || "",
-        session_id:    f.session_id    || "",
-      };
-
+      // 舊版轉發到 Make webhook(HOOK_DEEPDIVE),不帶任何冪等鍵，由 Make 自己決定重複觸發怎麼處理。
+      // 新後端的 /deep-read 端點要求 request_id 當冪等鍵；這裡沿用「每次點擊視為一次新觸發意圖」
+      // 的舊語意，用 crypto.randomUUID() 產生一次性 request_id。
+      // TODO(部署前確認):若要做到「同一次點擊只觸發一次」的更強冪等保護，應改成由前端(log.html)
+      // 產生並帶入穩定的 request_id，而不是 Worker 每次都生一個新的。
       try {
-        const hookRes = await fetch(env.HOOK_DEEPDIVE, {
+        const triggerRes = await fetch(`${env.MAKE_EXIT_API_BASE_URL}/gua-records/${encodeURIComponent(logId)}/deep-read`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(hookPayload),
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ request_id: crypto.randomUUID() }),
         });
-        if (!hookRes.ok) {
-          console.log("Deepdive webhook forward failed", hookRes.status);
-          return json({ error: "Webhook forward failed" }, 502);
+        if (!triggerRes.ok && triggerRes.status !== 202 && triggerRes.status !== 200) {
+          console.log("Deepdive trigger forward failed", triggerRes.status);
+          return json({ error: "Trigger forward failed" }, 502);
         }
       } catch (e) {
-        console.log("Deepdive webhook forward failed", e.message || e);
-        return json({ error: "Webhook forward failed" }, 502);
+        console.log("Deepdive trigger forward failed", e.message || e);
+        return json({ error: "Trigger forward failed" }, 502);
       }
 
       return json({ sent: true }, 202);

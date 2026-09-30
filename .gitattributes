@@ -1,0 +1,3 @@
+prompts/jiegua/* -text
+backend/data/*.json -text
+backend/w1-migrations/*.sql text eol=lf

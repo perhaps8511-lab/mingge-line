@@ -1,0 +1,13 @@
+name = "mingge-w1-staging"
+main = "worker.js"
+compatibility_date = "2026-09-21"
+workers_dev = true
+
+[observability]
+enabled = false
+
+[vars]
+W1_ENVIRONMENT = "staging"
+# W1_API_ORIGIN, W1_UI_ORIGIN, LINE_CHANNEL_ID, W1_SUBJECT_KID must be
+# injected from the reviewed staging manifest. Never reuse production keys.
+# Secret: W1_SUBJECT_PRIVATE_KEY_PKCS8 (base64 DER), LINE_CHANNEL_SECRET.
