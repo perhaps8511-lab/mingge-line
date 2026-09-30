@@ -66,7 +66,7 @@ const action = params.get('action'); // divine | log | pay | study | about
     "current_question": "TA 這次想問的、眼前的決定(自由輸入一句)"
   }
   ```
-- **鏈內部邏輯(已查證)**:用 `line_user_id_raw` 撈 `Divination_Log` 最近 **6 筆**、聚合成決策軌跡文字,送進 Dify(app-gJFNCzz61eyUajwBUAsiaVdo,即 v1.7.1 引擎)→ 一樣是 **push 純文字信到 LINE**,非同步回 LIFF。
+- **鏈內部邏輯(已查證)**:用 `line_user_id_raw` 撈 `Divination_Log` 最近 **6 筆**、聚合成決策軌跡文字,送進 Dify(〔已移除：Dify app key（2026-09-30）〕,即 v1.7.1 引擎)→ 一樣是 **push 純文字信到 LINE**,非同步回 LIFF。
 - 🔴 **另一個誠實缺口**:這條 Make 鏈**內部完全沒有 tier 檢查**——它信任呼叫端(不會擋非訂閱戶)。目前設計等於**只靠 LIFF 前端「gated-ii 不顯示按鈕」來擋**,如果有人繞過前端直接打 webhook,後端不會攔。這在正式上線前是一個真實的權限漏洞,建議 Claude Code 在 Worker 層(或 Make 鏈最前面加一個 Airtable 查 `Subscribers.subscriber_tier` 的 Router 分支)補一道後端檢查,不要只靠前端隱藏按鈕。這不是我謹慎過頭,是目前 blueprint 真的這樣寫,查證見上方 module 列表(webhook 直接進 search records,無 router 判斷 tier)。
 - **最小歷史筆數**:規格文件(`mingge_fupan_chain_v0_1.md`)寫明複盤要 ≥2 筆歷史才有意義,但**目前 Make 鏈本身也沒做這個檢查**,不足 2 筆一樣會硬跑(送 0-1 筆軌跡給 Dify,結果品質不可預期)。建議 LIFF 頁面自己先數一下歷史筆數,<2 筆時直接前端擋下,顯示「複盤要先有幾次卜卦的軌跡可連,先去問道幾次再回來複盤」(這句文案 `mingge_fupan_chain_v0_1.md` §5 已經寫好,直接用)。
 
